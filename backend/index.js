@@ -13,8 +13,8 @@ app.use(express.json());
 // Örnek: { "çekiliş": Set { "192.168.1.5", "10.0.0.2" } }
 const reports = {};
 
-// Eşik değeri: 5 farklı kişiden/cihazdan gelirse onaya sun
-const THRESHOLD = 5; 
+// Eşik değeri: 5 farklı kişiden/cihazdan gelirse onaya sun (Şu an test için 1 yapıldı)
+const THRESHOLD = 1; 
 
 // Kesinlikle engellenmesi yasak olan (günlük kullanım) kelimeler karalistesi
 const FORBIDDEN_WORDS = [
