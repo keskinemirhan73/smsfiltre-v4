@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, TextInput, Alert, DeviceEventEmitter } from 'react-native';
-import { ShieldAlert, Brain, Clock, FolderKanban, ShieldCheck, Database, Zap, Network, ListFilter, Globe, AlertTriangle, Info, ChevronRight, ChevronLeft, FileX, Palette, Languages } from 'lucide-react-native';
+import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, TextInput, Alert, DeviceEventEmitter, ActivityIndicator } from 'react-native';
+import { ShieldAlert, Brain, Clock, FolderKanban, ShieldCheck, Database, Zap, Network, ListFilter, Globe, AlertTriangle, Info, ChevronRight, ChevronLeft, FileX, Palette, Languages, Plus, Trash2, CheckCircle2, Server, Key, Phone, Activity } from 'lucide-react-native';
 import { useAppTheme, spacing, radii } from '../theme';
 import { FilterManager, AppSettings } from '../modules/FilterManager';
 import { ThreatCloudService } from '../services/ThreatCloudService';
@@ -12,7 +12,6 @@ export default function SettingsScreen() {
   const [keyword, setKeyword] = useState('');
   const [whitelistNumber, setWhitelistNumber] = useState('');
   
-  // Database Page States
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState('Yükleniyor...');
   useEffect(() => {
@@ -58,7 +57,7 @@ export default function SettingsScreen() {
     await FilterManager.saveSettings(newSettings);
   };
 
-  const updateSetting = async (key: keyof AppSettings, value: string) => {
+  const updateSetting = async (key: keyof AppSettings, value: string | any) => {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings as any);
     await FilterManager.saveSettings(newSettings as any);
@@ -75,6 +74,15 @@ export default function SettingsScreen() {
     await FilterManager.saveSettings(newSettings);
   };
 
+  const TopHeader = ({ title }: { title: string }) => (
+    <View style={styles.headerRow}>
+      <TouchableOpacity onPress={() => setActivePage('main')} style={styles.backBtn} activeOpacity={0.7}>
+        <ChevronLeft color={theme.text} size={28} />
+      </TouchableOpacity>
+      <Text style={[styles.title, { color: theme.text, flex: 1 }]}>{title}</Text>
+    </View>
+  );
+
   if (activePage === 'whitelist') {
     const addNumber = () => {
       if (!whitelistNumber.trim()) return;
@@ -89,37 +97,49 @@ export default function SettingsScreen() {
     
     return (
       <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => setActivePage('main')} style={styles.backBtn}>
-            <ChevronLeft color={theme.text} size={28} />
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: theme.text, flex: 1 }]}>Beyaz Liste (VIP)</Text>
-        </View>
+        <TopHeader title="Beyaz Liste (VIP)" />
         <View style={styles.section}>
           <SectionDesc text="Buraya eklediğiniz numaralar veya kurum adları HİÇBİR güvenlik filtresine takılmaz. Aile üyelerinizi veya bankalarınızı ekleyebilirsiniz." />
-          <View style={{flexDirection: 'row', marginTop: spacing.md, gap: 8}}>
+          
+          <View style={[styles.premiumInputContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Phone size={20} color={theme.textMuted} style={{ marginLeft: 12 }} />
             <TextInput 
-              style={[styles.input, { flex: 1, backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
-              placeholder="Numara / İsim (Örn: +90555... veya GARANTI)"
+              style={[styles.premiumInput, { color: theme.text }]}
+              placeholder="Numara veya İsim (Örn: +90555... veya GARANTI)"
               placeholderTextColor={theme.textMuted}
               value={whitelistNumber}
               onChangeText={setWhitelistNumber}
             />
             <TouchableOpacity 
-              style={{ backgroundColor: theme.primary, justifyContent: 'center', paddingHorizontal: 16, borderRadius: radii.md }}
+              style={[styles.premiumAddBtn, { backgroundColor: theme.primary, opacity: whitelistNumber.trim() ? 1 : 0.6 }]}
               onPress={addNumber}
+              disabled={!whitelistNumber.trim()}
             >
-              <Text style={{color: '#fff', fontWeight: '700'}}>Ekle</Text>
+              <Plus size={20} color="#fff" />
             </TouchableOpacity>
           </View>
           
-          <View style={{flexDirection: 'column', marginTop: spacing.lg, gap: 8}}>
-            {(settings.whitelist || []).map(num => (
-              <View key={`wl-${num}`} style={{flexDirection: 'row', backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1, borderRadius: radii.md, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'space-between'}}>
-                <Text style={{color: theme.text, fontSize: 16, fontWeight: '600'}}>{num}</Text>
-                <TouchableOpacity onPress={() => removeNumber(num)} style={{padding: 4}}><FileX size={20} color={theme.danger} /></TouchableOpacity>
+          <View style={{flexDirection: 'column', marginTop: spacing.xl, gap: spacing.sm}}>
+            <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: spacing.xs }]}>Güvenli Numara ve Kurumlar</Text>
+            
+            {(!settings.whitelist || settings.whitelist.length === 0) ? (
+              <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <ShieldCheck size={40} color={theme.border} style={{ marginBottom: spacing.md }} />
+                <Text style={{ color: theme.textMuted, fontSize: 14, textAlign: 'center' }}>Beyaz listenizde hiç numara yok.</Text>
               </View>
-            ))}
+            ) : (
+              (settings.whitelist || []).map(num => (
+                <View key={`wl-${num}`} style={[styles.listItem, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  <View style={[styles.listIcon, { backgroundColor: 'rgba(16,185,129,0.1)' }]}>
+                    <ShieldCheck size={18} color="#10B981" />
+                  </View>
+                  <Text style={[styles.listText, { color: theme.text }]}>{num}</Text>
+                  <TouchableOpacity onPress={() => removeNumber(num)} style={styles.deleteBtn}>
+                    <Trash2 size={18} color={theme.danger} />
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
           </View>
         </View>
       </ScrollView>
@@ -129,12 +149,7 @@ export default function SettingsScreen() {
   if (activePage === 'schedule') {
     return (
       <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => setActivePage('main')} style={styles.backBtn}>
-            <ChevronLeft color={theme.text} size={28} />
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: theme.text, flex: 1 }]}>Zaman Programı</Text>
-        </View>
+        <TopHeader title="Zaman Programı" />
         <View style={styles.section}>
           <SettingRow
             icon={Clock}
@@ -209,7 +224,7 @@ export default function SettingsScreen() {
                     {cat === 'junk' ? 'İstenmeyen (Junk)' : cat === 'transaction' ? 'İşlemler (Transactions)' : cat === 'promotion' ? 'Tanıtımlar (Promotions)' : 'Gelen Kutusu (İzin Ver)'}
                   </Text>
                 </View>
-                {isSelected && <ShieldCheck size={20} color={theme.primary} />}
+                {isSelected && <CheckCircle2 size={20} color={theme.primary} />}
               </TouchableOpacity>
             )
           })}
@@ -219,12 +234,7 @@ export default function SettingsScreen() {
 
     return (
       <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => setActivePage('main')} style={styles.backBtn}>
-            <ChevronLeft color={theme.text} size={28} />
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: theme.text, flex: 1 }]}>Kategori Eşleme</Text>
-        </View>
+        <TopHeader title="Kategori Eşleme" />
         <View style={styles.section}>
           <SectionDesc text="SMS Filtresi uygulamasının tespit ettiği mesajların, Apple Mesajlar uygulamasındaki hangi klasörlere gönderileceğini belirleyin." />
           <View style={{height: 24}} />
@@ -251,12 +261,7 @@ export default function SettingsScreen() {
     
     return (
       <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => setActivePage('main')} style={styles.backBtn}>
-            <ChevronLeft color={theme.text} size={28} />
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: theme.text, flex: 1 }]}>Dolandırıcılık Filtresi</Text>
-        </View>
+        <TopHeader title="Dolandırıcılık Filtresi" />
         <View style={styles.section}>
           <SettingRow
             icon={ShieldAlert}
@@ -267,32 +272,41 @@ export default function SettingsScreen() {
           />
           <SectionDesc text="Bu özellik Spam ve Tehdit Veritabanı'nın bir parçasıdır." />
           
-          <View style={{height: 24}}/>
-          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Hassas Kelime Avcısı</Text>
+          <View style={{height: spacing.xl}}/>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Hassas Kelime Avcısı</Text>
           <SectionDesc text="Aşağıdaki kelimelerden herhangi birini içeren mesajlar tehlikeli kabul edilir ve anında filtrelenir." />
-          <View style={{flexDirection: 'row', marginTop: spacing.md, gap: 8}}>
+          
+          <View style={[styles.premiumInputContainer, { backgroundColor: theme.card, borderColor: theme.border, marginTop: spacing.md }]}>
+            <Key size={20} color={theme.textMuted} style={{ marginLeft: 12 }} />
             <TextInput 
-              style={[styles.input, { flex: 1, backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
+              style={[styles.premiumInput, { color: theme.text }]}
               placeholder="Yeni kelime (Örn: Şifre, Banka)"
               placeholderTextColor={theme.textMuted}
               value={keyword}
               onChangeText={setKeyword}
             />
             <TouchableOpacity 
-              style={{ backgroundColor: theme.primary, justifyContent: 'center', paddingHorizontal: 16, borderRadius: radii.md }}
+              style={[styles.premiumAddBtn, { backgroundColor: theme.primary, opacity: keyword.trim() ? 1 : 0.6 }]}
               onPress={addKeyword}
+              disabled={!keyword.trim()}
             >
-              <Text style={{color: '#fff', fontWeight: '700'}}>Ekle</Text>
+              <Plus size={20} color="#fff" />
             </TouchableOpacity>
           </View>
           
-          <View style={{flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.lg, gap: 8}}>
-            {(settings.customFraudKeywords || []).map(kw => (
-              <View key={`kw-${kw}`} style={{flexDirection: 'row', backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1, borderRadius: 100, paddingVertical: 6, paddingHorizontal: 12, alignItems: 'center'}}>
-                <Text style={{color: theme.text, fontSize: 13, marginRight: 8}}>{kw}</Text>
-                <TouchableOpacity onPress={() => removeKeyword(kw)}><FileX size={14} color={theme.danger} /></TouchableOpacity>
-              </View>
-            ))}
+          <View style={{flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.xl, gap: spacing.sm}}>
+            {(settings.customFraudKeywords || []).length === 0 ? (
+               <Text style={{ color: theme.textMuted, fontSize: 14 }}>Özel dolandırıcılık kelimesi eklenmemiş.</Text>
+            ) : (
+              (settings.customFraudKeywords || []).map(kw => (
+                <View key={`kw-${kw}`} style={[styles.tagItem, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' }]}>
+                  <Text style={{color: theme.danger, fontSize: 14, fontWeight: '600', marginRight: 6}}>{kw}</Text>
+                  <TouchableOpacity onPress={() => removeKeyword(kw)}>
+                    <X size={16} color={theme.danger} />
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
           </View>
         </View>
       </ScrollView>
@@ -314,12 +328,7 @@ export default function SettingsScreen() {
 
     return (
       <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => setActivePage('main')} style={styles.backBtn}>
-            <ChevronLeft color={theme.text} size={28} />
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: theme.text, flex: 1 }]}>Veritabanı Filtresi</Text>
-        </View>
+        <TopHeader title="Veritabanı Filtresi" />
         <View style={styles.section}>
           <SettingRow
             icon={Database}
@@ -330,21 +339,35 @@ export default function SettingsScreen() {
           />
           <SectionDesc text="Bulut tabanlı tehdit veritabanı korumasını aktif eder. Sistem arka planda en güncel tehditleri otomatik olarak indirir." />
           
-          <View style={{height: 24}}/>
-          <View style={[styles.settingCard, { backgroundColor: theme.card, borderColor: theme.border, flexDirection: 'column', alignItems: 'stretch' }]}>
-            <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md}}>
-              <Zap color={theme.secondary} size={24} style={{marginRight: 12}} />
-              <View>
-                <Text style={{color: theme.text, fontSize: 16, fontWeight: '700'}}>Güncelleme Durumu</Text>
-                <Text style={{color: theme.secondary, fontSize: 13, marginTop: 2}}>Son Güncelleme: {lastSync}</Text>
+          <View style={{height: spacing.xl}}/>
+          
+          <View style={[styles.dbCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={styles.dbHeader}>
+              <View style={[styles.dbIconWrapper, { backgroundColor: 'rgba(59,130,246,0.1)' }]}>
+                <Server color={theme.primary} size={28} />
+              </View>
+              <View style={styles.dbInfo}>
+                <Text style={[styles.dbTitle, { color: theme.text }]}>Bulut Eşitlemesi</Text>
+                <Text style={[styles.dbSubtitle, { color: theme.textMuted }]}>
+                  Son Güncelleme: {lastSync}
+                </Text>
               </View>
             </View>
+            
             <TouchableOpacity 
-              style={{ backgroundColor: isSyncing ? theme.border : theme.primary, paddingVertical: 12, borderRadius: radii.md, alignItems: 'center' }}
+              style={[styles.dbSyncBtn, { backgroundColor: isSyncing ? theme.border : theme.primary }]}
               onPress={handleSync}
               disabled={isSyncing}
+              activeOpacity={0.8}
             >
-              <Text style={{color: isSyncing ? theme.textMuted : '#fff', fontWeight: '700', fontSize: 15}}>{isSyncing ? 'Buluta Bağlanılıyor...' : 'Buluttan Şimdi Güncelle'}</Text>
+              {isSyncing ? (
+                <ActivityIndicator color={theme.textMuted} size="small" />
+              ) : (
+                <Globe color="#fff" size={20} />
+              )}
+              <Text style={[styles.dbSyncBtnText, { color: isSyncing ? theme.textMuted : '#fff' }]}>
+                {isSyncing ? 'Eşitleniyor...' : 'Şimdi Eşitle'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -353,49 +376,53 @@ export default function SettingsScreen() {
   }
 
   if (activePage === 'proactive') {
+    const aiLevels = [
+      { val: 0.9, label: 'Düşük', desc: 'Sadece kesinlikle emin olduğunda engeller.', color: '#10B981' },
+      { val: 0.8, label: 'Orta', desc: 'Dengeli koruma sağlar (Önerilen).', color: theme.primary },
+      { val: 0.6, label: 'Yüksek', desc: 'Şüpheli bulduğu her mesajı engeller.', color: theme.danger }
+    ];
+
     return (
       <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => setActivePage('main')} style={styles.backBtn}>
-            <ChevronLeft color={theme.text} size={28} />
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: theme.text, flex: 1 }]}>Proaktif Filtre</Text>
-        </View>
+        <TopHeader title="Proaktif Filtre" />
         <View style={styles.section}>
           <SettingRow
-            icon={ShieldCheck}
+            icon={Activity}
             iconColor={theme.primary}
-            title="Aktif Et"
+            title="Yapay Zeka (AI) Aktif"
             value={settings.proactiveFilter}
             onToggle={() => toggleSetting('proactiveFilter')}
-            trackTrue={theme.secondary}
+            trackTrue={theme.primary}
           />
-          <SectionDesc text="Makine öğrenmesi tabanlı Olasılık Algoritması ile en saldırgan spam mesajlar anında filtrelenir." />
+          <SectionDesc text="Makine öğrenmesi tabanlı Olasılık Algoritması ile henüz bilinmeyen, yeni nesil spam mesajları analiz eder ve anında filtrelenir." />
           
-          <View style={{height: 24}}/>
-          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Yapay Zeka Hassasiyeti</Text>
+          <View style={{height: spacing.xl}}/>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>AI Hassasiyeti</Text>
           <SectionDesc text="Filtrenin şüpheli mesajları engellerken ne kadar katı davranacağını seçin." />
           
-          <View style={{marginTop: spacing.md}}>
-            {[
-              { val: 0.9, label: 'Düşük (Sadece Çok Emin Olduğunda)' },
-              { val: 0.8, label: 'Orta (Dengeli - Önerilen)' },
-              { val: 0.6, label: 'Yüksek (Şüphelendiği Her Şeyi Engeller)' }
-            ].map(lvl => (
-              <TouchableOpacity
-                key={`lvl-${lvl.val}`}
-                style={[
-                  styles.settingCard, 
-                  { backgroundColor: settings.aiSensitivity === lvl.val ? `${theme.primary}10` : theme.card, borderColor: settings.aiSensitivity === lvl.val ? theme.primary : theme.border }
-                ]}
-                onPress={() => updateSetting('aiSensitivity', lvl.val as any)}
-              >
-                <View style={{width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: settings.aiSensitivity === lvl.val ? theme.primary : theme.border, marginRight: 12, alignItems: 'center', justifyContent: 'center'}}>
-                  {settings.aiSensitivity === lvl.val && <View style={{width: 10, height: 10, borderRadius: 5, backgroundColor: theme.primary}} />}
-                </View>
-                <Text style={{color: theme.text, fontSize: 14, fontWeight: '500'}}>{lvl.label}</Text>
-              </TouchableOpacity>
-            ))}
+          <View style={{marginTop: spacing.md, gap: spacing.sm}}>
+            {aiLevels.map(lvl => {
+              const isSelected = settings.aiSensitivity === lvl.val;
+              return (
+                <TouchableOpacity
+                  key={`lvl-${lvl.val}`}
+                  style={[
+                    styles.aiLevelCard, 
+                    { backgroundColor: theme.card, borderColor: isSelected ? lvl.color : theme.border }
+                  ]}
+                  onPress={() => updateSetting('aiSensitivity', lvl.val as any)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.aiRadioOuter, { borderColor: isSelected ? lvl.color : theme.border }]}>
+                    {isSelected && <View style={[styles.aiRadioInner, { backgroundColor: lvl.color }]} />}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.aiLevelTitle, { color: isSelected ? lvl.color : theme.text }]}>{lvl.label}</Text>
+                    <Text style={[styles.aiLevelDesc, { color: theme.textMuted }]}>{lvl.desc}</Text>
+                  </View>
+                </TouchableOpacity>
+              )
+            })}
           </View>
         </View>
       </ScrollView>
@@ -405,12 +432,7 @@ export default function SettingsScreen() {
   if (activePage === 'invalidNumber') {
     return (
       <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => setActivePage('main')} style={styles.backBtn}>
-            <ChevronLeft color={theme.text} size={28} />
-          </TouchableOpacity>
-          <Text style={[styles.title, { color: theme.text, flex: 1 }]}>Geçersiz Numara Filtresi</Text>
-        </View>
+        <TopHeader title="Geçersiz Numara Filtresi" />
         <View style={styles.section}>
           <SettingRow
             icon={Info}
@@ -421,9 +443,9 @@ export default function SettingsScreen() {
           />
           <SectionDesc text="Gönderici numarasının doğruluğu ve formatı kontrol edilir." />
           
-          <View style={{height: 24}}/>
+          <View style={{height: spacing.xl}}/>
           <SettingRow
-            icon={ShieldAlert}
+            icon={AlertTriangle}
             iconColor={theme.danger}
             title="Yurtdışı Numaralarını Engelle"
             value={settings.blockForeignNumbers}
@@ -436,161 +458,90 @@ export default function SettingsScreen() {
     );
   }
 
+  // --- MAIN SETTINGS PAGE ---
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={styles.header}>
         <Text style={[styles.title, { color: theme.text }]}>{t.settings}</Text>
       </View>
       
-      {/* Görünüm ve Dil */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>{t.appearance}</Text>
-        
-        <View style={[styles.settingCard, { backgroundColor: theme.card, borderColor: theme.border, marginBottom: 8 }]}>
-          <View style={styles.settingIcon}>
-            <Languages size={22} color={theme.primary} />
-          </View>
-          <View style={styles.settingContent}>
-            <Text style={[styles.settingTitle, { color: theme.text }]}>{t.language}</Text>
-          </View>
-          <View style={{flexDirection: 'row', backgroundColor: theme.background, borderRadius: 8, padding: 4}}>
-            <TouchableOpacity onPress={() => updateSetting('language', 'tr')} style={{paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, backgroundColor: settings.language === 'tr' ? theme.primary : 'transparent'}}>
-              <Text style={{color: settings.language === 'tr' ? '#fff' : theme.textMuted, fontWeight: 'bold'}}>TR</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => updateSetting('language', 'en')} style={{paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, backgroundColor: settings.language === 'en' ? theme.primary : 'transparent'}}>
-              <Text style={{color: settings.language === 'en' ? '#fff' : theme.textMuted, fontWeight: 'bold'}}>EN</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={[styles.settingCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={styles.settingIcon}>
-            <Palette size={22} color={theme.primary} />
-          </View>
-          <View style={styles.settingContent}>
-            <Text style={[styles.settingTitle, { color: theme.text }]}>{t.theme}</Text>
-          </View>
-          <View style={{flexDirection: 'row', backgroundColor: theme.background, borderRadius: 8, padding: 4}}>
-            {(['system', 'light', 'dark'] as const).map((thm) => (
-              <TouchableOpacity key={thm} onPress={() => updateSetting('theme', thm)} style={{paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, backgroundColor: settings.theme === thm ? theme.primary : 'transparent'}}>
-                <Text style={{color: settings.theme === thm ? '#fff' : theme.textMuted, fontWeight: 'bold', textTransform: 'capitalize'}}>{t[thm] || thm}</Text>
+        <View style={[styles.settingGroupCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={styles.settingGroupItem}>
+            <View style={styles.settingIcon}><Languages size={22} color={theme.primary} /></View>
+            <View style={styles.settingContent}><Text style={[styles.settingTitle, { color: theme.text }]}>{t.language}</Text></View>
+            <View style={{flexDirection: 'row', backgroundColor: theme.background, borderRadius: radii.md, padding: 4}}>
+              <TouchableOpacity onPress={() => updateSetting('language', 'tr')} style={[styles.toggleBtn, settings.language === 'tr' && { backgroundColor: theme.primary }]}>
+                <Text style={{color: settings.language === 'tr' ? '#fff' : theme.textMuted, fontWeight: 'bold'}}>TR</Text>
               </TouchableOpacity>
-            ))}
+              <TouchableOpacity onPress={() => updateSetting('language', 'en')} style={[styles.toggleBtn, settings.language === 'en' && { backgroundColor: theme.primary }]}>
+                <Text style={{color: settings.language === 'en' ? '#fff' : theme.textMuted, fontWeight: 'bold'}}>EN</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          <View style={[styles.separator, { backgroundColor: theme.border }]} />
+          <View style={styles.settingGroupItem}>
+            <View style={styles.settingIcon}><Palette size={22} color={theme.primary} /></View>
+            <View style={styles.settingContent}><Text style={[styles.settingTitle, { color: theme.text }]}>{t.theme}</Text></View>
+            <View style={{flexDirection: 'row', backgroundColor: theme.background, borderRadius: radii.md, padding: 4}}>
+              {(['system', 'light', 'dark'] as const).map((thm) => (
+                <TouchableOpacity key={thm} onPress={() => updateSetting('theme', thm)} style={[styles.toggleBtn, settings.theme === thm && { backgroundColor: theme.primary }]}>
+                  <Text style={{color: settings.theme === thm ? '#fff' : theme.textMuted, fontWeight: 'bold', textTransform: 'capitalize'}}>{t[thm] || thm}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         </View>
       </View>
 
-      {/* Akıllı Filtre */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>{t.smartFilter}</Text>
-        <SettingRow
-          icon={Brain}
-          iconColor={theme.primary}
-          title={t.smartFilter}
-          value={settings.smartFilter}
-          onToggle={() => toggleSetting('smartFilter')}
-        />
+        <SettingRow icon={Brain} iconColor={theme.primary} title={t.smartFilter} value={settings.smartFilter} onToggle={() => toggleSetting('smartFilter')} />
         <SectionDesc text={t.smartFilterDesc} />
       </View>
 
-      {/* Kişisel Korumalar */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>{t.personalProtections}</Text>
-        <SettingRow
-          icon={ShieldCheck}
-          iconColor="#10B981"
-          title={t.whitelist}
-          isNav
-          onPress={() => setActivePage('whitelist')}
-        />
+        <SettingRow icon={ShieldCheck} iconColor="#10B981" title={t.whitelist} isNav onPress={() => setActivePage('whitelist')} />
         <SectionDesc text={t.whitelistDesc} />
       </View>
 
-      {/* Yabancı Alfabe ve Yurtdışı */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>{t.intlFilter}</Text>
-        <SettingRow
-          icon={Globe}
-          iconColor={theme.primary}
-          title={t.blockForeign}
-          desc="Türkiye (+90) dışından gelen SMS'leri engeller"
-          value={settings.blockForeignNumbers}
-          onToggle={() => toggleSetting('blockForeignNumbers')}
-        />
-        <View style={{height: 12}} />
-        <SettingRow
-          icon={AlertTriangle}
-          iconColor="#F59E0B"
-          title={t.blockArabic}
-          desc="Arapça karakter içeren SMS'leri engeller"
-          value={settings.blockArabic}
-          onToggle={() => toggleSetting('blockArabic')}
-        />
+        <View style={[styles.settingGroupCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <SettingRow icon={Globe} iconColor={theme.primary} title={t.blockForeign} value={settings.blockForeignNumbers} onToggle={() => toggleSetting('blockForeignNumbers')} isGrouped />
+          <View style={[styles.separator, { backgroundColor: theme.border }]} />
+          <SettingRow icon={AlertTriangle} iconColor="#F59E0B" title={t.blockArabic} value={settings.blockArabic} onToggle={() => toggleSetting('blockArabic')} isGrouped />
+        </View>
         <SectionDesc text={t.intlDesc} />
       </View>
 
-      {/* Diğer Filtreler */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>{t.otherFilters}</Text>
-        <SettingRow
-          icon={Clock}
-          iconColor="#8B5CF6"
-          title={t.schedule}
-          isNav
-          onPress={() => setActivePage('schedule')}
-        />
-        <SettingRow
-          icon={ListFilter}
-          iconColor="#EC4899"
-          title={t.mapping}
-          isNav
-          onPress={() => setActivePage('mapping')}
-        />
-        <SettingRow
-          icon={ShieldAlert}
-          iconColor="#EF4444"
-          title={t.fraud}
-          isNav
-          onPress={() => setActivePage('fraud')}
-        />
-        <SettingRow
-          icon={Database}
-          iconColor="#3B82F6"
-          title={t.database}
-          isNav
-          onPress={() => setActivePage('database')}
-        />
-        <SettingRow
-          icon={Zap}
-          iconColor="#10B981"
-          title={t.proactive}
-          isNav
-          onPress={() => setActivePage('proactive')}
-        />
+        <View style={[styles.settingGroupCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <SettingRow icon={Clock} iconColor="#8B5CF6" title={t.schedule} isNav onPress={() => setActivePage('schedule')} isGrouped />
+          <View style={[styles.separator, { backgroundColor: theme.border }]} />
+          <SettingRow icon={ListFilter} iconColor="#EC4899" title={t.mapping} isNav onPress={() => setActivePage('mapping')} isGrouped />
+          <View style={[styles.separator, { backgroundColor: theme.border }]} />
+          <SettingRow icon={ShieldAlert} iconColor="#EF4444" title={t.fraud} isNav onPress={() => setActivePage('fraud')} isGrouped />
+          <View style={[styles.separator, { backgroundColor: theme.border }]} />
+          <SettingRow icon={Database} iconColor="#3B82F6" title={t.database} isNav onPress={() => setActivePage('database')} isGrouped />
+          <View style={[styles.separator, { backgroundColor: theme.border }]} />
+          <SettingRow icon={Activity} iconColor="#10B981" title={t.proactive} isNav onPress={() => setActivePage('proactive')} isGrouped />
+        </View>
       </View>
 
-      {/* Tehlikeli Bölge */}
-      <View style={[styles.section, { marginBottom: 40 }]}>
+      <View style={[styles.section, { marginBottom: 60 }]}>
         <Text style={[styles.sectionTitle, { color: theme.danger }]}>{t.dangerZone}</Text>
         <SettingRow
-          icon={Network}
-          iconColor={theme.danger}
-          title={t.underAttack}
-          value={settings.underAttackMode}
+          icon={Network} iconColor={theme.danger} title={t.underAttack} value={settings.underAttackMode} danger
           onToggle={() => {
             if (!settings.underAttackMode) {
-              Alert.alert(
-                t.underAttack,
-                t.underAttackDesc,
-                [
-                  { text: 'İptal', style: 'cancel' },
-                  { 
-                    text: 'Aktifleştir', 
-                    style: 'destructive',
-                    onPress: () => toggleSetting('underAttackMode')
-                  }
-                ]
-              );
+              Alert.alert(t.underAttack, t.underAttackDesc, [
+                { text: 'İptal', style: 'cancel' },
+                { text: 'Aktifleştir', style: 'destructive', onPress: () => toggleSetting('underAttackMode') }
+              ]);
             } else {
               toggleSetting('underAttackMode');
             }
@@ -605,20 +556,22 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { padding: spacing.lg, paddingTop: spacing.xl },
-  headerRow: { padding: spacing.lg, paddingTop: spacing.xl, flexDirection: 'row', alignItems: 'center' },
+  headerRow: { padding: spacing.lg, paddingTop: spacing.xl, flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
   backBtn: { padding: 4, marginRight: spacing.sm, marginLeft: -8 },
-  title: { fontSize: 28, fontWeight: '800' },
+  title: { fontSize: 32, fontWeight: '800', letterSpacing: -0.5 },
+  
   section: { paddingHorizontal: spacing.lg, marginBottom: spacing.xl },
-  sectionTitle: {
-    fontSize: 16, fontWeight: '700', marginBottom: spacing.md,
-  },
-  sectionDesc: {
-    fontSize: 13, lineHeight: 18, marginTop: spacing.sm, paddingHorizontal: 4
-  },
+  sectionTitle: { fontSize: 14, fontWeight: '700', marginBottom: spacing.md, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionDesc: { fontSize: 13, lineHeight: 18, marginTop: spacing.sm, paddingHorizontal: 4 },
+  
   settingCard: {
-    flexDirection: 'row', borderRadius: radii.lg, padding: spacing.md,
+    flexDirection: 'row', borderRadius: radii.xl, padding: spacing.md,
     alignItems: 'center', borderWidth: 1, marginBottom: 4,
   },
+  settingGroupCard: { borderRadius: radii.xl, borderWidth: 1, overflow: 'hidden' },
+  settingGroupItem: { flexDirection: 'row', padding: spacing.md, alignItems: 'center' },
+  separator: { height: 1, marginLeft: 56 },
+  
   settingIcon: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center', marginRight: spacing.sm },
   settingContent: { flex: 1, marginRight: spacing.sm, justifyContent: 'center' },
   settingTitle: { fontSize: 16, fontWeight: '600' },
@@ -627,51 +580,57 @@ const styles = StyleSheet.create({
   navAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   navValue: { fontSize: 15 },
   
-  proBadge: {
-    backgroundColor: '#6366f1',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginLeft: 8,
+  toggleBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radii.sm },
+  
+  premiumInputContainer: {
+    flexDirection: 'row', alignItems: 'center', height: 56,
+    borderRadius: radii.lg, borderWidth: 1, overflow: 'hidden'
   },
-  proText: { color: 'white', fontSize: 10, fontWeight: '800' },
+  premiumInput: { flex: 1, fontSize: 16, paddingHorizontal: spacing.md, height: '100%' },
+  premiumAddBtn: { width: 56, height: '100%', justifyContent: 'center', alignItems: 'center' },
 
-  inputLabel: { fontSize: 14, fontWeight: '600', marginBottom: 8, marginLeft: 4 },
-  input: { borderWidth: 1, borderRadius: radii.md, padding: spacing.md, fontSize: 16 },
+  emptyCard: { padding: spacing.xxl, borderRadius: radii.xl, borderWidth: 1, alignItems: 'center' },
+  listItem: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radii.lg, borderWidth: 1 },
+  listIcon: { width: 36, height: 36, borderRadius: radii.md, justifyContent: 'center', alignItems: 'center', marginRight: spacing.sm },
+  listText: { flex: 1, fontSize: 16, fontWeight: '600' },
+  deleteBtn: { padding: spacing.sm },
 
-  mappingGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  mappingBtn: {
-    paddingHorizontal: 16, paddingVertical: 12, borderRadius: radii.md, borderWidth: 1,
-    borderColor: '#e5e7eb', backgroundColor: '#fff',
-  },
-  mappingText: { fontSize: 14, fontWeight: '600' },
+  tagItem: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: radii.full, borderWidth: 1 },
+  
+  dbCard: { borderRadius: radii.xl, borderWidth: 1, padding: spacing.xl },
+  dbHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xl },
+  dbIconWrapper: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginRight: spacing.md },
+  dbInfo: { flex: 1 },
+  dbTitle: { fontSize: 18, fontWeight: '700', marginBottom: 4 },
+  dbSubtitle: { fontSize: 13 },
+  dbSyncBtn: { flexDirection: 'row', height: 56, borderRadius: radii.lg, justifyContent: 'center', alignItems: 'center', gap: 8 },
+  dbSyncBtnText: { fontSize: 16, fontWeight: '700' },
+
+  aiLevelCard: { flexDirection: 'row', alignItems: 'center', padding: spacing.lg, borderRadius: radii.xl, borderWidth: 1 },
+  aiRadioOuter: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, justifyContent: 'center', alignItems: 'center', marginRight: spacing.md },
+  aiRadioInner: { width: 12, height: 12, borderRadius: 6 },
+  aiLevelTitle: { fontSize: 16, fontWeight: '700', marginBottom: 2 },
+  aiLevelDesc: { fontSize: 13 }
 });
 
-const SettingRow = ({ icon: Icon, iconColor, title, desc, value, onToggle, trackTrue, danger, isNav, isPro, onPress }: any) => {
+const SettingRow = ({ icon: Icon, iconColor, title, desc, value, onToggle, trackTrue, danger, isNav, isGrouped, onPress }: any) => {
   const theme = useAppTheme();
   const Wrapper = onPress ? TouchableOpacity : (View as any);
   return (
     <Wrapper 
       onPress={onPress}
       style={[
-        styles.settingCard,
-        { backgroundColor: theme.card, borderColor: theme.border },
-        danger && value && { borderColor: 'rgba(239,68,68,0.5)', backgroundColor: 'rgba(239,68,68,0.08)' },
-        isNav && { paddingVertical: spacing.md }
+        isGrouped ? styles.settingGroupItem : styles.settingCard,
+        !isGrouped && { backgroundColor: theme.card, borderColor: theme.border },
+        danger && value && !isGrouped && { borderColor: 'rgba(239,68,68,0.5)', backgroundColor: 'rgba(239,68,68,0.08)' },
+        isNav && !isGrouped && { paddingVertical: spacing.md }
       ]}
     >
       <View style={styles.settingIcon}>
-        <Icon color={iconColor || theme.textMuted} size={22} />
+        <Icon color={iconColor || theme.textMuted} size={24} />
       </View>
       <View style={styles.settingContent}>
-        <View style={{flexDirection: 'row', alignItems: 'center'}}>
-          <Text style={[styles.settingTitle, { color: theme.text }]}>{title}</Text>
-          {isPro && (
-            <View style={styles.proBadge}>
-              <Text style={styles.proText}>PRO</Text>
-            </View>
-          )}
-        </View>
+        <Text style={[styles.settingTitle, { color: danger && value ? theme.danger : theme.text }]}>{title}</Text>
         {desc && <Text style={[styles.settingDesc, { color: theme.textMuted }]}>{desc}</Text>}
       </View>
       {onToggle && !isNav && (
@@ -691,17 +650,9 @@ const SettingRow = ({ icon: Icon, iconColor, title, desc, value, onToggle, track
   );
 };
 
-const SectionDesc = ({ text, isProInfo }: { text: string, isProInfo?: boolean }) => {
+const SectionDesc = ({ text }: { text: string }) => {
   const theme = useAppTheme();
   return (
-    <Text style={[styles.sectionDesc, { color: theme.textMuted }]}>
-      {isProInfo ? (
-        <Text>
-          <Text style={{color: theme.text}}>{text.split('Pro Paket')[0]}</Text>
-          <Text style={{fontWeight: '700', color: theme.text}}>Pro Paket</Text>
-          <Text style={{color: theme.text}}>{text.split('Pro Paket')[1]}</Text>
-        </Text>
-      ) : text}
-    </Text>
+    <Text style={[styles.sectionDesc, { color: theme.textMuted }]}>{text}</Text>
   );
 };
