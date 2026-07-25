@@ -1,68 +1,88 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const fs = require('fs');
-const { Octokit } = require('@octokit/rest');
+const rateLimit = require('express-rate-limit');
+const mongoose = require('mongoose');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { Expo } = require('expo-server-sdk');
 
-// Initialize Expo SDK client
-let expo = new Expo();
+// Models
+const Rule = require('./src/models/Rule');
+const DeviceToken = require('./src/models/DeviceToken');
+const NotificationHistory = require('./src/models/NotificationHistory');
 
+let expo = new Expo();
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Bellekte tutulan geçici şikayet sayacı
-// Artık sadece "sayı" tutmuyor, kimlerin (Hangi IP adreslerinin) şikayet ettiğini tutuyor.
-// Örnek: { "çekiliş": Set { "192.168.1.5", "10.0.0.2" } }
-const reports = {};
+// Trust proxy for rate limiter (if behind Heroku, Render, Vercel etc)
+app.set('trust proxy', 1);
 
-// Eşik değeri: 5 farklı kişiden/cihazdan gelirse onaya sun
+// Rate Limiting
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: { error: 'Çok fazla istek gönderdiniz, lütfen daha sonra tekrar deneyin.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use('/api/', apiLimiter); // Apply rate limiter to all API routes
+
+// Environment variables
+const MONGODB_URI = process.env.MONGODB_URI;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '12345';
+const PORT = process.env.PORT || 5000;
 const THRESHOLD = 5; 
 
-// Kesinlikle engellenmesi yasak olan (günlük kullanım) kelimeler karalistesi
+// Connect to MongoDB
+if (MONGODB_URI) {
+  mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+    .then(() => console.log('📦 MongoDB Atlas bağlantısı BAŞARILI!'))
+    .catch(err => console.error('❌ MongoDB bağlantı hatası:', err));
+} else {
+  console.warn('⚠️ MONGODB_URI bulunamadı! Lütfen .env dosyanızı kontrol edin.');
+}
+
+const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
+
+// Kesinlikle engellenmesi yasak olan kelimeler
 const FORBIDDEN_WORDS = [
   'merhaba', 'selam', 'nasılsın', 'naber', 'ne haber', 'evet', 'hayır', 'tamam', 'olur', 'peki',
   'teşekkürler', 'sağ ol', 'günaydın', 'iyi akşamlar', 'iyi geceler', 'yarın', 'bugün', 'şimdi',
   'geldim', 'gittim', 'arıyorum', 'alo', 'anne', 'baba', 'abi', 'abla', 'kardeşim', 'canım', 'aşkım'
 ];
 
-const GITHUB_PAT = process.env.GITHUB_PAT;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const REPO_OWNER = process.env.GITHUB_REPO_OWNER || 'keskinemirhan73';
-const REPO_NAME = process.env.GITHUB_REPO_NAME || 'sms-filtre-db';
-const FILE_PATH = 'database.json';
+// Admin Authorization Middleware
+const verifyAdmin = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader || authHeader !== `Bearer ${ADMIN_PASSWORD}`) {
+    return res.status(401).json({ error: 'Yetkisiz erişim! Geçersiz şifre.' });
+  }
+  next();
+};
 
-const octokit = new Octokit({ auth: GITHUB_PAT });
-const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
-
+// PUBLIC API: Report a spam keyword
 app.post('/api/report', async (req, res) => {
   try {
     const { keyword, type } = req.body;
-    
-    // Güvenlik: İstek atan kişinin IP adresi
     const userIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
 
-    if (!keyword) {
-      return res.status(400).json({ error: 'Kelime boş olamaz' });
-    }
-
+    if (!keyword) return res.status(400).json({ error: 'Kelime boş olamaz' });
     const lowerKeyword = keyword.toLowerCase().trim();
     
-    // Güvenlik 1: Çok kısa veya anlamsız (Aşırı genel) kelimeleri baştan reddet
     if (lowerKeyword.length < 3) {
       return res.status(400).json({ error: 'Çok kısa kelimeler engellenemez (En az 3 harf)' });
     }
 
-    // Güvenlik 2: Günlük, masum kelimeleri reddet (Mantık Filtresi)
     if (FORBIDDEN_WORDS.includes(lowerKeyword)) {
-      console.log(`[REDDEDİLDİ] Sabotaj girişimi! Günlük kelime engellenmeye çalışıldı: "${lowerKeyword}"`);
       return res.status(400).json({ error: 'Güvenlik Kalkanı: Bu kelime günlük bir kelimedir ve engellenemez.' });
     }
 
-    // Güvenlik 3: Gerçek Yapay Zeka (Gemini AI) Doğrulaması
-    if (genAI && lowerKeyword.length > 4) { // Sadece 4 harften uzun kelimeleri/cümleleri AI'a sor
+    // AI Verification
+    if (genAI && lowerKeyword.length > 4) {
       try {
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
         const prompt = `Kullanıcı şu metni/kelimeyi SMS spam veya dolandırıcılık olarak şikayet etti: "${lowerKeyword}". Sence bu kelime/metin gerçekten bir bahis, casino, dolandırıcılık, yasadışı iddaa veya spam reklam kategorisine girer mi? Sadece "EVET" veya "HAYIR" olarak cevap ver.`;
@@ -70,95 +90,48 @@ app.post('/api/report', async (req, res) => {
         const aiResponse = result.response.text().trim().toUpperCase();
         
         if (aiResponse.includes("HAYIR")) {
-          console.log(`[YAPAY ZEKA REDDETTİ] Gemini AI bu kelimenin spam olmadığını düşünüyor: "${lowerKeyword}"`);
           return res.status(400).json({ error: 'Gemini AI Kalkanı: Şikayetiniz Yapay Zeka tarafından incelendi ve spam bulunmadığı için reddedildi.' });
-        } else {
-          console.log(`[YAPAY ZEKA ONAYLADI] Gemini AI şikayeti haklı buldu: "${lowerKeyword}"`);
         }
       } catch (aiError) {
         console.error('[Gemini AI Hatası]', aiError.message);
       }
     }
 
-    // Set'i başlat (Eğer daha önce kimse bu kelimeyi şikayet etmediyse)
-    if (!reports[lowerKeyword]) {
-      reports[lowerKeyword] = new Set();
-    }
-
-    // IP adresini kontrol et
-    if (reports[lowerKeyword].has(userIP)) {
-      console.log(`[ENGEL] ${userIP} aynı kelimeyi ("${lowerKeyword}") tekrar şikayet etmeye çalıştı!`);
-      return res.status(429).json({ error: 'Bu kelimeyi zaten şikayet ettiniz. Diğer kullanıcıların şikayetleri bekleniyor.' });
-    }
-
-    // IP'yi listeye ekle
-    reports[lowerKeyword].add(userIP);
-    const currentCount = reports[lowerKeyword].size;
+    // Upsert Rule in DB
+    let rule = await Rule.findOne({ keyword: lowerKeyword });
     
-    console.log(`[Yeni Şikayet] Kelime: "${lowerKeyword}" | Cihaz IP: ${userIP} | Toplam: ${currentCount}/${THRESHOLD}`);
-
-    // Eşik geçildiyse Yönetici Onayına (Pull Request) Gönder
-    if (currentCount >= THRESHOLD) {
-      console.log(`[OTO-PİLOT] "${lowerKeyword}" eşiği geçti! Yönetici (GitHub PR) Onayına sunuluyor...`);
-      
-      const branchName = `auto-pilot-${Date.now()}`;
-
-      // 1. Ana dalın (main) son sürümünü bul
-      const { data: refData } = await octokit.git.getRef({
-        owner: REPO_OWNER, repo: REPO_NAME, ref: 'heads/main'
+    if (!rule) {
+      rule = new Rule({
+        keyword: lowerKeyword,
+        type: type === 'number' ? 'number' : 'word',
+        status: 'pending',
+        reportCount: 1,
+        reportedByIPs: [userIP]
       });
-
-      // 2. Otonom olarak yeni bir dal (branch) aç
-      await octokit.git.createRef({
-        owner: REPO_OWNER, repo: REPO_NAME, ref: `refs/heads/${branchName}`, sha: refData.object.sha
-      });
-
-      // 3. Dosyayı yeni daldan çek
-      const { data: fileData } = await octokit.repos.getContent({
-        owner: REPO_OWNER, repo: REPO_NAME, path: FILE_PATH, ref: branchName
-      });
-
-      const decodedContent = Buffer.from(fileData.content, 'base64').toString('utf-8');
-      const db = JSON.parse(decodedContent);
-
-      // 4. Kelimeyi ekle
-      if (type === 'number' && !db.blacklistedNumbers.includes(lowerKeyword)) {
-        db.blacklistedNumbers.push(lowerKeyword);
-      } else if (!db.spamKeywords.includes(lowerKeyword)) {
-        db.spamKeywords.push(lowerKeyword);
+    } else {
+      if (rule.reportedByIPs.includes(userIP)) {
+        return res.status(429).json({ error: 'Bu kelimeyi zaten şikayet ettiniz. Diğer kullanıcıların şikayetleri bekleniyor.' });
       }
-
-      const newContentStr = JSON.stringify(db, null, 2);
-      const newContentBase64 = Buffer.from(newContentStr).toString('base64');
-
-      // 5. Değişikliği yeni dala kaydet
-      await octokit.repos.createOrUpdateFileContents({
-        owner: REPO_OWNER, repo: REPO_NAME, path: FILE_PATH,
-        message: `🤖 Onay Bekleniyor: "${lowerKeyword}" kelimesi şikayet edildi`,
-        content: newContentBase64,
-        branch: branchName,
-        sha: fileData.sha
-      });
-
-      // 6. Patron için Pull Request (Yönetici Onay Ekranı) Aç!
-      await octokit.pulls.create({
-        owner: REPO_OWNER, repo: REPO_NAME,
-        title: `⚠️ YÖNETİCİ ONAYI BEKLENİYOR: "${lowerKeyword}"`,
-        head: branchName,
-        base: 'main',
-        body: `🤖 **Oto-Pilot Yapay Zeka Sistemi**\n\n"${lowerKeyword}" kelimesi ${THRESHOLD} farklı cihazdan (IP) Spam olarak işaretlendi.\n\nEğer bu kelimenin herkesin telefonunda **engellenmesini istiyorsan** aşağıdaki yeşil \`Merge pull request\` butonuna bas.\nEğer bunun yanlış bir şikayet olduğunu düşünüyorsan \`Close pull request\` butonuna basarak iptal et.`
-      });
-
-      console.log(`[BAŞARILI] "${lowerKeyword}" için Onay İsteği oluşturuldu!`);
+      if (rule.status === 'approved') {
+         return res.status(200).json({ success: true, message: 'Bu kelime zaten sistemde onaylanmış durumda.' });
+      }
       
-      // Temizlik (Tekrar şikayet edilmesini sıfırla)
-      reports[lowerKeyword].clear();
+      rule.reportedByIPs.push(userIP);
+      rule.reportCount = rule.reportedByIPs.length;
+    }
+
+    await rule.save();
+    console.log(`[Yeni Şikayet] "${lowerKeyword}" | Toplam: ${rule.reportCount}/${THRESHOLD}`);
+
+    if (rule.reportCount >= THRESHOLD && rule.status === 'pending') {
+      console.log(`[OTO-PİLOT] "${lowerKeyword}" eşiği geçti! Onay bekleniyor.`);
+      // Admin dashboard'da görünecek, GitHub'a PR atmıyoruz artık
     }
 
     res.status(200).json({ 
       success: true, 
       message: 'Şikayetiniz alındı! Kelime doğrulanınca engellenecektir.',
-      currentCount: currentCount,
+      currentCount: rule.reportCount,
       threshold: THRESHOLD
     });
 
@@ -168,166 +141,166 @@ app.post('/api/report', async (req, res) => {
   }
 });
 
-// Admin yetkilendirme (Şifre kontrol) ara yazılımı
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '12345'; // .env dosyasında tanımlı olmalı
-
-const verifyAdmin = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  if (!authHeader || authHeader !== `Bearer ${ADMIN_PASSWORD}`) {
-    return res.status(401).json({ error: 'Yetkisiz erişim! Geçersiz şifre.' });
+// PUBLIC API: Get community rules (Approved rules)
+app.get('/api/rules/community', async (req, res) => {
+  try {
+    const rules = await Rule.find({ status: 'approved' }).select('keyword type -_id');
+    res.json(rules);
+  } catch (error) {
+    res.status(500).json({ error: 'Kurallar alınamadı' });
   }
-  next();
-};
+});
 
-// Admin API: Açık olan (Onay bekleyen) Pull Request'leri getir
+// PUBLIC API: Register Push Token
+app.post('/api/push-token', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token || !Expo.isExpoPushToken(token)) {
+      return res.status(400).json({ error: 'Geçersiz Token' });
+    }
+    
+    await DeviceToken.findOneAndUpdate(
+      { token },
+      { lastActive: Date.now() },
+      { upsert: true, new: true }
+    );
+    
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Token kaydedilemedi' });
+  }
+});
+
+// ADMIN API: Get Dashboard Stats
+app.get('/api/admin/stats', verifyAdmin, async (req, res) => {
+  try {
+    const pendingCount = await Rule.countDocuments({ status: 'pending' });
+    const approvedCount = await Rule.countDocuments({ status: 'approved' });
+    const deviceCount = await DeviceToken.countDocuments();
+    const recentNotifications = await NotificationHistory.find().sort({ createdAt: -1 }).limit(5);
+
+    // Top reported words
+    const topReported = await Rule.find({ status: 'pending' })
+      .sort({ reportCount: -1 })
+      .limit(5)
+      .select('keyword reportCount');
+
+    res.json({
+      pendingCount,
+      approvedCount,
+      deviceCount,
+      recentNotifications,
+      topReported
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'İstatistikler alınamadı' });
+  }
+});
+
+// ADMIN API: Get Pending Rules
 app.get('/api/pending', verifyAdmin, async (req, res) => {
   try {
-    const { data: pulls } = await octokit.pulls.list({
-      owner: REPO_OWNER,
-      repo: REPO_NAME,
-      state: 'open'
-    });
+    const pendingRules = await Rule.find({ status: 'pending', reportCount: { $gte: 1 } }).sort({ reportCount: -1 });
     
-    const pendingItems = pulls.map(pr => {
-      // Başlıktan kelimeyi çıkar: '⚠️ YÖNETİCİ ONAYI BEKLENİYOR: "kelime"' -> 'kelime'
-      const match = pr.title.match(/"([^"]+)"/);
-      const keyword = match ? match[1] : pr.title;
-      return {
-        id: pr.number,
-        keyword: keyword,
-        title: pr.title,
-        url: pr.html_url,
-        created_at: pr.created_at
-      };
-    });
+    // Map to old frontend structure for compatibility
+    const pendingItems = pendingRules.map(r => ({
+      id: r._id,
+      keyword: r.keyword,
+      title: `⚠️ ONAY BEKLENİYOR: "${r.keyword}" (${r.reportCount} şikayet)`,
+      created_at: r.createdAt
+    }));
     
     res.json(pendingItems);
   } catch (error) {
-    console.error('[API Error]', error);
     res.status(500).json({ error: 'PR verileri alınamadı' });
   }
 });
 
-// Admin API: Canlı Veritabanını (database.json) GitHub'dan çek
-app.get('/api/database', verifyAdmin, async (req, res) => {
+// ADMIN API: Approve Rule
+app.post('/api/approve/:id', verifyAdmin, async (req, res) => {
   try {
-    const { data: fileData } = await octokit.repos.getContent({
-      owner: REPO_OWNER, repo: REPO_NAME, path: FILE_PATH, ref: 'main'
-    });
-    const decodedContent = Buffer.from(fileData.content, 'base64').toString('utf-8');
-    const db = JSON.parse(decodedContent);
-    res.json(db);
+    const rule = await Rule.findByIdAndUpdate(req.params.id, { status: 'approved' });
+    res.json({ success: true, message: 'Başarıyla onaylandı.' });
   } catch (error) {
-    console.error('[API Error]', error);
-    res.status(500).json({ error: 'Veritabanı okunamadı' });
-  }
-});
-
-// Admin API: PR'ı Onayla (Merge)
-app.post('/api/approve/:pull_number', verifyAdmin, async (req, res) => {
-  try {
-    const { pull_number } = req.params;
-    await octokit.pulls.merge({
-      owner: REPO_OWNER,
-      repo: REPO_NAME,
-      pull_number: parseInt(pull_number)
-    });
-    res.json({ success: true, message: 'Başarıyla onaylandı ve eklendi.' });
-  } catch (error) {
-    console.error('[API Error]', error);
     res.status(500).json({ error: 'Onaylama başarısız' });
   }
 });
 
-// Admin API: PR'ı Reddet (Close)
-app.post('/api/reject/:pull_number', verifyAdmin, async (req, res) => {
+// ADMIN API: Reject Rule
+app.post('/api/reject/:id', verifyAdmin, async (req, res) => {
   try {
-    const { pull_number } = req.params;
-    await octokit.pulls.update({
-      owner: REPO_OWNER,
-      repo: REPO_NAME,
-      pull_number: parseInt(pull_number),
-      state: 'closed'
-    });
-    res.json({ success: true, message: 'Başarıyla reddedildi ve kapatıldı.' });
+    await Rule.findByIdAndUpdate(req.params.id, { status: 'rejected' });
+    res.json({ success: true, message: 'Başarıyla reddedildi.' });
   } catch (error) {
-    console.error('[API Error]', error);
     res.status(500).json({ error: 'Reddetme başarısız' });
   }
 });
 
-// PUSH NOTIFICATIONS STORAGE
-const TOKENS_FILE = 'pushTokens.json';
-let savedPushTokens = [];
-try {
-  if (fs.existsSync(TOKENS_FILE)) {
-    savedPushTokens = JSON.parse(fs.readFileSync(TOKENS_FILE, 'utf8'));
-  }
-} catch (e) {
-  console.log("Token dosyası okunamadı", e);
-}
-
-const saveTokens = () => {
-  fs.writeFileSync(TOKENS_FILE, JSON.stringify(savedPushTokens, null, 2));
-};
-
-// Cihazdan Token Alıp Kaydetme
-app.post('/api/push-token', (req, res) => {
-  const { token } = req.body;
-  if (!token || !Expo.isExpoPushToken(token)) {
-    return res.status(400).json({ error: 'Geçersiz Token' });
-  }
-  
-  if (!savedPushTokens.includes(token)) {
-    savedPushTokens.push(token);
-    saveTokens();
-    console.log(`[YENİ TOKEN] Cihaz kaydedildi. Toplam cihaz: ${savedPushTokens.length}`);
-  }
-  
-  res.json({ success: true });
-});
-
-// Admin API: Tüm Cihazlara Bildirim Gönder
+// ADMIN API: Send Global Notification
 app.post('/api/admin/send-notification', verifyAdmin, async (req, res) => {
   try {
     const { title, body } = req.body;
     if (!title || !body) return res.status(400).json({ error: 'Başlık ve mesaj gereklidir' });
 
+    const devices = await DeviceToken.find();
     let messages = [];
-    for (let pushToken of savedPushTokens) {
-      if (!Expo.isExpoPushToken(pushToken)) {
-        continue;
-      }
+    
+    for (let device of devices) {
       messages.push({
-        to: pushToken,
+        to: device.token,
         sound: 'default',
         title: title,
         body: body,
-        data: { withSome: 'data' },
       });
     }
 
     let chunks = expo.chunkPushNotifications(messages);
-    let tickets = [];
+    let successCount = 0;
+    let failureCount = 0;
+
     for (let chunk of chunks) {
       try {
         let ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-        tickets.push(...ticketChunk);
+        for (let ticket of ticketChunk) {
+          if (ticket.status === 'ok') successCount++;
+          else failureCount++;
+        }
       } catch (error) {
         console.error(error);
+        failureCount += chunk.length;
       }
     }
+
+    // Save history
+    const history = new NotificationHistory({
+      title, body, sentToCount: devices.length, successCount, failureCount
+    });
+    await history.save();
     
-    res.json({ success: true, message: `${savedPushTokens.length} cihaza bildirim gönderildi.`, tickets });
+    res.json({ success: true, message: `${successCount} cihaza bildirim gönderildi.`, successCount, failureCount });
   } catch (error) {
     console.error('[PUSH ERROR]', error);
     res.status(500).json({ error: 'Bildirim gönderilemedi' });
   }
 });
 
-const PORT = process.env.PORT || 5000;
+// ADMIN API: Get Database Data (for backward compatibility)
+app.get('/api/database', verifyAdmin, async (req, res) => {
+  try {
+    const rules = await Rule.find({ status: 'approved' });
+    const spamKeywords = rules.filter(r => r.type === 'word').map(r => r.keyword);
+    const blacklistedNumbers = rules.filter(r => r.type === 'number').map(r => r.keyword);
+    
+    res.json({
+      spamKeywords,
+      blacklistedNumbers
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Veritabanı okunamadı' });
+  }
+});
+
 app.listen(PORT, () => {
-  console.log(`🚀 (MODERASYONLU & AI DESTEKLİ) Oto-Pilot Sunucusu ${PORT} portunda çalışıyor...`);
-  console.log(`⚠️ GitHub PAT Ayarı: ${GITHUB_PAT ? 'BAŞARILI' : 'EKSİK'}`);
+  console.log(`🚀 (MODERASYONLU & AI DESTEKLİ) Mongoose Sunucusu ${PORT} portunda çalışıyor...`);
   console.log(`🧠 Gemini AI Ayarı: ${GEMINI_API_KEY ? 'BAŞARILI' : 'EKSİK (Pasif)'}`);
 });

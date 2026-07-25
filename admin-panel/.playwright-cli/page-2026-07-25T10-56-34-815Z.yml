@@ -1,0 +1,8 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - heading "Yönetici Girişi" [level=1] [ref=e9]
+    - paragraph [ref=e10]: Devam etmek için yönetici şifrenizi girin.
+    - generic [ref=e11]:
+      - textbox "Şifre..." [ref=e13]
+      - button "Giriş Yap" [ref=e14]
+  - alert [ref=e18]

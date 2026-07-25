@@ -157,6 +157,14 @@ export default function DashboardScreen() {
               <Text style={[styles.heroStatusDesc, { color: theme.textMuted }]}>
                 {settings.underAttackMode ? 'Bilinmeyen tüm numaralar engelleniyor.' : 'Yapay zeka arka planda smsleri tarıyor.'}
               </Text>
+              
+              {stats.blockedCount > 0 && (
+                <View style={{ marginTop: spacing.md, backgroundColor: 'rgba(16,185,129,0.1)', paddingVertical: 8, paddingHorizontal: 16, borderRadius: radii.full }}>
+                  <Text style={{ color: theme.secondary, fontWeight: '800', fontSize: 13 }}>
+                    🎉 Harika! Bu ay {stats.blockedCount} spam mesajdan kurtuldunuz!
+                  </Text>
+                </View>
+              )}
             </View>
 
             <View style={[styles.cloudBadge, { backgroundColor: 'rgba(59,130,246,0.08)' }]}>

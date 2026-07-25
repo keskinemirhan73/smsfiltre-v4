@@ -10,6 +10,7 @@ import DashboardScreen from './src/screens/DashboardScreen';
 import RulesScreen from './src/screens/RulesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import TestSimulatorScreen from './src/screens/TestSimulatorScreen';
+import CommunityRulesScreen from './src/screens/CommunityRulesScreen';
 import { darkColors, lightColors } from './src/theme';
 import { FilterManager } from './src/modules/FilterManager';
 import { ToastProvider } from './src/components/Toast';
@@ -100,6 +101,13 @@ export default function App() {
             component={TestSimulatorScreen}
             options={{
               tabBarIcon: ({ color, size }) => <FlaskConical color={color} size={size} />,
+            }}
+          />
+          <Tab.Screen 
+            name="Topluluk" 
+            component={CommunityRulesScreen}
+            options={{
+              tabBarIcon: ({ color, size }) => <List color={color} size={size} />,
             }}
           />
           <Tab.Screen 
