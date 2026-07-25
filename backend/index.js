@@ -226,7 +226,7 @@ Lütfen SADECE aşağıdaki JSON formatında ve Türkçe cevap ver, ekstra hiçb
 
   } catch (error) {
     console.error('[ANALYZE HATA]', error.message);
-    res.status(500).json({ error: 'Analiz sırasında sunucu hatası oluştu.' });
+    res.status(500).json({ error: 'Analiz sırasında sunucu hatası oluştu.', details: error.message, stack: error.stack });
   }
 });
 
