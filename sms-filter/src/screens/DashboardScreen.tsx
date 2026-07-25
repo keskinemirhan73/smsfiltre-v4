@@ -271,6 +271,10 @@ export default function DashboardScreen() {
                 <Text style={[styles.stepText, { color: theme.text }]}><Text style={{fontWeight: 'bold'}}>FiltreAI</Text> uygulamasını seçin.</Text>
               </View>
             </View>
+
+            <Text style={{ color: theme.textMuted, fontSize: 13, textAlign: 'center', marginTop: spacing.xl, paddingHorizontal: spacing.md, fontStyle: 'italic' }}>
+              Not: Apple'ın güvenlik politikaları gereği doğrudan Mesajlar menüsü açılamayabilir. Genel ayarlar açılırsa geri dönüp Mesajlar'ı bulunuz.
+            </Text>
           </View>
 
           <View style={[styles.setupFooter, { backgroundColor: theme.card, borderColor: theme.border }]}>
