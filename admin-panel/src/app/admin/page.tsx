@@ -19,8 +19,8 @@ export default function AdminDashboard() {
   const [loginError, setLoginError] = useState(false);
   
   // Data state
-  const [pendingItems, setPendingItems] = useState<Record<string, unknown>[]>([]);
-  const [stats, setStats] = useState<Record<string, unknown>>({
+  const [pendingItems, setPendingItems] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>({
     pendingCount: 0,
     approvedCount: 0,
     deviceCount: 0,
