@@ -1,0 +1,25 @@
+{
+  "blacklistedNumbers": [
+    "+905550000001",
+    "+905329999999"
+  ],
+  "spamKeywords": [
+    "bet",
+    "casino",
+    "bahis",
+    "kumar",
+    "bonus",
+    "çevrimsiz",
+    "deneme bonusu",
+    "kredi onayı",
+    "hesabınız bloke",
+    "yasa dışı",
+    "KANKA BU MESAJI GÖRDÜYSEN BULUT %100 ÇALIŞIYORDUR"
+  ],
+  "scamUrls": [
+    "bit.ly",
+    "cutt.ly",
+    "kisa.link",
+    "t.me"
+  ]
+}

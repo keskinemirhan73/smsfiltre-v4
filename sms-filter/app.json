@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "FiltreAI",
+    "slug": "sms-filter",
+    "version": "1.0.1",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.smsfilter.app",
+      "appleTeamId": "YOUR_TEAM_ID",
+      "buildNumber": "1"
+    },
+    "android": {
+      "package": "com.smsfilter.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#1E1E2E",
+        "foregroundImage": "./assets/icon.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "versionCode": 1
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "@bacons/apple-targets",
+      "./plugins/withAndroidSmsFilter.js"
+    ],
+    "extra": {
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "bundleIdentifier": "com.smsfilter.app.action",
+                  "targetName": "smsfilter",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.smsfilter.app"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "04eef69b-5b2d-49a6-b8fd-4f3090a2b43e"
+      }
+    },
+    "cli": {
+      "appVersionSource": "remote"
+    }
+  }
+}

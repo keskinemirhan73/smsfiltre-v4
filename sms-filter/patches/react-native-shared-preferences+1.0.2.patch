@@ -1,0 +1,12 @@
+diff --git a/node_modules/react-native-shared-preferences/android/build.gradle b/node_modules/react-native-shared-preferences/android/build.gradle
+index 1e21956..868b755 100644
+--- a/node_modules/react-native-shared-preferences/android/build.gradle
++++ b/node_modules/react-native-shared-preferences/android/build.gradle
+@@ -22,6 +22,6 @@ android {
+ 
+ dependencies {
+     implementation fileTree(include: ['*.jar'], dir: 'libs')
+-    implementation "com.android.support:appcompat-v7:${safeExtGet('supportLibVersion', '23.0.1')}"
++    implementation "androidx.appcompat:appcompat:1.6.1"
+     implementation "com.facebook.react:react-native:${safeExtGet('reactNativeVersion', '+')}"
+ }
