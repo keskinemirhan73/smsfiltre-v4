@@ -237,7 +237,19 @@ Lütfen SADECE aşağıdaki JSON formatında ve Türkçe cevap ver, ekstra hiçb
 
   } catch (error) {
     console.error('[ANALYZE HATA]', error.message);
-    res.status(500).json({ error: 'Analiz sırasında sunucu hatası oluştu.', details: error.message, stack: error.stack });
+    
+    // YZ hatası durumunda (429 Quota vb.) uygulamanın çökmemesi için Fallback
+    const lower = cleanText.toLowerCase();
+    const isSpam = lower.includes('bahis') || lower.includes('casino') || lower.includes('bonus') || lower.includes('kredi') || lower.includes('borç') || lower.includes('kazandınız') || lower.includes('bet');
+    
+    res.json({
+      success: true,
+      cached: false,
+      isFallback: true,
+      riskLevel: isSpam ? 'Yüksek' : 'Düşük',
+      threatType: isSpam ? 'Şüpheli Kelimeler İçeriyor (Sistem Taraması)' : 'Temiz Görünüyor (AI Beklemede)',
+      recommendation: isSpam ? 'Bu mesaja itibar etmeyin ve linklere tıklamayın.' : 'Yapay zeka analiz servisi şu an yoğun, ancak mesaj standart sistem taramasından geçti. Yine de dikkatli olun.'
+    });
   }
 });
 
