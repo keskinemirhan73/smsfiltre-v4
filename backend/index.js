@@ -39,7 +39,7 @@ const THRESHOLD = 5;
 
 // Connect to MongoDB
 if (MONGODB_URI) {
-  mongoose.connect(MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  mongoose.connect(MONGODB_URI)
     .then(() => console.log('📦 MongoDB Atlas bağlantısı BAŞARILI!'))
     .catch(err => console.error('❌ MongoDB bağlantı hatası:', err));
 } else {
