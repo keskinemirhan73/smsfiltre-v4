@@ -19,8 +19,15 @@ export default function AdminDashboard() {
   const [loginError, setLoginError] = useState(false);
   
   // Data state
+  interface StatsData {
+    pendingCount: number;
+    approvedCount: number;
+    deviceCount: number;
+    recentNotifications: unknown[];
+    topReported: unknown[];
+  }
   const [pendingItems, setPendingItems] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>({
+  const [stats, setStats] = useState<StatsData>({
     pendingCount: 0,
     approvedCount: 0,
     deviceCount: 0,
