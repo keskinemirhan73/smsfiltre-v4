@@ -25,6 +25,7 @@ export default function DashboardScreen() {
   const [cloudThreatCount, setCloudThreatCount] = useState<number>(0);
 
   const [isReportModalVisible, setIsReportModalVisible] = useState(false);
+  const [isSetupModalVisible, setIsSetupModalVisible] = useState(false);
   const [reportKeyword, setReportKeyword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -141,7 +142,11 @@ export default function DashboardScreen() {
 
         {/* iOS Settings Setup Card */}
         {Platform.OS === 'ios' && (
-          <View style={[styles.setupCard, { backgroundColor: 'rgba(139,92,246,0.1)', borderColor: 'rgba(139,92,246,0.3)' }]}>
+          <TouchableOpacity 
+            style={[styles.setupCard, { backgroundColor: 'rgba(139,92,246,0.1)', borderColor: 'rgba(139,92,246,0.3)' }]}
+            activeOpacity={0.8}
+            onPress={() => setIsSetupModalVisible(true)}
+          >
             <View style={styles.setupHeader}>
               <View style={[styles.setupIconWrapper, { backgroundColor: '#8B5CF6' }]}>
                 <ShieldCheck size={20} color="#fff" />
@@ -149,9 +154,13 @@ export default function DashboardScreen() {
               <Text style={[styles.setupTitle, { color: '#8B5CF6' }]}>Filtreyi Aktifleştirin</Text>
             </View>
             <Text style={[styles.setupDesc, { color: theme.text }]}>
-              Filtrelemenin çalışması için telefonunuzun <Text style={{fontWeight: '800'}}>Ayarlar {'>'} Mesajlar {'>'} Bilinmeyenleri Filtrele</Text> menüsüne giderek <Text style={{fontWeight: '800'}}>SmsFiltre</Text>'yi seçmeniz gerekmektedir.
+              Filtrelemenin çalışması için telefonunuzun <Text style={{fontWeight: '800'}}>Ayarlar {'>'} Mesajlar {'>'} Bilinmeyenleri Filtrele</Text> menüsüne giderek <Text style={{fontWeight: '800'}}>FiltreAI</Text>'yi seçmeniz gerekmektedir.
             </Text>
-          </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.md }}>
+               <Text style={{ color: '#8B5CF6', fontWeight: '700', marginRight: 4 }}>Nasıl Yapılır?</Text>
+               <ArrowRight size={16} color="#8B5CF6" />
+            </View>
+          </TouchableOpacity>
         )}
 
         {/* 2x2 Stats Widget */}
@@ -222,6 +231,75 @@ export default function DashboardScreen() {
           <Text style={styles.floatingBtnText}>Spam Bildir</Text>
         </TouchableOpacity>
       </View>
+
+      {/* iOS Enable Filter Modal */}
+      <Modal visible={isSetupModalVisible} animationType="slide" presentationStyle="pageSheet">
+        <View style={[styles.fullModalContainer, { backgroundColor: theme.background }]}>
+          <View style={styles.fullModalHeader}>
+            <TouchableOpacity onPress={() => setIsSetupModalVisible(false)} style={{ padding: spacing.sm }}>
+              <X size={28} color={theme.text} />
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView contentContainerStyle={styles.fullModalContent}>
+            <View style={[styles.setupIllustration, { backgroundColor: 'rgba(139,92,246,0.1)' }]}>
+              <ShieldCheck size={80} color="#8B5CF6" />
+            </View>
+            
+            <Text style={[styles.setupModalTitle, { color: theme.text }]}>Filtreyi Etkinleştir</Text>
+            <Text style={[styles.setupModalDesc, { color: theme.textMuted }]}>
+              Uygulamanın gelen spam SMS'leri otomatik engelleyebilmesi için iOS ayarlarından FiltreAI'ye izin vermeniz gerekiyor.
+            </Text>
+
+            <View style={[styles.setupStepsBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <View style={styles.setupStep}>
+                <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}>
+                  <Text style={styles.stepNumberText}>1</Text>
+                </View>
+                <Text style={[styles.stepText, { color: theme.text }]}>Aşağıdaki butona basarak <Text style={{fontWeight: 'bold'}}>Ayarlar</Text> uygulamasını açın.</Text>
+              </View>
+              <View style={styles.setupStepDivider} />
+              <View style={styles.setupStep}>
+                <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}>
+                  <Text style={styles.stepNumberText}>2</Text>
+                </View>
+                <Text style={[styles.stepText, { color: theme.text }]}><Text style={{fontWeight: 'bold'}}>Mesajlar</Text> bölümüne girin.</Text>
+              </View>
+              <View style={styles.setupStepDivider} />
+              <View style={styles.setupStep}>
+                <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}>
+                  <Text style={styles.stepNumberText}>3</Text>
+                </View>
+                <Text style={[styles.stepText, { color: theme.text }]}><Text style={{fontWeight: 'bold'}}>Bilinmeyenleri Filtrele</Text> seçeneğine dokunun.</Text>
+              </View>
+              <View style={styles.setupStepDivider} />
+              <View style={styles.setupStep}>
+                <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}>
+                  <Text style={styles.stepNumberText}>4</Text>
+                </View>
+                <Text style={[styles.stepText, { color: theme.text }]}><Text style={{fontWeight: 'bold'}}>FiltreAI</Text> uygulamasını seçin.</Text>
+              </View>
+            </View>
+          </ScrollView>
+
+          <View style={[styles.setupFooter, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <TouchableOpacity 
+              style={[styles.openSettingsBtn, { backgroundColor: '#8B5CF6' }]}
+              activeOpacity={0.8}
+              onPress={() => {
+                import('react-native').then(({ Linking }) => {
+                  Linking.openURL('App-Prefs:root=MESSAGES').catch(() => {
+                    Linking.openSettings();
+                  });
+                });
+              }}
+            >
+              <Text style={styles.openSettingsBtnText}>Ayarları Aç</Text>
+              <ArrowRight size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Modern Bottom Sheet Modal */}
       <Modal visible={isReportModalVisible} transparent={true} animationType="slide">
@@ -376,5 +454,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     height: 56, borderRadius: radii.lg, gap: 8
   },
-  submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' }
+  submitBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+
+  // Setup Modal Styles
+  fullModalContainer: { flex: 1 },
+  fullModalHeader: { alignItems: 'flex-end', paddingTop: Platform.OS === 'ios' ? 44 : 20, paddingRight: spacing.md },
+  fullModalContent: { alignItems: 'center', padding: spacing.xl, paddingBottom: 100 },
+  setupIllustration: { width: 140, height: 140, borderRadius: 70, justifyContent: 'center', alignItems: 'center', marginBottom: spacing.xl },
+  setupModalTitle: { fontSize: 28, fontWeight: '800', marginBottom: spacing.sm, textAlign: 'center' },
+  setupModalDesc: { fontSize: 16, textAlign: 'center', lineHeight: 24, marginBottom: spacing.xxl, paddingHorizontal: spacing.md },
+  
+  setupStepsBox: { width: '100%', borderRadius: radii.xl, borderWidth: 1, padding: spacing.lg },
+  setupStep: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md },
+  stepNumberBadge: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginRight: spacing.md },
+  stepNumberText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  stepText: { flex: 1, fontSize: 15, lineHeight: 22 },
+  setupStepDivider: { height: 1, backgroundColor: 'rgba(150,150,150,0.2)', marginLeft: 44 },
+  
+  setupFooter: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    padding: spacing.xl, paddingBottom: Platform.OS === 'ios' ? 40 : spacing.xl,
+    borderTopWidth: 1,
+  },
+  openSettingsBtn: {
+    flexDirection: 'row', height: 56, borderRadius: radii.lg,
+    justifyContent: 'center', alignItems: 'center', gap: 8,
+  },
+  openSettingsBtnText: { color: '#fff', fontSize: 18, fontWeight: '700' }
 });
