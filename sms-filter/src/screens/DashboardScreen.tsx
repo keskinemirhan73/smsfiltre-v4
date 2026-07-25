@@ -139,6 +139,21 @@ export default function DashboardScreen() {
           </View>
         </View>
 
+        {/* iOS Settings Setup Card */}
+        {Platform.OS === 'ios' && (
+          <View style={[styles.setupCard, { backgroundColor: 'rgba(139,92,246,0.1)', borderColor: 'rgba(139,92,246,0.3)' }]}>
+            <View style={styles.setupHeader}>
+              <View style={[styles.setupIconWrapper, { backgroundColor: '#8B5CF6' }]}>
+                <ShieldCheck size={20} color="#fff" />
+              </View>
+              <Text style={[styles.setupTitle, { color: '#8B5CF6' }]}>Filtreyi Aktifleştirin</Text>
+            </View>
+            <Text style={[styles.setupDesc, { color: theme.text }]}>
+              Filtrelemenin çalışması için telefonunuzun <Text style={{fontWeight: '800'}}>Ayarlar {'>'} Mesajlar {'>'} Bilinmeyenleri Filtrele</Text> menüsüne giderek <Text style={{fontWeight: '800'}}>SmsFiltre</Text>'yi seçmeniz gerekmektedir.
+            </Text>
+          </View>
+        )}
+
         {/* 2x2 Stats Widget */}
         <Text style={[styles.sectionTitle, { color: theme.text }]}>İstatistikler</Text>
         <View style={styles.statsGrid}>
@@ -282,6 +297,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8,
     borderRadius: radii.full, marginTop: spacing.lg
   },
+
+  setupCard: {
+    borderRadius: radii.xl, padding: spacing.lg, borderWidth: 1,
+    marginBottom: spacing.xxl,
+  },
+  setupHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
+  setupIconWrapper: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginRight: spacing.sm },
+  setupTitle: { fontSize: 16, fontWeight: '800' },
+  setupDesc: { fontSize: 14, lineHeight: 22 },
 
   sectionTitle: { fontSize: 18, fontWeight: '800', marginBottom: spacing.md, letterSpacing: -0.5 },
   
