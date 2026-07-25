@@ -278,9 +278,25 @@ export default function DashboardScreen() {
               style={[styles.openSettingsBtn, { backgroundColor: '#8B5CF6' }]}
               activeOpacity={0.8}
               onPress={async () => {
-                try {
-                  await Linking.openURL('App-Prefs:root=MESSAGES');
-                } catch (e) {
+                const urls = [
+                  'App-Prefs:root=MESSAGES',
+                  'prefs:root=MESSAGES',
+                  'App-Prefs:MESSAGES',
+                  'prefs:MESSAGES'
+                ];
+                
+                let opened = false;
+                for (const url of urls) {
+                  try {
+                    await Linking.openURL(url);
+                    opened = true;
+                    break;
+                  } catch (e) {
+                    // Ignore and try the next one
+                  }
+                }
+                
+                if (!opened) {
                   Linking.openSettings();
                 }
               }}
