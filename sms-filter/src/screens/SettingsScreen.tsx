@@ -143,25 +143,36 @@ export default function SettingsScreen() {
             value={settings.filterScheduleEnabled}
             onToggle={() => toggleSetting('filterScheduleEnabled')}
           />
-          <SectionDesc text="Zaman programı aktifken sadece belirlediğiniz saatler arasında filtreleme yapılır." />
+          <SectionDesc text="Zaman programı aktifken, SMS koruması SADECE belirlediğiniz saatler arasında çalışır. (Örn: Sadece gece uyurken rahatsız edilmek istemiyorsanız)" />
           
           {settings.filterScheduleEnabled && (
-            <View style={{ marginTop: spacing.lg }}>
-              <Text style={[styles.inputLabel, { color: theme.text }]}>Başlangıç Saati (Örn: 22:00)</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
-                value={settings.scheduleStart}
-                onChangeText={(t) => updateSetting('scheduleStart', t)}
-                keyboardType="numbers-and-punctuation"
-              />
+            <View style={{ marginTop: spacing.xl }}>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Koruma Saatleri</Text>
               
-              <Text style={[styles.inputLabel, { color: theme.text, marginTop: spacing.md }]}>Bitiş Saati (Örn: 08:00)</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: theme.card, borderColor: theme.border, color: theme.text }]}
-                value={settings.scheduleEnd}
-                onChangeText={(t) => updateSetting('scheduleEnd', t)}
-                keyboardType="numbers-and-punctuation"
-              />
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: spacing.sm }}>
+                <View style={{ flex: 1, backgroundColor: theme.card, borderRadius: radii.lg, padding: spacing.md, borderWidth: 1, borderColor: theme.border, alignItems: 'center' }}>
+                  <Text style={{ color: theme.textMuted, fontSize: 13, marginBottom: 8, fontWeight: '600' }}>BAŞLANGIÇ</Text>
+                  <TextInput
+                    style={{ fontSize: 24, fontWeight: '800', color: theme.text, textAlign: 'center', width: '100%' }}
+                    value={settings.scheduleStart}
+                    onChangeText={(t) => updateSetting('scheduleStart', t)}
+                    keyboardType="numbers-and-punctuation"
+                    maxLength={5}
+                  />
+                </View>
+                
+                <View style={{ flex: 1, backgroundColor: theme.card, borderRadius: radii.lg, padding: spacing.md, borderWidth: 1, borderColor: theme.border, alignItems: 'center' }}>
+                  <Text style={{ color: theme.textMuted, fontSize: 13, marginBottom: 8, fontWeight: '600' }}>BİTİŞ</Text>
+                  <TextInput
+                    style={{ fontSize: 24, fontWeight: '800', color: theme.text, textAlign: 'center', width: '100%' }}
+                    value={settings.scheduleEnd}
+                    onChangeText={(t) => updateSetting('scheduleEnd', t)}
+                    keyboardType="numbers-and-punctuation"
+                    maxLength={5}
+                  />
+                </View>
+              </View>
+              <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: 12, textAlign: 'center' }}>Saatleri 24-saat formatında girin (Örn: 22:00)</Text>
             </View>
           )}
         </View>
@@ -170,6 +181,42 @@ export default function SettingsScreen() {
   }
 
   if (activePage === 'mapping') {
+    const MappingBlock = ({ id, title, desc, icon: Icon, color }: any) => (
+      <View style={{ marginBottom: spacing.xl }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
+          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: `${color}15`, justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+            <Icon color={color} size={18} />
+          </View>
+          <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>{title}</Text>
+        </View>
+        <SectionDesc text={desc} />
+        
+        <View style={{ marginTop: spacing.md, backgroundColor: theme.card, borderRadius: radii.lg, borderWidth: 1, borderColor: theme.border, overflow: 'hidden' }}>
+          {['junk', 'transaction', 'promotion', 'allowed'].map((cat, index) => {
+            const isSelected = settings.categoryMapping[id as keyof typeof settings.categoryMapping] === cat;
+            return (
+              <TouchableOpacity
+                key={cat}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', padding: spacing.md,
+                  borderBottomWidth: index < 3 ? 1 : 0, borderBottomColor: theme.border,
+                  backgroundColor: isSelected ? `${theme.primary}08` : 'transparent'
+                }}
+                onPress={() => updateMapping(id as any, cat)}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: isSelected ? '700' : '500', color: isSelected ? theme.primary : theme.text }}>
+                    {cat === 'junk' ? 'İstenmeyen (Junk)' : cat === 'transaction' ? 'İşlemler (Transactions)' : cat === 'promotion' ? 'Tanıtımlar (Promotions)' : 'Gelen Kutusu (İzin Ver)'}
+                  </Text>
+                </View>
+                {isSelected && <ShieldCheck size={20} color={theme.primary} />}
+              </TouchableOpacity>
+            )
+          })}
+        </View>
+      </View>
+    );
+
     return (
       <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
         <View style={styles.headerRow}>
@@ -179,23 +226,12 @@ export default function SettingsScreen() {
           <Text style={[styles.title, { color: theme.text, flex: 1 }]}>Kategori Eşleme</Text>
         </View>
         <View style={styles.section}>
-          <SectionDesc text="Spam, işlem ve promosyon kategorilerini Apple'ın hangi varsayılan klasörüne yönlendireceğinizi seçin." />
-          <View style={{height: 20}} />
+          <SectionDesc text="SMS Filtresi uygulamasının tespit ettiği mesajların, Apple Mesajlar uygulamasındaki hangi klasörlere gönderileceğini belirleyin." />
+          <View style={{height: 24}} />
           
-          <Text style={[styles.inputLabel, { color: theme.text }]}>Spam ve Dolandırıcılık Mesajları</Text>
-          <View style={styles.mappingGrid}>
-            {['junk', 'transaction', 'promotion', 'allowed'].map(cat => (
-              <TouchableOpacity
-                key={`spam-${cat}`}
-                style={[styles.mappingBtn, settings.categoryMapping.spam === cat && { backgroundColor: theme.primary, borderColor: theme.primary }]}
-                onPress={() => updateMapping('spam', cat)}
-              >
-                <Text style={[styles.mappingText, settings.categoryMapping.spam === cat ? { color: '#fff' } : { color: theme.text }]}>
-                  {cat === 'junk' ? 'İstenmeyen' : cat === 'transaction' ? 'İşlemler' : cat === 'promotion' ? 'Promosyon' : 'İzin Ver'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <MappingBlock id="spam" title="Spam ve Dolandırıcılık" desc="Tehlikeli linkler, yasa dışı bahis ve dolandırıcılık mesajları." icon={ShieldAlert} color={theme.danger} />
+          <MappingBlock id="promotion" title="Tanıtım ve Reklam" desc="Markaların indirim, kampanya ve bülten mesajları (Örn: B001)." icon={Zap} color="#F59E0B" />
+          <MappingBlock id="transaction" title="İşlem ve Bilgi" desc="Banka şifreleri, kargo takip kodları ve doğrulama mesajları." icon={Database} color="#3B82F6" />
         </View>
       </ScrollView>
     );
