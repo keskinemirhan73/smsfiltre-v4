@@ -119,10 +119,10 @@ export default function TestSimulatorScreen() {
           <View style={[styles.learningSection, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <View style={styles.learningHeader}>
               <BrainCircuit color={theme.primary} size={20} />
-              <Text style={[styles.learningTitle, { color: theme.text }]}>Yapay Zeka Öğrenimi</Text>
+              <Text style={[styles.learningTitle, { color: theme.text }]}>Kişisel Yapay Zeka (Lokal)</Text>
             </View>
             <Text style={[styles.learningDesc, { color: theme.textMuted }]}>
-              Eğer filtre yanlış sonuç verdiyse, algoritmanın öğrenmesi için aşağıdaki butonları kullanarak mesajı işaretleyin.
+              Bu özellik sadece *sizin cihazınızdaki* algoritmayı eğitir. Diğer kullanıcıları veya genel veritabanını etkilemez. Yanlış filtreleme yaparsa buradan doğruyu öğretebilirsiniz.
             </Text>
             <View style={styles.learningButtons}>
               <TouchableOpacity 
