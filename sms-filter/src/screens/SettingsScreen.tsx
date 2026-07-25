@@ -75,61 +75,6 @@ export default function SettingsScreen() {
     await FilterManager.saveSettings(newSettings);
   };
 
-  const SettingRow = ({ icon: Icon, iconColor, title, desc, value, onToggle, trackTrue, danger, isNav, isPro, onPress }: any) => {
-    const Wrapper = onPress ? TouchableOpacity : (View as any);
-    return (
-      <Wrapper 
-        onPress={onPress}
-        style={[
-          styles.settingCard,
-          { backgroundColor: theme.card, borderColor: theme.border },
-          danger && value && { borderColor: 'rgba(239,68,68,0.5)', backgroundColor: 'rgba(239,68,68,0.08)' },
-          isNav && { paddingVertical: spacing.md }
-        ]}
-      >
-        <View style={styles.settingIcon}>
-          <Icon color={iconColor || theme.textMuted} size={22} />
-        </View>
-        <View style={styles.settingContent}>
-          <View style={{flexDirection: 'row', alignItems: 'center'}}>
-            <Text style={[styles.settingTitle, { color: theme.text }]}>{title}</Text>
-            {isPro && (
-              <View style={styles.proBadge}>
-                <Text style={styles.proText}>PRO</Text>
-              </View>
-            )}
-          </View>
-          {desc && <Text style={[styles.settingDesc, { color: theme.textMuted }]}>{desc}</Text>}
-        </View>
-        {onToggle && !isNav && (
-          <Switch
-            value={value}
-            onValueChange={onToggle}
-            trackColor={{ false: theme.border, true: trackTrue || theme.primary }}
-          />
-        )}
-        {isNav && (
-          <View style={styles.navAction}>
-            {value !== undefined && <Text style={[styles.navValue, { color: theme.textMuted }]}>{value ? 'Açık' : 'Kapalı'}</Text>}
-            <ChevronRight color={theme.textMuted} size={20} />
-          </View>
-        )}
-      </Wrapper>
-    );
-  };
-
-  const SectionDesc = ({ text, isProInfo }: { text: string, isProInfo?: boolean }) => (
-    <Text style={[styles.sectionDesc, { color: theme.textMuted }]}>
-      {isProInfo ? (
-        <Text>
-          <Text style={{color: theme.text}}>{text.split('Pro Paket')[0]}</Text>
-          <Text style={{fontWeight: '700', color: theme.text}}>Pro Paket</Text>
-          <Text style={{color: theme.text}}>{text.split('Pro Paket')[1]}</Text>
-        </Text>
-      ) : text}
-    </Text>
-  );
-
   if (activePage === 'whitelist') {
     const addNumber = () => {
       if (!whitelistNumber.trim()) return;
@@ -666,3 +611,61 @@ const styles = StyleSheet.create({
   mappingText: { fontSize: 14, fontWeight: '600' },
 });
 
+const SettingRow = ({ icon: Icon, iconColor, title, desc, value, onToggle, trackTrue, danger, isNav, isPro, onPress }: any) => {
+  const theme = useAppTheme();
+  const Wrapper = onPress ? TouchableOpacity : (View as any);
+  return (
+    <Wrapper 
+      onPress={onPress}
+      style={[
+        styles.settingCard,
+        { backgroundColor: theme.card, borderColor: theme.border },
+        danger && value && { borderColor: 'rgba(239,68,68,0.5)', backgroundColor: 'rgba(239,68,68,0.08)' },
+        isNav && { paddingVertical: spacing.md }
+      ]}
+    >
+      <View style={styles.settingIcon}>
+        <Icon color={iconColor || theme.textMuted} size={22} />
+      </View>
+      <View style={styles.settingContent}>
+        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+          <Text style={[styles.settingTitle, { color: theme.text }]}>{title}</Text>
+          {isPro && (
+            <View style={styles.proBadge}>
+              <Text style={styles.proText}>PRO</Text>
+            </View>
+          )}
+        </View>
+        {desc && <Text style={[styles.settingDesc, { color: theme.textMuted }]}>{desc}</Text>}
+      </View>
+      {onToggle && !isNav && (
+        <Switch
+          value={value}
+          onValueChange={onToggle}
+          trackColor={{ false: theme.border, true: trackTrue || theme.primary }}
+        />
+      )}
+      {isNav && (
+        <View style={styles.navAction}>
+          {value !== undefined && <Text style={[styles.navValue, { color: theme.textMuted }]}>{value ? 'Açık' : 'Kapalı'}</Text>}
+          <ChevronRight color={theme.textMuted} size={20} />
+        </View>
+      )}
+    </Wrapper>
+  );
+};
+
+const SectionDesc = ({ text, isProInfo }: { text: string, isProInfo?: boolean }) => {
+  const theme = useAppTheme();
+  return (
+    <Text style={[styles.sectionDesc, { color: theme.textMuted }]}>
+      {isProInfo ? (
+        <Text>
+          <Text style={{color: theme.text}}>{text.split('Pro Paket')[0]}</Text>
+          <Text style={{fontWeight: '700', color: theme.text}}>Pro Paket</Text>
+          <Text style={{color: theme.text}}>{text.split('Pro Paket')[1]}</Text>
+        </Text>
+      ) : text}
+    </Text>
+  );
+};
