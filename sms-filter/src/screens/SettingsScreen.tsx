@@ -532,13 +532,16 @@ export default function SettingsScreen() {
           icon={Globe}
           iconColor={theme.primary}
           title={t.blockForeign}
+          desc="Türkiye (+90) dışından gelen SMS'leri engeller"
           value={settings.blockForeignNumbers}
           onToggle={() => toggleSetting('blockForeignNumbers')}
         />
+        <View style={{height: 12}} />
         <SettingRow
           icon={AlertTriangle}
           iconColor="#F59E0B"
           title={t.blockArabic}
+          desc="Arapça karakter içeren SMS'leri engeller"
           value={settings.blockArabic}
           onToggle={() => toggleSetting('blockArabic')}
         />
