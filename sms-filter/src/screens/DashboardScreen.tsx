@@ -43,33 +43,24 @@ export default function DashboardScreen() {
 
   const BACKEND_URL = 'https://smsfiltre-v4.onrender.com/api/report';
 
-  const handleReportSpam = async () => {
+  const handleReportSpam = () => {
     if (!reportKeyword.trim()) {
       Alert.alert('Hata', 'Lütfen bir kelime veya numara girin.');
       return;
     }
     
-    setIsSubmitting(true);
-    try {
-      const response = await fetch(BACKEND_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword: reportKeyword, type: 'word' })
-      });
-      
-      const result = await response.json();
-      if (response.ok) {
-        Alert.alert('Teşekkürler!', result.message);
-        setReportKeyword('');
-        setIsReportModalVisible(false);
-      } else {
-        Alert.alert('Hata', result.error || 'Şikayet gönderilemedi.');
-      }
-    } catch (error) {
-      Alert.alert('Bağlantı Hatası', 'Oto-Pilot sunucusuna ulaşılamadı. Sunucunun açık olduğundan emin olun.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    const keywordToReport = reportKeyword;
+    // Optimistic UI: Hemen başarılı göster ve modalı kapat (Render uyanmasını bekletme)
+    Alert.alert('Teşekkürler!', 'Şikayetiniz incelenmek üzere bulut sistemine iletildi.');
+    setReportKeyword('');
+    setIsReportModalVisible(false);
+
+    // Arka planda fire-and-forget gönderim
+    fetch(BACKEND_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword: keywordToReport, type: 'word' })
+    }).catch(error => console.log('Arka plan raporlama hatası:', error));
   };
 
   useFocusEffect(
