@@ -481,7 +481,7 @@ export default function SettingsScreen() {
           value={settings.blockForeignNumbers}
           onToggle={() => toggleSetting('blockForeignNumbers')}
         />
-        <View style={{height: 20}} />
+        <View style={{height: 12}} />
         <SettingRow
           icon={AlertTriangle}
           iconColor="#F59E0B"
