@@ -42,6 +42,7 @@ export interface AppSettings {
   language: 'tr' | 'en';
   customFraudKeywords: string[];
   whitelist: string[];
+  autoSyncEnabled?: boolean;
 }
 
 export interface Stats {
@@ -152,6 +153,7 @@ const defaultSettings: AppSettings = {
   language: 'tr',
   customFraudKeywords: [],
   whitelist: [],
+  autoSyncEnabled: true,
 };
 
 const defaultStats: Stats = {

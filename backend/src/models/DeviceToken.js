@@ -9,6 +9,14 @@ const deviceTokenSchema = new mongoose.Schema({
   lastActive: {
     type: Date,
     default: Date.now
+  },
+  points: {
+    type: Number,
+    default: 0
+  },
+  reportsCount: {
+    type: Number,
+    default: 0
   }
 }, { timestamps: true });
 

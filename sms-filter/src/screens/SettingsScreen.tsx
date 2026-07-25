@@ -343,6 +343,9 @@ function DatabaseScreen({ navigation }: any) {
             </Text>
           </TouchableOpacity>
         </View>
+        <View style={{height: spacing.xl}}/>
+        <SettingRow icon={Activity} iconColor={theme.primary} title="Otomatik Arka Plan Güncellemesi" value={settings.autoSyncEnabled !== false} onToggle={() => toggleSetting('autoSyncEnabled')} />
+        <SectionDesc text="Uygulama kapalıyken bile günde 2 kez buluttan en yeni tehdit verilerini arka planda cihazınıza indirir. İnternet ve şarj tüketimi yok denecek kadar azdır." />
       </View>
     </ScrollView>
   );
@@ -539,6 +542,7 @@ export default function SettingsScreen() {
     language: 'tr',
     customFraudKeywords: [],
     whitelist: [],
+    autoSyncEnabled: true,
   });
 
   useEffect(() => {
@@ -552,6 +556,15 @@ export default function SettingsScreen() {
     setSettings(newSettings as any);
     await FilterManager.saveSettings(newSettings as any);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    if (key === 'autoSyncEnabled') {
+      const { registerBackgroundSync, unregisterBackgroundSync } = require('../services/BackgroundSyncService');
+      if (!val) { // it was false, now true
+        registerBackgroundSync();
+      } else {
+        unregisterBackgroundSync();
+      }
+    }
   };
 
   const updateSetting = async (key: keyof AppSettings, value: any) => {

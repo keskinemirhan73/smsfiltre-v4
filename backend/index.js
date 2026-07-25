@@ -67,7 +67,7 @@ const verifyAdmin = (req, res, next) => {
 // PUBLIC API: Report a spam keyword
 app.post('/api/report', async (req, res) => {
   try {
-    const { keyword, type } = req.body;
+    const { keyword, type, token } = req.body;
     const userIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
 
     if (!keyword) return res.status(400).json({ error: 'Kelime boş olamaz' });
@@ -125,7 +125,18 @@ app.post('/api/report', async (req, res) => {
 
     if (rule.reportCount >= THRESHOLD && rule.status === 'pending') {
       console.log(`[OTO-PİLOT] "${lowerKeyword}" eşiği geçti! Onay bekleniyor.`);
-      // Admin dashboard'da görünecek, GitHub'a PR atmıyoruz artık
+    }
+
+    // Gamification: Give points to the user
+    if (token) {
+      try {
+        await DeviceToken.findOneAndUpdate(
+          { token },
+          { $inc: { points: 10, reportsCount: 1 }, lastActive: Date.now() }
+        );
+      } catch (e) {
+        console.error('Puan eklenirken hata:', e.message);
+      }
     }
 
     res.status(200).json({ 
@@ -138,6 +149,84 @@ app.post('/api/report', async (req, res) => {
   } catch (error) {
     console.error('[HATA]', error.message);
     res.status(500).json({ error: 'Sunucu hatası, lütfen tekrar deneyin.' });
+  }
+});
+
+const AIAnalysisCache = require('./src/models/AIAnalysisCache');
+
+// PUBLIC API: Analyze text with Gemini AI (with Cache)
+app.post('/api/analyze', async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || text.trim().length < 5) {
+      return res.status(400).json({ error: 'Lütfen analiz edilecek anlamlı bir metin girin.' });
+    }
+
+    const cleanText = text.trim();
+
+    // 1. Check Cache
+    const cached = await AIAnalysisCache.findOne({ messageText: cleanText });
+    if (cached) {
+      cached.queryCount += 1;
+      await cached.save();
+      return res.json({
+        success: true,
+        cached: true,
+        riskLevel: cached.riskLevel,
+        threatType: cached.threatType,
+        recommendation: cached.recommendation
+      });
+    }
+
+    // 2. Ask Gemini
+    if (!genAI) {
+      return res.status(500).json({ error: 'Yapay Zeka servisi şu an kullanılamıyor.' });
+    }
+
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const prompt = `Şu SMS metnini analiz et: "${cleanText}"
+Görev: Bu metin bir dolandırıcılık, oltalama (phishing), yasadışı bahis veya spam mıdır?
+Lütfen SADECE aşağıdaki JSON formatında ve Türkçe cevap ver, ekstra hiçbir kelime yazma:
+{
+  "riskLevel": "Düşük" | "Orta" | "Yüksek" | "Çok Yüksek",
+  "threatType": "Kısa bir tehdit özeti (Örn: Zararlı Link, Aciliyet Hissi, Zararsız vb.)",
+  "recommendation": "Kullanıcıya 1 cümlelik tavsiye"
+}`;
+
+    const result = await model.generateContent(prompt);
+    let aiResponse = result.response.text().trim();
+    
+    // Remove markdown code blocks if Gemini added them
+    if (aiResponse.startsWith('\`\`\`json')) {
+      aiResponse = aiResponse.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
+    }
+
+    let parsedResponse;
+    try {
+      parsedResponse = JSON.parse(aiResponse);
+    } catch (e) {
+      console.error('Gemini JSON Parse Hatası:', aiResponse);
+      return res.status(500).json({ error: 'Yapay zeka yanıtı anlaşılamadı.' });
+    }
+
+    // 3. Save to Cache
+    const newCache = new AIAnalysisCache({
+      messageText: cleanText,
+      riskLevel: parsedResponse.riskLevel || 'Orta',
+      threatType: parsedResponse.threatType || 'Bilinmiyor',
+      recommendation: parsedResponse.recommendation || 'Dikkatli olun.'
+    });
+    await newCache.save();
+
+    res.json({
+      success: true,
+      cached: false,
+      ...parsedResponse
+    });
+
+  } catch (error) {
+    console.error('[ANALYZE HATA]', error.message);
+    res.status(500).json({ error: 'Analiz sırasında sunucu hatası oluştu.' });
   }
 });
 
@@ -168,6 +257,34 @@ app.post('/api/push-token', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Token kaydedilemedi' });
+  }
+});
+
+// PUBLIC API: Get User Profile (Gamification)
+app.post('/api/user/profile', async (req, res) => {
+  try {
+    const { token } = req.body;
+    if (!token) return res.status(400).json({ error: 'Token gerekli' });
+
+    let user = await DeviceToken.findOne({ token });
+    if (!user) {
+      user = new DeviceToken({ token, points: 0, reportsCount: 0 });
+      await user.save();
+    }
+
+    // Determine Badge
+    let badge = 'Acemi Kalkan';
+    if (user.points >= 500) badge = 'Siber Güvenlik Uzmanı';
+    else if (user.points >= 100) badge = 'Spam Savaşçısı';
+    else if (user.points >= 50) badge = 'Aktif Kalkan';
+
+    res.json({
+      points: user.points || 0,
+      reportsCount: user.reportsCount || 0,
+      badge
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Profil alınamadı' });
   }
 });
 

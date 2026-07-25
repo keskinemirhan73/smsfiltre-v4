@@ -1,5 +1,5 @@
-import React from 'react';
 import { Shield, Lock, FileText, CheckCircle, Mail, Database } from 'lucide-react';
+import Link from 'next/link';
 
 export const metadata = {
   title: 'Gizlilik Politikası | SMS Filtre AI',
@@ -53,7 +53,7 @@ export default function PrivacyPolicy() {
             <Lock className="w-8 h-8 text-[#7cff5b] mb-4" />
             <h2 className="text-xl font-bold text-white mb-2">Veri Güvenliği</h2>
             <p className="text-[#a9bfd3] leading-relaxed">
-              Kullanıcı bilgileri (push token'lar vb.) endüstri standartlarında şifreleme ile korunur ve 3. şahıslarla asla paylaşılmaz veya satılmaz.
+              Kullanıcı bilgileri (push token&apos;lar vb.) endüstri standartlarında şifreleme ile korunur ve 3. şahıslarla asla paylaşılmaz veya satılmaz.
             </p>
           </div>
         </div>
@@ -69,11 +69,11 @@ export default function PrivacyPolicy() {
             <ul className="space-y-3 text-[#a9bfd3] ml-4 list-none">
               <li className="flex items-start gap-2">
                 <CheckCircle size={18} className="text-[#7cff5b] mt-1 shrink-0" />
-                <span><strong>Push Bildirim Token'ları:</strong> Size önemli sistem güncellemeleri ve yeni spam kural duyuruları yapabilmek için cihazınıza özel push bildirim anahtarını anonim olarak saklarız.</span>
+                <span><strong>Push Bildirim Token&apos;ları:</strong> Size önemli sistem güncellemeleri ve yeni spam kural duyuruları yapabilmek için cihazınıza özel push bildirim anahtarını anonim olarak saklarız.</span>
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle size={18} className="text-[#7cff5b] mt-1 shrink-0" />
-                <span><strong>Gönüllü Spam Bildirimleri:</strong> Yalnızca siz bir mesajı "Spam Olarak Bildir" seçeneği ile bilerek gönderdiğinizde, o mesajın içeriği sistemimizi eğitmek amacıyla sunucularımıza iletilir.</span>
+                <span><strong>Gönüllü Spam Bildirimleri:</strong> Yalnızca siz bir mesajı &quot;Spam Olarak Bildir&quot; seçeneği ile bilerek gönderdiğinizde, o mesajın içeriği sistemimizi eğitmek amacıyla sunucularımıza iletilir.</span>
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle size={18} className="text-[#7cff5b] mt-1 shrink-0" />
@@ -117,8 +117,8 @@ export default function PrivacyPolicy() {
         <footer className="text-center text-[#eef7ff]/60 text-sm py-8 border-t border-white/10">
           <p>© {new Date().getFullYear()} FiltreAI. Tüm hakları saklıdır.</p>
           <div className="flex justify-center gap-4 mt-4">
-            <a href="/" className="hover:text-[#22d3ee] transition-colors">Ana Sayfa</a>
-            <a href="/terms" className="hover:text-[#22d3ee] transition-colors">Kullanım Koşulları</a>
+            <Link href="/" className="hover:text-[#22d3ee] transition-colors">Ana Sayfa</Link>
+            <Link href="/terms" className="hover:text-[#22d3ee] transition-colors">Kullanım Koşulları</Link>
           </div>
         </footer>
 

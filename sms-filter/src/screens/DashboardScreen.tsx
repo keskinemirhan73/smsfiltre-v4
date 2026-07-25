@@ -53,12 +53,15 @@ export default function DashboardScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
     try {
+      const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync();
+      
       const resp = await fetch(BACKEND_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text: reportKeyword,
-          category: 'spam',
+          keyword: reportKeyword,
+          type: 'word',
+          token: expoPushToken,
           deviceInfo: Platform.OS,
         })
       });

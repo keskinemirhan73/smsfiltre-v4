@@ -52,7 +52,7 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <button className="w-full sm:w-auto flex items-center justify-center gap-3 bg-gradient-to-r from-[#22d3ee] to-[#7cff5b] text-[#071625] px-8 py-4 rounded-2xl font-bold text-lg hover:scale-105 transition-transform shadow-[0_0_40px_rgba(34,211,238,0.3)]">
               <Smartphone size={24} />
-              App Store'dan İndir
+              App Store&apos;dan İndir
             </button>
             <button className="w-full sm:w-auto flex items-center justify-center gap-3 bg-white/10 border border-white/20 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:bg-white/20 transition-colors backdrop-blur-sm">
               Özellikleri Keşfet

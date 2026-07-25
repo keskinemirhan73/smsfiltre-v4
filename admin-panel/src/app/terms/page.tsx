@@ -1,5 +1,5 @@
-import React from 'react';
 import { FileText, AlertTriangle, CheckCircle, Scale, Users } from 'lucide-react';
+import Link from 'next/link';
 
 export const metadata = {
   title: 'Kullanım Koşulları | SMS Filtre AI',
@@ -50,7 +50,7 @@ export default function TermsOfService() {
             </p>
             <ul className="space-y-2 text-[#a9bfd3] list-disc list-inside ml-2">
               <li>Uygulama, %100 doğruluk garantisi vermez.</li>
-              <li>Filtreleme işlemi yerel olarak (cihazda) ve isteğe bağlı olarak bulut API'leri kullanılarak yapılır.</li>
+              <li>Filtreleme işlemi yerel olarak (cihazda) ve isteğe bağlı olarak bulut API&apos;leri kullanılarak yapılır.</li>
               <li>Hizmet kesintisiz veya tamamen hatasız olmayabilir.</li>
             </ul>
           </div>
@@ -71,7 +71,7 @@ export default function TermsOfService() {
               </li>
               <li className="flex items-start gap-2">
                 <AlertTriangle size={18} className="text-[#F59E0B] mt-1 shrink-0" />
-                <span>Kullanıcı, "Spam Olarak Bildir" özelliğini kötüye kullanamaz veya yanıltıcı bildirimlerde bulunamaz.</span>
+                <span>Kullanıcı, &quot;Spam Olarak Bildir&quot; özelliğini kötüye kullanamaz veya yanıltıcı bildirimlerde bulunamaz.</span>
               </li>
               <li className="flex items-start gap-2">
                 <AlertTriangle size={18} className="text-[#F59E0B] mt-1 shrink-0" />
@@ -95,8 +95,8 @@ export default function TermsOfService() {
         <footer className="text-center text-[#eef7ff]/60 text-sm py-8 border-t border-white/10">
           <p>© {new Date().getFullYear()} FiltreAI. Tüm hakları saklıdır.</p>
           <div className="flex justify-center gap-4 mt-4">
-            <a href="/" className="hover:text-[#22d3ee] transition-colors">Ana Sayfa</a>
-            <a href="/privacy" className="hover:text-[#22d3ee] transition-colors">Gizlilik Politikası</a>
+            <Link href="/" className="hover:text-[#22d3ee] transition-colors">Ana Sayfa</Link>
+            <Link href="/privacy" className="hover:text-[#22d3ee] transition-colors">Gizlilik Politikası</Link>
           </div>
         </footer>
 

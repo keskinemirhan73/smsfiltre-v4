@@ -19,8 +19,8 @@ export default function AdminDashboard() {
   const [loginError, setLoginError] = useState(false);
   
   // Data state
-  const [pendingItems, setPendingItems] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>({
+  const [pendingItems, setPendingItems] = useState<Record<string, unknown>[]>([]);
+  const [stats, setStats] = useState<Record<string, unknown>>({
     pendingCount: 0,
     approvedCount: 0,
     deviceCount: 0,
@@ -116,6 +116,7 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line
     setMounted(true);
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       setIsDark(true);
@@ -129,10 +130,10 @@ export default function AdminDashboard() {
     { name: 'Onaylı', value: stats.approvedCount, color: '#10b981' },
     { name: 'Bekleyen', value: stats.pendingCount, color: '#f59e0b' }
   ];
-  const barData = stats.topReported.map((item: any) => ({
+  const barData = (stats.topReported as Record<string, unknown>[] | undefined)?.map((item) => ({
     name: item.keyword,
     sikayet: item.reportCount
-  }));
+  })) || [];
 
   if (!isAuthenticated) {
     return (
@@ -270,14 +271,14 @@ export default function AdminDashboard() {
               <div>
                 <h3 className="font-bold text-gray-400 text-sm uppercase mb-3">Son Gönderilen Bildirimler</h3>
                 <div className="space-y-3">
-                  {stats.recentNotifications?.length === 0 ? (
+                  {(!stats.recentNotifications || (stats.recentNotifications as Record<string, unknown>[]).length === 0) ? (
                     <p className="text-gray-500 text-sm">Hiç bildirim gönderilmedi.</p>
                   ) : (
-                    stats.recentNotifications?.map((n: any, i: number) => (
+                    (stats.recentNotifications as Record<string, unknown>[]).map((n, i) => (
                       <div key={i} className={`p-3 rounded-lg text-sm border ${isDark ? 'border-gray-800 bg-gray-800/50' : 'border-gray-100 bg-gray-50'}`}>
-                        <p className="font-bold">{n.title}</p>
-                        <p className="text-gray-400 mt-1 truncate">{n.body}</p>
-                        <p className="text-xs text-emerald-500 mt-2">Başarılı: {n.successCount} | Hatalı: {n.failureCount}</p>
+                        <p className="font-bold">{n.title as string}</p>
+                        <p className="text-gray-400 mt-1 truncate">{n.body as string}</p>
+                        <p className="text-xs text-emerald-500 mt-2">Başarılı: {n.successCount as number} | Hatalı: {n.failureCount as number}</p>
                       </div>
                     ))
                   )}

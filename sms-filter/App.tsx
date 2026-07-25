@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Shield, List, Settings, FlaskConical } from 'lucide-react-native';
+import { Shield, List, Settings, FlaskConical, Sparkles, User } from 'lucide-react-native';
 import { useColorScheme, DeviceEventEmitter } from 'react-native';
 import * as Notifications from 'expo-notifications';
 
@@ -11,11 +11,14 @@ import RulesScreen from './src/screens/RulesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import TestSimulatorScreen from './src/screens/TestSimulatorScreen';
 import CommunityRulesScreen from './src/screens/CommunityRulesScreen';
+import AIAnalysisScreen from './src/screens/AIAnalysisScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
 import { darkColors, lightColors } from './src/theme';
 import { FilterManager } from './src/modules/FilterManager';
 import { ToastProvider } from './src/components/Toast';
 import { registerForPushNotificationsAsync } from './src/services/PushNotificationService';
 import { ThreatCloudService } from './src/services/ThreatCloudService';
+import { registerBackgroundSync, unregisterBackgroundSync } from './src/services/BackgroundSyncService';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -39,6 +42,13 @@ export default function App() {
     registerForPushNotificationsAsync().then(token => {
       if (token) {
         ThreatCloudService.registerPushToken(token);
+      }
+    });
+
+    // Check if background sync is enabled in settings
+    FilterManager.loadSettings().then(settings => {
+      if (settings.autoSyncEnabled !== false) { // Default true
+        registerBackgroundSync();
       }
     });
 
@@ -108,6 +118,20 @@ export default function App() {
             component={CommunityRulesScreen}
             options={{
               tabBarIcon: ({ color, size }) => <List color={color} size={size} />,
+            }}
+          />
+          <Tab.Screen 
+            name="AI Analiz" 
+            component={AIAnalysisScreen}
+            options={{
+              tabBarIcon: ({ color, size }) => <Sparkles color={color} size={size} />,
+            }}
+          />
+          <Tab.Screen 
+            name="Profil" 
+            component={ProfileScreen}
+            options={{
+              tabBarIcon: ({ color, size }) => <User color={color} size={size} />,
             }}
           />
           <Tab.Screen 
