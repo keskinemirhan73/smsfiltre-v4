@@ -313,7 +313,7 @@ export default function DashboardScreen() {
       </Modal>
 
       {/* Modern Bottom Sheet Modal */}
-      <Modal visible={isReportModalVisible} transparent={true} animationType="slide">
+      <Modal visible={isReportModalVisible} transparent={true} animationType="fade">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <TouchableOpacity style={styles.modalDismissArea} onPress={() => setIsReportModalVisible(false)} activeOpacity={1} />
           <View style={[styles.bottomSheet, { backgroundColor: theme.surface, borderColor: theme.border }]}>
