@@ -156,9 +156,9 @@ export default function DashboardScreen() {
             <Text style={[styles.setupDesc, { color: theme.text }]}>
               Filtrelemenin çalışması için telefonunuzun <Text style={{fontWeight: '800'}}>Ayarlar {'>'} Mesajlar {'>'} Bilinmeyenleri Filtrele</Text> menüsüne giderek <Text style={{fontWeight: '800'}}>FiltreAI</Text>'yi seçmeniz gerekmektedir.
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.md }}>
-               <Text style={{ color: '#8B5CF6', fontWeight: '700', marginRight: 4 }}>Nasıl Yapılır?</Text>
-               <ArrowRight size={16} color="#8B5CF6" />
+            <View style={{ backgroundColor: '#8B5CF6', alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 100, flexDirection: 'row', alignItems: 'center', marginTop: spacing.md }}>
+               <Text style={{ color: '#fff', fontWeight: '800', marginRight: 6 }}>Nasıl Yapılır?</Text>
+               <ArrowRight size={18} color="#fff" />
             </View>
           </TouchableOpacity>
         )}
