@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, ShieldAlert, BarChart3, Users, 
-  Settings, Globe, Moon, Sun, CheckCircle, XCircle, Lock, LogIn
+  Settings, Globe, Moon, Sun, CheckCircle, XCircle, Lock, LogIn, Bell, Send
 } from 'lucide-react';
 
 const TRANSLATIONS = {
@@ -24,7 +24,12 @@ const TRANSLATIONS = {
     loginTitle: 'Yönetici Girişi',
     loginDesc: 'Devam etmek için yönetici şifrenizi girin.',
     loginBtn: 'Giriş Yap',
-    passwordPlaceholder: 'Şifre...'
+    passwordPlaceholder: 'Şifre...',
+    sendNotif: 'Toplu Bildirim Gönder',
+    notifTitle: 'Bildirim Başlığı',
+    notifBody: 'Bildirim İçeriği',
+    sendBtn: 'Gönder',
+    sending: 'Gönderiliyor...'
   },
   en: {
     title: 'Auto-Pilot Admin Panel',
@@ -44,7 +49,12 @@ const TRANSLATIONS = {
     loginTitle: 'Admin Login',
     loginDesc: 'Enter your admin password to continue.',
     loginBtn: 'Login',
-    passwordPlaceholder: 'Password...'
+    passwordPlaceholder: 'Password...',
+    sendNotif: 'Send Global Notification',
+    notifTitle: 'Notification Title',
+    notifBody: 'Notification Body',
+    sendBtn: 'Send',
+    sending: 'Sending...'
   }
 };
 
@@ -64,6 +74,12 @@ export default function AdminDashboard() {
     spamKeywords: [], blacklistedNumbers: []
   });
   const [loadingItems, setLoadingItems] = useState<Record<number, boolean>>({});
+  
+  // Notification State
+  const [notifTitle, setNotifTitle] = useState('');
+  const [notifBody, setNotifBody] = useState('');
+  const [isSendingNotif, setIsSendingNotif] = useState(false);
+  const [notifStatus, setNotifStatus] = useState<{type: 'success'|'error', msg: string} | null>(null);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
@@ -116,6 +132,35 @@ export default function AdminDashboard() {
       console.error(e);
     }
     setLoadingItems(prev => ({ ...prev, [id]: false }));
+  };
+
+  const handleSendNotification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!notifTitle || !notifBody) return;
+    setIsSendingNotif(true);
+    setNotifStatus(null);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/send-notification`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${password}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ title: notifTitle, body: notifBody })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setNotifStatus({ type: 'success', msg: data.message || 'Başarıyla gönderildi.' });
+        setNotifTitle('');
+        setNotifBody('');
+      } else {
+        setNotifStatus({ type: 'error', msg: data.error || 'Gönderim başarısız.' });
+      }
+    } catch (e) {
+      setNotifStatus({ type: 'error', msg: 'Sunucuya ulaşılamadı.' });
+    }
+    setIsSendingNotif(false);
+    setTimeout(() => setNotifStatus(null), 5000);
   };
 
   useEffect(() => {
@@ -259,6 +304,45 @@ export default function AdminDashboard() {
                 <p className="text-4xl font-black mt-1 text-emerald-500">ONLINE</p>
               </div>
 
+            </div>
+          </div>
+
+          {/* NOTIFICATION CARD */}
+          <div>
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <Bell className="w-5 h-5 text-indigo-500" /> {t.sendNotif}
+            </h2>
+            <div className={`p-6 rounded-2xl border ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
+              <form onSubmit={handleSendNotification} className="space-y-4">
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{t.notifTitle}</label>
+                  <input 
+                    type="text" required
+                    value={notifTitle} onChange={e => setNotifTitle(e.target.value)}
+                    className={`w-full px-4 py-2 rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'}`}
+                  />
+                </div>
+                <div>
+                  <label className={`block text-sm font-medium mb-1 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{t.notifBody}</label>
+                  <textarea 
+                    required rows={3}
+                    value={notifBody} onChange={e => setNotifBody(e.target.value)}
+                    className={`w-full px-4 py-2 rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? 'bg-gray-800 border-gray-700 text-white' : 'bg-gray-50 border-gray-300 text-gray-900'}`}
+                  />
+                </div>
+                {notifStatus && (
+                  <div className={`p-3 rounded-xl text-sm ${notifStatus.type === 'success' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
+                    {notifStatus.msg}
+                  </div>
+                )}
+                <button 
+                  type="submit" disabled={isSendingNotif}
+                  className={`w-full font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors ${isSendingNotif ? 'opacity-70 bg-indigo-800' : 'bg-indigo-600 hover:bg-indigo-700'} text-white`}
+                >
+                  <Send className="w-4 h-4" />
+                  {isSendingNotif ? t.sending : t.sendBtn}
+                </button>
+              </form>
             </div>
           </div>
 

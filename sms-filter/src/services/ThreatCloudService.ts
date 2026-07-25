@@ -105,4 +105,24 @@ export class ThreatCloudService {
       return 'Bilinmiyor';
     }
   }
+
+  /**
+   * Cihazın Push Notification Token'ını sunucuya kaydeder.
+   */
+  static async registerPushToken(token: string): Promise<boolean> {
+    try {
+      const BACKEND_URL = 'https://smsfiltre-v4.onrender.com/api/push-token';
+      const response = await fetch(BACKEND_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token }),
+      });
+      return response.ok;
+    } catch (error) {
+      console.warn('Push token register error:', error);
+      return false;
+    }
+  }
 }

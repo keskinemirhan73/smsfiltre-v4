@@ -1,8 +1,13 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
 const { Octokit } = require('@octokit/rest');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { Expo } = require('expo-server-sdk');
+
+// Initialize Expo SDK client
+let expo = new Expo();
 
 const app = express();
 app.use(cors());
@@ -248,6 +253,75 @@ app.post('/api/reject/:pull_number', verifyAdmin, async (req, res) => {
   } catch (error) {
     console.error('[API Error]', error);
     res.status(500).json({ error: 'Reddetme başarısız' });
+  }
+});
+
+// PUSH NOTIFICATIONS STORAGE
+const TOKENS_FILE = 'pushTokens.json';
+let savedPushTokens = [];
+try {
+  if (fs.existsSync(TOKENS_FILE)) {
+    savedPushTokens = JSON.parse(fs.readFileSync(TOKENS_FILE, 'utf8'));
+  }
+} catch (e) {
+  console.log("Token dosyası okunamadı", e);
+}
+
+const saveTokens = () => {
+  fs.writeFileSync(TOKENS_FILE, JSON.stringify(savedPushTokens, null, 2));
+};
+
+// Cihazdan Token Alıp Kaydetme
+app.post('/api/push-token', (req, res) => {
+  const { token } = req.body;
+  if (!token || !Expo.isExpoPushToken(token)) {
+    return res.status(400).json({ error: 'Geçersiz Token' });
+  }
+  
+  if (!savedPushTokens.includes(token)) {
+    savedPushTokens.push(token);
+    saveTokens();
+    console.log(`[YENİ TOKEN] Cihaz kaydedildi. Toplam cihaz: ${savedPushTokens.length}`);
+  }
+  
+  res.json({ success: true });
+});
+
+// Admin API: Tüm Cihazlara Bildirim Gönder
+app.post('/api/admin/send-notification', verifyAdmin, async (req, res) => {
+  try {
+    const { title, body } = req.body;
+    if (!title || !body) return res.status(400).json({ error: 'Başlık ve mesaj gereklidir' });
+
+    let messages = [];
+    for (let pushToken of savedPushTokens) {
+      if (!Expo.isExpoPushToken(pushToken)) {
+        continue;
+      }
+      messages.push({
+        to: pushToken,
+        sound: 'default',
+        title: title,
+        body: body,
+        data: { withSome: 'data' },
+      });
+    }
+
+    let chunks = expo.chunkPushNotifications(messages);
+    let tickets = [];
+    for (let chunk of chunks) {
+      try {
+        let ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+        tickets.push(...ticketChunk);
+      } catch (error) {
+        console.error(error);
+      }
+    }
+    
+    res.json({ success: true, message: `${savedPushTokens.length} cihaza bildirim gönderildi.`, tickets });
+  } catch (error) {
+    console.error('[PUSH ERROR]', error);
+    res.status(500).json({ error: 'Bildirim gönderilemedi' });
   }
 });
 

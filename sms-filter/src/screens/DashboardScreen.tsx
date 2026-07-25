@@ -27,6 +27,7 @@ export default function DashboardScreen() {
   const [recentActivity, setRecentActivity] = useState<HistoryItem[]>([]);
   const [cloudThreatCount, setCloudThreatCount] = useState<number>(0);
 
+  const [isSetupModalVisible, setIsSetupModalVisible] = useState(false);
   const [isReportModalVisible, setIsReportModalVisible] = useState(false);
   const [reportKeyword, setReportKeyword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -46,8 +47,6 @@ export default function DashboardScreen() {
 
   const BACKEND_URL = 'https://smsfiltre-v4.onrender.com/api/report';
 
-  const handleReportSpam = () => {
-    if (!reportKeyword.trim()) {
   const handleReport = async () => {
     if (!reportKeyword.trim()) return;
     setIsSubmitting(true);
@@ -181,9 +180,13 @@ export default function DashboardScreen() {
               </View>
               <Text style={[styles.setupTitle, { color: '#8B5CF6' }]}>Filtreyi Aktifleştirin</Text>
             </View>
-            <Text style={[styles.setupDesc, { color: theme.text }]}>
-              Filtrelemenin çalışması için telefonunuzun Ayarlar > Mesajlar > Bilinmeyenleri Filtrele menüsüne giderek FiltreAI'yi seçmeniz gerekmektedir.
+            <Text style={[styles.setupDesc, { color: theme.text, marginBottom: spacing.md }]}>
+              Filtrelemenin çalışması için telefonunuzun Ayarlar &gt; Mesajlar &gt; Bilinmeyenleri Filtrele menüsüne giderek FiltreAI'yi seçmeniz gerekmektedir.
             </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#8B5CF6', paddingVertical: 10, paddingHorizontal: 16, borderRadius: radii.md, alignSelf: 'flex-start' }}>
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14, marginRight: 6 }}>Hemen Kurulumu Yap</Text>
+              <ArrowRight size={16} color="#fff" />
+            </View>
           </TouchableOpacity>
         )}
 
@@ -327,15 +330,49 @@ export default function DashboardScreen() {
               <X size={28} color={theme.text} />
             </TouchableOpacity>
           </View>
-          <View style={styles.fullModalContent}>
-            <ShieldCheck size={80} color="#8B5CF6" />
+          
+          <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: 150, alignItems: 'center' }}>
+            <View style={[styles.setupIllustration, { backgroundColor: 'rgba(139,92,246,0.1)' }]}>
+              <ShieldCheck size={48} color="#8B5CF6" />
+            </View>
             <Text style={[styles.setupModalTitle, { color: theme.text }]}>Filtreyi Etkinleştir</Text>
-            <Text style={[styles.setupModalDesc, { color: theme.textMuted }]}>Ayarlar > Mesajlar > Bilinmeyenleri Filtrele üzerinden FiltreAI'yi açın.</Text>
+            <Text style={[styles.setupModalDesc, { color: theme.textMuted }]}>
+              Gelen şüpheli mesajları anında durdurmak için aşağıdaki adımları takip edin.
+            </Text>
+            
+            <View style={[styles.setupStepsBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <View style={styles.setupStep}>
+                <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}><Text style={styles.stepNumberText}>1</Text></View>
+                <Text style={[styles.stepText, { color: theme.text }]}>Telefonunuzun <Text style={{fontWeight:'800'}}>Ayarlar</Text> uygulamasına girin.</Text>
+              </View>
+              <View style={styles.setupStepDivider} />
+              
+              <View style={styles.setupStep}>
+                <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}><Text style={styles.stepNumberText}>2</Text></View>
+                <Text style={[styles.stepText, { color: theme.text }]}><Text style={{fontWeight:'800'}}>Mesajlar</Text> bölümünü bulun ve açın.</Text>
+              </View>
+              <View style={styles.setupStepDivider} />
+              
+              <View style={styles.setupStep}>
+                <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}><Text style={styles.stepNumberText}>3</Text></View>
+                <Text style={[styles.stepText, { color: theme.text }]}><Text style={{fontWeight:'800'}}>Bilinmeyenleri Filtrele</Text> (veya İstenmeyenler) menüsüne dokunun.</Text>
+              </View>
+              <View style={styles.setupStepDivider} />
+              
+              <View style={styles.setupStep}>
+                <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}><Text style={styles.stepNumberText}>4</Text></View>
+                <Text style={[styles.stepText, { color: theme.text }]}><Text style={{fontWeight:'800'}}>FiltreAI</Text> uygulamasını seçip yeşil tik ile onaylayın.</Text>
+              </View>
+            </View>
+          </ScrollView>
+
+          <View style={[styles.setupFooter, { backgroundColor: theme.background, borderColor: theme.border }]}>
             <TouchableOpacity 
-              style={styles.openSettingsBtn}
+              style={[styles.openSettingsBtn, { backgroundColor: '#8B5CF6' }]}
               onPress={() => Linking.openSettings()}
             >
               <Text style={styles.openSettingsBtnText}>Ayarları Aç</Text>
+              <ArrowRight size={20} color="#fff" />
             </TouchableOpacity>
           </View>
         </View>

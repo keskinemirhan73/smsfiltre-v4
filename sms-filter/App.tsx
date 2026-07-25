@@ -13,6 +13,8 @@ import TestSimulatorScreen from './src/screens/TestSimulatorScreen';
 import { darkColors, lightColors } from './src/theme';
 import { FilterManager } from './src/modules/FilterManager';
 import { ToastProvider } from './src/components/Toast';
+import { registerForPushNotificationsAsync } from './src/services/PushNotificationService';
+import { ThreatCloudService } from './src/services/ThreatCloudService';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -30,6 +32,14 @@ export default function App() {
 
   useEffect(() => {
     FilterManager.loadSettings().then(s => setAppTheme(s.theme || 'system'));
+
+    // Register for push notifications and send token to backend
+    registerForPushNotificationsAsync().then(token => {
+      if (token) {
+        ThreatCloudService.registerPushToken(token);
+      }
+    });
+
     const sub = DeviceEventEmitter.addListener('onThemeChanged', (newTheme) => {
       setAppTheme(newTheme);
     });
