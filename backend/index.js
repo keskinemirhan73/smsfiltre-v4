@@ -183,7 +183,7 @@ app.post('/api/analyze', async (req, res) => {
       return res.status(500).json({ error: 'Yapay Zeka servisi şu an kullanılamıyor.' });
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
     const prompt = `Şu SMS metnini analiz et: "${cleanText}"
 Görev: Bu metin bir dolandırıcılık, oltalama (phishing), yasadışı bahis veya spam mıdır?
 Lütfen SADECE aşağıdaki JSON formatında ve Türkçe cevap ver, ekstra hiçbir kelime yazma:
