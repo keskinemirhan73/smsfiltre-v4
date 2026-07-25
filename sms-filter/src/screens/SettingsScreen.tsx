@@ -102,13 +102,11 @@ export default function SettingsScreen() {
           {desc && <Text style={[styles.settingDesc, { color: theme.textMuted }]}>{desc}</Text>}
         </View>
         {onToggle && !isNav && (
-          <View style={{width: 52, height: 32, justifyContent: 'center', alignItems: 'flex-end'}} collapsable={false}>
-            <Switch
-              value={value}
-              onValueChange={onToggle}
-              trackColor={{ false: theme.border, true: trackTrue || theme.primary }}
-            />
-          </View>
+          <Switch
+            value={value}
+            onValueChange={onToggle}
+            trackColor={{ false: theme.border, true: trackTrue || theme.primary }}
+          />
         )}
         {isNav && (
           <View style={styles.navAction}>
