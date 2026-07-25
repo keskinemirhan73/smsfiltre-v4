@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, TextInput, Alert, DeviceEventEmitter } from 'react-native';
 import { ShieldAlert, Brain, Clock, FolderKanban, ShieldCheck, Database, Zap, Network, ListFilter, Globe, AlertTriangle, Info, ChevronRight, ChevronLeft, FileX, Palette, Languages } from 'lucide-react-native';
 import { useAppTheme, spacing, radii } from '../theme';
 import { FilterManager, AppSettings } from '../modules/FilterManager';
@@ -39,7 +39,11 @@ export default function SettingsScreen() {
     },
     aiSensitivity: 0.8,
     blockForeignNumbers: false,
+    blockArabic: false,
+    theme: 'system',
+    language: 'tr',
     customFraudKeywords: [],
+    whitelist: [],
   });
 
   useEffect(() => {
@@ -58,6 +62,9 @@ export default function SettingsScreen() {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings as any);
     await FilterManager.saveSettings(newSettings as any);
+    if (key === 'theme') {
+      DeviceEventEmitter.emit('onThemeChanged', value);
+    }
   };
   
   const t = getT(settings.language as any || 'tr');

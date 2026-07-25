@@ -1,21 +1,33 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Shield, List, Settings, FlaskConical } from 'lucide-react-native';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, DeviceEventEmitter } from 'react-native';
 
 import DashboardScreen from './src/screens/DashboardScreen';
 import RulesScreen from './src/screens/RulesScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import TestSimulatorScreen from './src/screens/TestSimulatorScreen';
 import { darkColors, lightColors } from './src/theme';
+import { FilterManager } from './src/modules/FilterManager';
 
 const Tab = createBottomTabNavigator();
 
 export default function App() {
-  const scheme = useColorScheme();
-  const themeColors = scheme === 'dark' ? darkColors : lightColors;
+  const systemScheme = useColorScheme();
+  const [appTheme, setAppTheme] = useState('system');
+
+  useEffect(() => {
+    FilterManager.loadSettings().then(s => setAppTheme(s.theme || 'system'));
+    const sub = DeviceEventEmitter.addListener('onThemeChanged', (newTheme) => {
+      setAppTheme(newTheme);
+    });
+    return () => sub.remove();
+  }, []);
+
+  const isDark = appTheme === 'dark' || (appTheme === 'system' && systemScheme === 'dark');
+  const themeColors = isDark ? darkColors : lightColors;
 
   return (
     <>
