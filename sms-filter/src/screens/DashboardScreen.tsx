@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity, Modal, TextInput, Alert, ActivityIndicator, Animated, Platform, KeyboardAvoidingView, Easing } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity, Modal, TextInput, Alert, ActivityIndicator, Animated, Platform, KeyboardAvoidingView, Easing, Linking } from 'react-native';
 import { ShieldAlert, Zap, History, ShieldCheck, TrendingUp, Receipt, Megaphone, ShieldBan, X, ArrowRight, Activity, Globe } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppTheme, spacing, radii } from '../theme';
@@ -277,12 +277,12 @@ export default function DashboardScreen() {
             <TouchableOpacity 
               style={[styles.openSettingsBtn, { backgroundColor: '#8B5CF6' }]}
               activeOpacity={0.8}
-              onPress={() => {
-                import('react-native').then(({ Linking }) => {
-                  Linking.openURL('App-Prefs:root=MESSAGES').catch(() => {
-                    Linking.openSettings();
-                  });
-                });
+              onPress={async () => {
+                try {
+                  await Linking.openURL('App-Prefs:root=MESSAGES');
+                } catch (e) {
+                  Linking.openSettings();
+                }
               }}
             >
               <Text style={styles.openSettingsBtnText}>Ayarları Aç</Text>
