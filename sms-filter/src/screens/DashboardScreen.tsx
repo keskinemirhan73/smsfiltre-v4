@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity, Modal
 import { ShieldAlert, Zap, History, ShieldCheck, TrendingUp, Receipt, Megaphone, ShieldBan } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAppTheme, spacing, radii } from '../theme';
-import { FilterManager, AppSettings, Stats, HistoryItem, THREAT_DATABASE } from '../modules/FilterManager';
+import { FilterManager, AppSettings, Stats, HistoryItem } from '../modules/FilterManager';
 import { ThreatCloudService } from '../services/ThreatCloudService';
 
 const { width } = Dimensions.get('window');
@@ -62,13 +62,9 @@ export default function DashboardScreen() {
       FilterManager.loadSettings().then(setSettings);
       FilterManager.loadStats().then(setStats);
       FilterManager.loadHistory().then(setRecentActivity);
-      // Önce buluttan senkronize et, sonra sayıyı güncelle
       ThreatCloudService.syncDatabase().then(() => {
         ThreatCloudService.getDatabase().then(db => {
-          const cloudCount = db.blacklistedNumbers.length + db.spamKeywords.length + db.scamUrls.length + (db.regexPatterns?.length || 0);
-          const localCount = THREAT_DATABASE.length;
-          // Tekrarlayanları çıkar, toplamı göster
-          setCloudThreatCount(cloudCount + localCount);
+          setCloudThreatCount(db.spamKeywords.length + db.scamUrls.length + (db.regexPatterns?.length || 0));
         });
       });
     }, [])

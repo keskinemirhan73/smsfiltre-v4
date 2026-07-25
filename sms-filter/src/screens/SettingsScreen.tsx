@@ -102,11 +102,13 @@ export default function SettingsScreen() {
           {desc && <Text style={[styles.settingDesc, { color: theme.textMuted }]}>{desc}</Text>}
         </View>
         {onToggle && !isNav && (
-          <Switch
-            value={value}
-            onValueChange={onToggle}
-            trackColor={{ false: theme.border, true: trackTrue || theme.primary }}
-          />
+          <View style={{width: 52, height: 32, justifyContent: 'center', alignItems: 'flex-end'}} collapsable={false}>
+            <Switch
+              value={value}
+              onValueChange={onToggle}
+              trackColor={{ false: theme.border, true: trackTrue || theme.primary }}
+            />
+          </View>
         )}
         {isNav && (
           <View style={styles.navAction}>
@@ -536,7 +538,7 @@ export default function SettingsScreen() {
           value={settings.blockForeignNumbers}
           onToggle={() => toggleSetting('blockForeignNumbers')}
         />
-        <View style={{height: 12}} />
+        <View style={{height: 20}} />
         <SettingRow
           icon={AlertTriangle}
           iconColor="#F59E0B"
