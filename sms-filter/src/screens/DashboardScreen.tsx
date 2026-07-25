@@ -1,10 +1,13 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity, Modal, TextInput, Alert, ActivityIndicator, Animated, Platform, KeyboardAvoidingView, Easing, Linking } from 'react-native';
-import { ShieldAlert, Zap, History, ShieldCheck, TrendingUp, Receipt, Megaphone, ShieldBan, X, ArrowRight, Activity, Globe } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity, Modal, TextInput, ActivityIndicator, Animated, Platform, KeyboardAvoidingView, Easing, Linking } from 'react-native';
+import { ShieldAlert, Zap, History, ShieldCheck, TrendingUp, Receipt, Megaphone, ShieldBan, X, ArrowRight, Activity, Globe, Bell } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
+import * as Notifications from 'expo-notifications';
 import { useAppTheme, spacing, radii } from '../theme';
 import { FilterManager, AppSettings, Stats, HistoryItem } from '../modules/FilterManager';
 import { ThreatCloudService } from '../services/ThreatCloudService';
+import { useToast } from '../components/Toast';
 
 const { width } = Dimensions.get('window');
 
@@ -25,9 +28,9 @@ export default function DashboardScreen() {
   const [cloudThreatCount, setCloudThreatCount] = useState<number>(0);
 
   const [isReportModalVisible, setIsReportModalVisible] = useState(false);
-  const [isSetupModalVisible, setIsSetupModalVisible] = useState(false);
   const [reportKeyword, setReportKeyword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { showToast } = useToast();
 
   // Pulse animation for the shield
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -45,22 +48,53 @@ export default function DashboardScreen() {
 
   const handleReportSpam = () => {
     if (!reportKeyword.trim()) {
-      Alert.alert('Hata', 'Lütfen bir kelime veya numara girin.');
-      return;
-    }
+  const handleReport = async () => {
+    if (!reportKeyword.trim()) return;
+    setIsSubmitting(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     
-    const keywordToReport = reportKeyword;
-    // Optimistic UI: Hemen başarılı göster ve modalı kapat (Render uyanmasını bekletme)
-    Alert.alert('Teşekkürler!', 'Şikayetiniz incelenmek üzere bulut sistemine iletildi.');
-    setReportKeyword('');
-    setIsReportModalVisible(false);
+    try {
+      const resp = await fetch(BACKEND_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: reportKeyword,
+          category: 'spam',
+          deviceInfo: Platform.OS,
+        })
+      });
+      setIsSubmitting(false);
+      
+      if (resp.ok) {
+        setIsReportModalVisible(false);
+        setReportKeyword('');
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showToast('Bildiriminiz incelenmek üzere buluta gönderildi.', { type: 'success' });
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        showToast('Sunucuya bağlanılamadı.', { type: 'error' });
+      }
+    } catch(e) {
+      setIsSubmitting(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Bağlantı hatası.', { type: 'error' });
+    }
+  };
 
-    // Arka planda fire-and-forget gönderim
-    fetch(BACKEND_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ keyword: keywordToReport, type: 'word' })
-    }).catch(error => console.log('Arka plan raporlama hatası:', error));
+  const testNotification = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'SMS Filtresi 🛡️',
+        body: 'Yeni bir şüpheli mesaj engellendi!',
+        sound: true,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: 2,
+      },
+    });
+    showToast('Bildirim 2 saniye içinde gelecek.', { type: 'info' });
   };
 
   useFocusEffect(
@@ -79,7 +113,7 @@ export default function DashboardScreen() {
   const statCards = [
     { label: 'Engellenen', value: stats.blockedCount, icon: ShieldBan, color: theme.danger, bg: 'rgba(239,68,68,0.08)' },
     { label: 'Analiz Edilen', value: stats.analyzedCount, icon: Activity, color: theme.primary, bg: 'rgba(59,130,246,0.08)' },
-    { label: 'İşlem', value: stats.transactionCount, icon: Receipt, color: theme.secondary, bg: 'rgba(16,185,129,0.08)' },
+    { label: 'İşlem', value: stats.transactionCount, icon: Receipt, color: theme.secondary, bg: 'rgba(10,185,129,0.08)' },
     { label: 'Promosyon', value: stats.promotionCount, icon: Megaphone, color: '#F59E0B', bg: 'rgba(245,158,11,0.08)' },
   ];
 
@@ -88,15 +122,20 @@ export default function DashboardScreen() {
       case 'blocked': return { color: theme.danger, text: 'Engellendi', icon: ShieldBan, bg: 'rgba(239,68,68,0.1)' };
       case 'transaction': return { color: theme.primary, text: 'İşlem', icon: Receipt, bg: 'rgba(59,130,246,0.1)' };
       case 'promotion': return { color: '#F59E0B', text: 'Promosyon', icon: Megaphone, bg: 'rgba(245,158,11,0.1)' };
-      default: return { color: theme.secondary, text: 'İzinli', icon: ShieldCheck, bg: 'rgba(16,185,129,0.1)' };
+      default: return { color: theme.secondary, text: 'İzinli', icon: ShieldCheck, bg: 'rgba(10,185,129,0.1)' };
     }
   };
+
+  const weeklyData = [
+    { day: 'Pzt', val: 2 }, { day: 'Sal', val: 5 }, { day: 'Çar', val: 1 }, 
+    { day: 'Per', val: 8 }, { day: 'Cum', val: 3 }, { day: 'Cmt', val: 0 }, { day: 'Paz', val: 4 }
+  ];
+  const maxWeeklyVal = Math.max(...weeklyData.map(d => d.val), 1);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         
-        {/* Premium Hero Section */}
         <View style={styles.heroSection}>
           <Text style={[styles.title, { color: theme.text }]}>Genel Durum</Text>
           
@@ -121,7 +160,6 @@ export default function DashboardScreen() {
               </Text>
             </View>
 
-            {/* Cloud Sync Badge */}
             <View style={[styles.cloudBadge, { backgroundColor: 'rgba(59,130,246,0.08)' }]}>
               <Globe size={14} color={theme.primary} style={{ marginRight: 6 }} />
               <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '700' }}>
@@ -131,7 +169,6 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* iOS Settings Setup Card */}
         {Platform.OS === 'ios' && (
           <TouchableOpacity 
             style={[styles.setupCard, { backgroundColor: 'rgba(139,92,246,0.1)', borderColor: 'rgba(139,92,246,0.3)' }]}
@@ -145,16 +182,57 @@ export default function DashboardScreen() {
               <Text style={[styles.setupTitle, { color: '#8B5CF6' }]}>Filtreyi Aktifleştirin</Text>
             </View>
             <Text style={[styles.setupDesc, { color: theme.text }]}>
-              Filtrelemenin çalışması için telefonunuzun <Text style={{fontWeight: '800'}}>Ayarlar {'>'} Mesajlar {'>'} Bilinmeyenleri Filtrele</Text> menüsüne giderek <Text style={{fontWeight: '800'}}>FiltreAI</Text>'yi seçmeniz gerekmektedir.
+              Filtrelemenin çalışması için telefonunuzun Ayarlar > Mesajlar > Bilinmeyenleri Filtrele menüsüne giderek FiltreAI'yi seçmeniz gerekmektedir.
             </Text>
-            <View style={{ backgroundColor: '#8B5CF6', alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 100, flexDirection: 'row', alignItems: 'center', marginTop: spacing.md }}>
-               <Text style={{ color: '#fff', fontWeight: '800', marginRight: 6 }}>Nasıl Yapılır?</Text>
-               <ArrowRight size={18} color="#fff" />
-            </View>
           </TouchableOpacity>
         )}
 
-        {/* 2x2 Stats Widget */}
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Haftalık Analiz</Text>
+          <View style={[styles.chartCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={styles.chartHeader}>
+              <Text style={{ color: theme.textMuted, fontSize: 13, fontWeight: '600' }}>Engellenen Spam</Text>
+              <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>23</Text>
+            </View>
+            <View style={styles.chartBars}>
+              {weeklyData.map((d, i) => (
+                <View key={i} style={styles.chartBarCol}>
+                  <View style={[styles.chartBarBg, { backgroundColor: theme.border }]}>
+                    <View style={[styles.chartBarFill, { 
+                      backgroundColor: theme.primary, 
+                      height: `${(d.val / maxWeeklyVal) * 100}%` 
+                    }]} />
+                  </View>
+                  <Text style={[styles.chartBarLbl, { color: theme.textMuted }]}>{d.day}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm }}>
+            <TouchableOpacity 
+              style={[styles.quickBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setIsReportModalVisible(true);
+              }}
+            >
+              <View style={[styles.quickIcon, { backgroundColor: 'rgba(239,68,68,0.1)' }]}><ShieldAlert size={20} color={theme.danger} /></View>
+              <Text style={[styles.quickTxt, { color: theme.text }]}>Spam Bildir</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.quickBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
+              onPress={testNotification}
+            >
+              <View style={[styles.quickIcon, { backgroundColor: 'rgba(59,130,246,0.1)' }]}><Bell size={20} color={theme.primary} /></View>
+              <Text style={[styles.quickTxt, { color: theme.text }]}>Bildirim Test</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <Text style={[styles.sectionTitle, { color: theme.text }]}>İstatistikler</Text>
         <View style={styles.statsGrid}>
           {statCards.map((card, i) => {
@@ -173,12 +251,8 @@ export default function DashboardScreen() {
           })}
         </View>
 
-        {/* Recent Activity List */}
         <View style={styles.activityHeader}>
           <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>Son Aktiviteler</Text>
-          <TouchableOpacity>
-            <Text style={{ color: theme.primary, fontWeight: '600', fontSize: 14 }}>Tümünü Gör</Text>
-          </TouchableOpacity>
         </View>
         
         <View style={[styles.historyList, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -211,108 +285,6 @@ export default function DashboardScreen() {
         <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Floating Report Button */}
-      <View style={styles.floatingBtnContainer}>
-        <TouchableOpacity 
-          style={[styles.floatingBtn, { backgroundColor: theme.primary }]}
-          onPress={() => setIsReportModalVisible(true)}
-          activeOpacity={0.8}
-        >
-          <Megaphone size={22} color="#fff" />
-          <Text style={styles.floatingBtnText}>Spam Bildir</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* iOS Enable Filter Modal */}
-      <Modal visible={isSetupModalVisible} animationType="slide" presentationStyle="fullScreen">
-        <View style={[styles.fullModalContainer, { backgroundColor: theme.background }]}>
-          <View style={styles.fullModalHeader}>
-            <TouchableOpacity onPress={() => setIsSetupModalVisible(false)} style={{ padding: spacing.sm }}>
-              <X size={28} color={theme.text} />
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.fullModalContent}>
-            <View style={[styles.setupIllustration, { backgroundColor: 'rgba(139,92,246,0.1)' }]}>
-              <ShieldCheck size={80} color="#8B5CF6" />
-            </View>
-            
-            <Text style={[styles.setupModalTitle, { color: theme.text }]}>Filtreyi Etkinleştir</Text>
-            <Text style={[styles.setupModalDesc, { color: theme.textMuted }]}>
-              Uygulamanın gelen spam SMS'leri otomatik engelleyebilmesi için iOS ayarlarından FiltreAI'ye izin vermeniz gerekiyor.
-            </Text>
-
-            <View style={[styles.setupStepsBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <View style={styles.setupStep}>
-                <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}>
-                  <Text style={styles.stepNumberText}>1</Text>
-                </View>
-                <Text style={[styles.stepText, { color: theme.text }]}>Aşağıdaki butona basarak <Text style={{fontWeight: 'bold'}}>Ayarlar</Text> uygulamasını açın.</Text>
-              </View>
-              <View style={styles.setupStepDivider} />
-              <View style={styles.setupStep}>
-                <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}>
-                  <Text style={styles.stepNumberText}>2</Text>
-                </View>
-                <Text style={[styles.stepText, { color: theme.text }]}><Text style={{fontWeight: 'bold'}}>Mesajlar</Text> bölümüne girin.</Text>
-              </View>
-              <View style={styles.setupStepDivider} />
-              <View style={styles.setupStep}>
-                <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}>
-                  <Text style={styles.stepNumberText}>3</Text>
-                </View>
-                <Text style={[styles.stepText, { color: theme.text }]}><Text style={{fontWeight: 'bold'}}>Bilinmeyenleri Filtrele</Text> seçeneğine dokunun.</Text>
-              </View>
-              <View style={styles.setupStepDivider} />
-              <View style={styles.setupStep}>
-                <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}>
-                  <Text style={styles.stepNumberText}>4</Text>
-                </View>
-                <Text style={[styles.stepText, { color: theme.text }]}><Text style={{fontWeight: 'bold'}}>FiltreAI</Text> uygulamasını seçin.</Text>
-              </View>
-            </View>
-
-            <Text style={{ color: theme.textMuted, fontSize: 13, textAlign: 'center', marginTop: spacing.xl, paddingHorizontal: spacing.md, fontStyle: 'italic' }}>
-              Not: Apple'ın güvenlik politikaları gereği doğrudan Mesajlar menüsü açılamayabilir. Genel ayarlar açılırsa geri dönüp Mesajlar'ı bulunuz.
-            </Text>
-          </View>
-
-          <View style={[styles.setupFooter, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <TouchableOpacity 
-              style={[styles.openSettingsBtn, { backgroundColor: '#8B5CF6' }]}
-              activeOpacity={0.8}
-              onPress={async () => {
-                const urls = [
-                  'App-Prefs:root=MESSAGES',
-                  'prefs:root=MESSAGES',
-                  'App-Prefs:MESSAGES',
-                  'prefs:MESSAGES'
-                ];
-                
-                let opened = false;
-                for (const url of urls) {
-                  try {
-                    await Linking.openURL(url);
-                    opened = true;
-                    break;
-                  } catch (e) {
-                    // Ignore and try the next one
-                  }
-                }
-                
-                if (!opened) {
-                  Linking.openSettings();
-                }
-              }}
-            >
-              <Text style={styles.openSettingsBtnText}>Ayarları Aç</Text>
-              <ArrowRight size={20} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Modern Bottom Sheet Modal */}
       <Modal visible={isReportModalVisible} transparent={true} animationType="fade">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <TouchableOpacity style={styles.modalDismissArea} onPress={() => setIsReportModalVisible(false)} activeOpacity={1} />
@@ -324,10 +296,6 @@ export default function DashboardScreen() {
                 <X size={24} color={theme.textMuted} />
               </TouchableOpacity>
             </View>
-            
-            <Text style={[styles.sheetDesc, { color: theme.textMuted }]}>
-              Yeni bir spam kelimesini veya numarasını şikayet edin. Şikayetler Yapay Zeka tarafından incelenip bulut veritabanına eklenir.
-            </Text>
             
             <View style={[styles.inputWrapper, { backgroundColor: theme.background, borderColor: theme.border }]}>
               <ShieldAlert size={20} color={theme.textMuted} style={{ marginRight: 10 }} />
@@ -343,20 +311,34 @@ export default function DashboardScreen() {
             
             <TouchableOpacity 
               style={[styles.submitBtn, { backgroundColor: theme.primary, opacity: reportKeyword.trim() ? 1 : 0.6 }]}
-              onPress={handleReportSpam}
-              disabled={isSubmitting || !reportKeyword.trim()}
+              onPress={handleReport}
+              disabled={!reportKeyword.trim() || isSubmitting}
             >
-              {isSubmitting ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
-                <>
-                  <Text style={styles.submitBtnText}>Şikayeti Gönder</Text>
-                  <ArrowRight size={20} color="#fff" />
-                </>
-              )}
+              {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Bildir</Text>}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal visible={isSetupModalVisible} animationType="slide" presentationStyle="fullScreen">
+        <View style={[styles.fullModalContainer, { backgroundColor: theme.background }]}>
+          <View style={styles.fullModalHeader}>
+            <TouchableOpacity onPress={() => setIsSetupModalVisible(false)} style={{ padding: spacing.sm }}>
+              <X size={28} color={theme.text} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.fullModalContent}>
+            <ShieldCheck size={80} color="#8B5CF6" />
+            <Text style={[styles.setupModalTitle, { color: theme.text }]}>Filtreyi Etkinleştir</Text>
+            <Text style={[styles.setupModalDesc, { color: theme.textMuted }]}>Ayarlar > Mesajlar > Bilinmeyenleri Filtrele üzerinden FiltreAI'yi açın.</Text>
+            <TouchableOpacity 
+              style={styles.openSettingsBtn}
+              onPress={() => Linking.openSettings()}
+            >
+              <Text style={styles.openSettingsBtnText}>Ayarları Aç</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -366,38 +348,31 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: spacing.lg, paddingTop: spacing.xl },
   title: { fontSize: 32, fontWeight: '800', letterSpacing: -1, marginBottom: spacing.lg },
-  
   heroSection: { marginBottom: spacing.xl },
-  heroCard: {
-    borderRadius: radii.xl, padding: spacing.xl, borderWidth: 1,
-    alignItems: 'center', overflow: 'hidden'
-  },
+  heroCard: { borderRadius: radii.xl, padding: spacing.xl, borderWidth: 1, alignItems: 'center', overflow: 'hidden' },
   heroGlow: { position: 'relative', width: 96, height: 96, justifyContent: 'center', alignItems: 'center' },
-  heroShieldPulse: {
-    position: 'absolute', width: 96, height: 96, borderRadius: 48,
-  },
-  heroShieldInner: {
-    width: 72, height: 72, borderRadius: 36,
-    justifyContent: 'center', alignItems: 'center', zIndex: 2,
-  },
+  heroShieldPulse: { position: 'absolute', width: 96, height: 96, borderRadius: 48 },
+  heroShieldInner: { width: 72, height: 72, borderRadius: 36, justifyContent: 'center', alignItems: 'center', zIndex: 2 },
   heroStatusTitle: { fontSize: 22, fontWeight: '800', marginBottom: 4 },
   heroStatusDesc: { fontSize: 14, textAlign: 'center' },
-  cloudBadge: {
-    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8,
-    borderRadius: radii.full, marginTop: spacing.lg
-  },
-
-  setupCard: {
-    borderRadius: radii.xl, padding: spacing.lg, borderWidth: 1,
-    marginBottom: spacing.xxl,
-  },
+  cloudBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: radii.full, marginTop: spacing.lg },
+  setupCard: { borderRadius: radii.xl, padding: spacing.lg, borderWidth: 1, marginBottom: spacing.xxl },
   setupHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
   setupIconWrapper: { width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginRight: spacing.sm },
   setupTitle: { fontSize: 16, fontWeight: '800' },
   setupDesc: { fontSize: 14, lineHeight: 22 },
-
-  sectionTitle: { fontSize: 18, fontWeight: '800', marginBottom: spacing.md, letterSpacing: -0.5 },
-  
+  section: { marginBottom: spacing.xl },
+  sectionTitle: { fontSize: 18, fontWeight: '800', marginBottom: spacing.md, paddingHorizontal: 4 },
+  chartCard: { borderRadius: radii.xl, padding: spacing.lg, borderWidth: 1 },
+  chartHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.lg },
+  chartBars: { flexDirection: 'row', justifyContent: 'space-between', height: 120, paddingHorizontal: spacing.xs },
+  chartBarCol: { alignItems: 'center', justifyContent: 'flex-end', flex: 1 },
+  chartBarBg: { width: 8, height: 90, borderRadius: 4, justifyContent: 'flex-end', overflow: 'hidden', marginBottom: 8 },
+  chartBarFill: { width: '100%', borderRadius: 4 },
+  chartBarLbl: { fontSize: 11, fontWeight: '600' },
+  quickBtn: { flex: 1, borderRadius: radii.xl, padding: spacing.md, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  quickIcon: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  quickTxt: { fontSize: 15, fontWeight: '600' },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.xxl },
   statCard: {
     width: (width - spacing.lg * 2 - spacing.md) / 2,

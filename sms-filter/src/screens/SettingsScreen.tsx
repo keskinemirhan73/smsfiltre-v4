@@ -7,6 +7,9 @@ import { ThreatCloudService } from '../services/ThreatCloudService';
 import { getT } from '../i18n';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
+import { useToast } from '../components/Toast';
+import SwipeToDeleteItem from '../components/SwipeToDeleteItem';
 
 const SettingsContext = createContext<any>(null);
 const useSettings = () => useContext(SettingsContext);
@@ -29,17 +32,24 @@ const TopHeader = ({ title, navigation }: { title: string, navigation: any }) =>
 function WhitelistScreen({ navigation }: any) {
   const theme = useAppTheme();
   const { settings, updateSetting } = useSettings();
+  const { showToast } = useToast();
   const [whitelistNumber, setWhitelistNumber] = useState('');
 
   const addNumber = () => {
     if (!whitelistNumber.trim()) return;
     const wl = settings.whitelist || [];
-    if (!wl.includes(whitelistNumber.trim())) updateSetting('whitelist', [...wl, whitelistNumber.trim()]);
+    if (!wl.includes(whitelistNumber.trim())) {
+      updateSetting('whitelist', [...wl, whitelistNumber.trim()]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(`${whitelistNumber.trim()} beyaz listeye eklendi.`, { type: 'success' });
+    }
     setWhitelistNumber('');
   };
   const removeNumber = (num: string) => {
     const wl = settings.whitelist || [];
     updateSetting('whitelist', wl.filter((n: string) => n !== num));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    showToast(`${num} silindi.`, { type: 'info' });
   };
   
   return (
@@ -76,15 +86,14 @@ function WhitelistScreen({ navigation }: any) {
             </View>
           ) : (
             (settings.whitelist || []).map((num: string) => (
-              <View key={`wl-${num}`} style={[styles.listItem, { backgroundColor: theme.card, borderColor: theme.border }]}>
-                <View style={[styles.listIcon, { backgroundColor: 'rgba(16,185,129,0.1)' }]}>
-                  <ShieldCheck size={18} color="#10B981" />
+              <SwipeToDeleteItem key={`wl-${num}`} onDelete={() => removeNumber(num)}>
+                <View style={[styles.listItem, { backgroundColor: theme.card, borderColor: theme.border, marginBottom: 0 }]}>
+                  <View style={[styles.listIcon, { backgroundColor: 'rgba(16,185,129,0.1)' }]}>
+                    <ShieldCheck size={18} color="#10B981" />
+                  </View>
+                  <Text style={[styles.listText, { color: theme.text }]}>{num}</Text>
                 </View>
-                <Text style={[styles.listText, { color: theme.text }]}>{num}</Text>
-                <TouchableOpacity onPress={() => removeNumber(num)} style={styles.deleteBtn}>
-                  <Trash2 size={18} color={theme.danger} />
-                </TouchableOpacity>
-              </View>
+              </SwipeToDeleteItem>
             ))
           )}
         </View>
@@ -202,17 +211,23 @@ function MappingScreen({ navigation }: any) {
 function FraudScreen({ navigation }: any) {
   const theme = useAppTheme();
   const { settings, toggleSetting, updateSetting } = useSettings();
+  const { showToast } = useToast();
   const [keyword, setKeyword] = useState('');
 
   const addKeyword = () => {
     if (!keyword.trim()) return;
     const kws = settings.customFraudKeywords || [];
-    if (!kws.includes(keyword.trim())) updateSetting('customFraudKeywords', [...kws, keyword.trim()]);
+    if (!kws.includes(keyword.trim())) {
+      updateSetting('customFraudKeywords', [...kws, keyword.trim()]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast(`'${keyword.trim()}' filtresi eklendi.`, { type: 'success' });
+    }
     setKeyword('');
   };
   const removeKeyword = (kw: string) => {
     const kws = settings.customFraudKeywords || [];
     updateSetting('customFraudKeywords', kws.filter((k: string) => k !== kw));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
   
   return (
@@ -248,14 +263,18 @@ function FraudScreen({ navigation }: any) {
           {(settings.customFraudKeywords || []).length === 0 ? (
              <Text style={{ color: theme.textMuted, fontSize: 14 }}>Özel dolandırıcılık kelimesi eklenmemiş.</Text>
           ) : (
-            (settings.customFraudKeywords || []).map((kw: string) => (
-              <View key={`kw-${kw}`} style={[styles.tagItem, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' }]}>
-                <Text style={{color: theme.danger, fontSize: 14, fontWeight: '600', marginRight: 6}}>{kw}</Text>
-                <TouchableOpacity onPress={() => removeKeyword(kw)}>
-                  <X size={16} color={theme.danger} />
-                </TouchableOpacity>
-              </View>
-            ))
+            <View style={{ flexDirection: 'column', width: '100%', gap: spacing.sm }}>
+              {(settings.customFraudKeywords || []).map((kw: string) => (
+                <SwipeToDeleteItem key={`kw-${kw}`} onDelete={() => removeKeyword(kw)}>
+                  <View style={[styles.listItem, { backgroundColor: theme.card, borderColor: theme.border, marginBottom: 0 }]}>
+                    <View style={[styles.listIcon, { backgroundColor: 'rgba(239,68,68,0.1)' }]}>
+                      <Key size={18} color={theme.danger} />
+                    </View>
+                    <Text style={[styles.listText, { color: theme.danger }]}>{kw}</Text>
+                  </View>
+                </SwipeToDeleteItem>
+              ))}
+            </View>
           )}
         </View>
       </View>
@@ -266,6 +285,7 @@ function FraudScreen({ navigation }: any) {
 function DatabaseScreen({ navigation }: any) {
   const theme = useAppTheme();
   const { settings, toggleSetting } = useSettings();
+  const { showToast } = useToast();
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState('Yükleniyor...');
   
@@ -275,13 +295,16 @@ function DatabaseScreen({ navigation }: any) {
 
   const handleSync = async () => {
     setIsSyncing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const success = await ThreatCloudService.syncDatabase();
     setIsSyncing(false);
     if (success) {
-      Alert.alert('Başarılı', 'Veritabanı buluttan başarıyla güncellendi!\nSpam kelimeleri ve numaralar listeye eklendi.');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showToast('Veritabanı buluttan başarıyla güncellendi!', { type: 'success' });
       ThreatCloudService.getLastSyncDate().then(setLastSync);
     } else {
-      Alert.alert('Hata', 'Bulut sunucusuna bağlanılamadı. Lütfen internet bağlantınızı kontrol edin.');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast('Bulut sunucusuna bağlanılamadı.', { type: 'error' });
     }
   };
 
@@ -528,6 +551,7 @@ export default function SettingsScreen() {
     const newSettings = { ...settings, [key]: !val };
     setSettings(newSettings as any);
     await FilterManager.saveSettings(newSettings as any);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
   const updateSetting = async (key: keyof AppSettings, value: any) => {
@@ -537,12 +561,14 @@ export default function SettingsScreen() {
     if (key === 'theme') {
       DeviceEventEmitter.emit('onThemeChanged', value);
     }
+    Haptics.selectionAsync();
   };
 
   const updateMapping = async (key: keyof typeof settings.categoryMapping, value: string) => {
     const newSettings = { ...settings, categoryMapping: { ...settings.categoryMapping, [key]: value } };
     setSettings(newSettings as any);
     await FilterManager.saveSettings(newSettings as any);
+    Haptics.selectionAsync();
   };
 
   const contextValue = {
@@ -633,7 +659,12 @@ const SettingRow = ({ icon: Icon, iconColor, title, desc, value, onToggle, track
   const Wrapper = onPress ? TouchableOpacity : (View as any);
   return (
     <Wrapper 
-      onPress={onPress}
+      onPress={() => {
+        if (onPress) {
+          Haptics.selectionAsync();
+          onPress();
+        }
+      }}
       style={[
         isGrouped ? styles.settingGroupItem : styles.settingCard,
         !isGrouped && { backgroundColor: theme.card, borderColor: theme.border },

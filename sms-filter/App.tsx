@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Shield, List, Settings, FlaskConical } from 'lucide-react-native';
 import { useColorScheme, DeviceEventEmitter } from 'react-native';
+import * as Notifications from 'expo-notifications';
 
 import DashboardScreen from './src/screens/DashboardScreen';
 import RulesScreen from './src/screens/RulesScreen';
@@ -11,6 +12,15 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import TestSimulatorScreen from './src/screens/TestSimulatorScreen';
 import { darkColors, lightColors } from './src/theme';
 import { FilterManager } from './src/modules/FilterManager';
+import { ToastProvider } from './src/components/Toast';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 const Tab = createBottomTabNavigator();
 
@@ -30,7 +40,7 @@ export default function App() {
   const themeColors = isDark ? darkColors : lightColors;
 
   return (
-    <>
+    <ToastProvider>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <NavigationContainer theme={{
         dark: isDark,
@@ -90,6 +100,6 @@ export default function App() {
           />
         </Tab.Navigator>
       </NavigationContainer>
-    </>
+    </ToastProvider>
   );
 }
