@@ -459,17 +459,17 @@ const styles = StyleSheet.create({
   // Setup Modal Styles
   fullModalContainer: { flex: 1 },
   fullModalHeader: { alignItems: 'flex-end', paddingTop: Platform.OS === 'ios' ? 44 : 20, paddingRight: spacing.md },
-  fullModalContent: { alignItems: 'center', padding: spacing.xl, paddingBottom: 100 },
-  setupIllustration: { width: 140, height: 140, borderRadius: 70, justifyContent: 'center', alignItems: 'center', marginBottom: spacing.xl },
-  setupModalTitle: { fontSize: 28, fontWeight: '800', marginBottom: spacing.sm, textAlign: 'center' },
-  setupModalDesc: { fontSize: 16, textAlign: 'center', lineHeight: 24, marginBottom: spacing.xxl, paddingHorizontal: spacing.md },
+  fullModalContent: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, paddingBottom: 130 },
+  setupIllustration: { width: 90, height: 90, borderRadius: 45, justifyContent: 'center', alignItems: 'center', marginBottom: spacing.lg },
+  setupModalTitle: { fontSize: 26, fontWeight: '800', marginBottom: spacing.sm, textAlign: 'center' },
+  setupModalDesc: { fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: spacing.xl, paddingHorizontal: spacing.sm },
   
-  setupStepsBox: { width: '100%', borderRadius: radii.xl, borderWidth: 1, padding: spacing.lg },
-  setupStep: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md },
-  stepNumberBadge: { width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginRight: spacing.md },
-  stepNumberText: { color: '#fff', fontSize: 14, fontWeight: '800' },
-  stepText: { flex: 1, fontSize: 15, lineHeight: 22 },
-  setupStepDivider: { height: 1, backgroundColor: 'rgba(150,150,150,0.2)', marginLeft: 44 },
+  setupStepsBox: { width: '100%', borderRadius: radii.xl, borderWidth: 1, padding: spacing.md },
+  setupStep: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
+  stepNumberBadge: { width: 26, height: 26, borderRadius: 13, justifyContent: 'center', alignItems: 'center', marginRight: spacing.md },
+  stepNumberText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  stepText: { flex: 1, fontSize: 14, lineHeight: 20 },
+  setupStepDivider: { height: 1, backgroundColor: 'rgba(150,150,150,0.2)', marginLeft: 42 },
   
   setupFooter: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
