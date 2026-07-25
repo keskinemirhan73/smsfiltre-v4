@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useRef, ReactNode, useEffect } from 'react';
-import { View, Text, StyleSheet, Animated, TouchableOpacity, Easing, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, Animated, TouchableOpacity, Easing } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react-native';
 import { useAppTheme, spacing, radii } from '../theme';
 

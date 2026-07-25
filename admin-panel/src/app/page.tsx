@@ -168,22 +168,10 @@ export default function AdminDashboard() {
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       setIsDark(true);
     }
-    // Attempt auto-login if password is saved in local storage (optional enhancement)
-    const savedPass = localStorage.getItem('admin_pass');
-    if (savedPass) {
-      setPassword(savedPass);
-      fetchDashboardData(savedPass).then(success => {
-        if (success) setIsAuthenticated(true);
-      });
-    }
+    // Clear any saved passwords for security - always require login
+    localStorage.removeItem('admin_pass');
   }, []);
   
-  // Save password when authenticated
-  useEffect(() => {
-    if (isAuthenticated && password) {
-      localStorage.setItem('admin_pass', password);
-    }
-  }, [isAuthenticated, password]);
 
   if (!mounted) return null;
 

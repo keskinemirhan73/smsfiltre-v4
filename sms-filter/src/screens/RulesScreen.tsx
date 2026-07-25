@@ -2,6 +2,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, Animated, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
 import { Plus, Trash2, X, ShieldBan, ShieldCheck, Receipt, Megaphone, Search } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme, spacing, radii } from '../theme';
 import { FilterManager, FilterRule } from '../modules/FilterManager';
 
@@ -18,6 +19,7 @@ const { width } = Dimensions.get('window');
 
 export default function RulesScreen() {
   const theme = useAppTheme();
+  const insets = useSafeAreaInsets();
   const [rules, setRules] = useState<FilterRule[]>([]);
   const [activeTab, setActiveTab] = useState<CategoryTab>('junk');
   const [showModal, setShowModal] = useState(false);
@@ -63,7 +65,7 @@ export default function RulesScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top + spacing.sm, spacing.xl) }]}>
         <Text style={[styles.title, { color: theme.text }]}>Kurallar</Text>
         <Text style={[styles.subtitle, { color: theme.textMuted }]}>Özel kelime ve numaraları filtreleyin</Text>
       </View>
@@ -234,7 +236,7 @@ export default function RulesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { padding: spacing.lg, paddingTop: spacing.xl, paddingBottom: spacing.md },
+  header: { padding: spacing.lg, paddingBottom: spacing.md },
   title: { fontSize: 32, fontWeight: '800', letterSpacing: -1 },
   subtitle: { fontSize: 15, marginTop: 4 },
 

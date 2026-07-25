@@ -18,7 +18,8 @@ import { ThreatCloudService } from './src/services/ThreatCloudService';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   }),
@@ -64,6 +65,7 @@ export default function App() {
         }
       }}>
         <Tab.Navigator
+          sceneContainerStyle={{ backgroundColor: themeColors.background }}
           screenOptions={{
             headerStyle: {
               backgroundColor: themeColors.surface,

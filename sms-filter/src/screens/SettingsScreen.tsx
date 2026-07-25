@@ -580,7 +580,7 @@ export default function SettingsScreen() {
 
   return (
     <SettingsContext.Provider value={contextValue}>
-      <Stack.Navigator screenOptions={{ headerShown: false, presentation: 'card', animation: 'simple_push', contentStyle: { backgroundColor: theme.background } }}>
+      <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.background } }}>
         <Stack.Screen name="SettingsMain" component={SettingsMainScreen} />
         <Stack.Screen name="Whitelist" component={WhitelistScreen} />
         <Stack.Screen name="Schedule" component={ScheduleScreen} />
