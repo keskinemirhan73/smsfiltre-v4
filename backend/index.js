@@ -48,6 +48,17 @@ if (MONGODB_URI) {
 
 const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
 
+app.get('/api/models', async (req, res) => {
+  if (!GEMINI_API_KEY) return res.status(500).json({ error: 'No API KEY' });
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Kesinlikle engellenmesi yasak olan kelimeler
 const FORBIDDEN_WORDS = [
   'merhaba', 'selam', 'nasılsın', 'naber', 'ne haber', 'evet', 'hayır', 'tamam', 'olur', 'peki',
