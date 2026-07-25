@@ -233,7 +233,7 @@ export default function DashboardScreen() {
       </View>
 
       {/* iOS Enable Filter Modal */}
-      <Modal visible={isSetupModalVisible} animationType="slide" presentationStyle="pageSheet">
+      <Modal visible={isSetupModalVisible} animationType="slide" presentationStyle="fullScreen">
         <View style={[styles.fullModalContainer, { backgroundColor: theme.background }]}>
           <View style={styles.fullModalHeader}>
             <TouchableOpacity onPress={() => setIsSetupModalVisible(false)} style={{ padding: spacing.sm }}>
@@ -241,7 +241,7 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
           
-          <ScrollView contentContainerStyle={styles.fullModalContent}>
+          <View style={styles.fullModalContent}>
             <View style={[styles.setupIllustration, { backgroundColor: 'rgba(139,92,246,0.1)' }]}>
               <ShieldCheck size={80} color="#8B5CF6" />
             </View>
@@ -280,7 +280,7 @@ export default function DashboardScreen() {
                 <Text style={[styles.stepText, { color: theme.text }]}><Text style={{fontWeight: 'bold'}}>FiltreAI</Text> uygulamasını seçin.</Text>
               </View>
             </View>
-          </ScrollView>
+          </View>
 
           <View style={[styles.setupFooter, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <TouchableOpacity 
