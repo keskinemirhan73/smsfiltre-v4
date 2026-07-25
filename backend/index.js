@@ -84,7 +84,7 @@ app.post('/api/report', async (req, res) => {
     // AI Verification
     if (genAI && lowerKeyword.length > 4) {
       try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
         const prompt = `Kullanıcı şu metni/kelimeyi SMS spam veya dolandırıcılık olarak şikayet etti: "${lowerKeyword}". Sence bu kelime/metin gerçekten bir bahis, casino, dolandırıcılık, yasadışı iddaa veya spam reklam kategorisine girer mi? Sadece "EVET" veya "HAYIR" olarak cevap ver.`;
         const result = await model.generateContent(prompt);
         const aiResponse = result.response.text().trim().toUpperCase();
