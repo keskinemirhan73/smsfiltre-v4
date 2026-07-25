@@ -239,8 +239,8 @@ Lütfen SADECE aşağıdaki JSON formatında ve Türkçe cevap ver, ekstra hiçb
     console.error('[ANALYZE HATA]', error.message);
     
     // YZ hatası durumunda (429 Quota vb.) uygulamanın çökmemesi için Fallback
-    const lower = cleanText.toLowerCase();
-    const isSpam = lower.includes('bahis') || lower.includes('casino') || lower.includes('bonus') || lower.includes('kredi') || lower.includes('borç') || lower.includes('kazandınız') || lower.includes('bet');
+    const fallbackText = req.body.text ? req.body.text.trim().toLowerCase() : '';
+    const isSpam = fallbackText.includes('bahis') || fallbackText.includes('casino') || fallbackText.includes('bonus') || fallbackText.includes('kredi') || fallbackText.includes('borç') || fallbackText.includes('kazandınız') || fallbackText.includes('bet');
     
     res.json({
       success: true,
