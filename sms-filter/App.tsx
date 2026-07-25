@@ -31,9 +31,9 @@ export default function App() {
 
   return (
     <>
-      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <NavigationContainer theme={{
-        dark: scheme === 'dark',
+        dark: isDark,
         colors: {
           primary: themeColors.primary,
           background: themeColors.background,
