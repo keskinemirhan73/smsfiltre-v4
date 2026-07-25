@@ -26,7 +26,7 @@ export default function DashboardScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Oto-Pilot Sunucu Adresi (Geçici olarak Localhost, yayınlanınca değişecek)
-  const BACKEND_URL = 'http://192.168.1.109:3000/api/report';
+  const BACKEND_URL = 'https://smsfiltre-v4.onrender.com/api/report';
 
   const handleReportSpam = async () => {
     if (!reportKeyword.trim()) {
