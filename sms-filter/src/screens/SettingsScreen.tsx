@@ -6,6 +6,7 @@ import { FilterManager, AppSettings } from '../modules/FilterManager';
 import { ThreatCloudService } from '../services/ThreatCloudService';
 import { getT } from '../i18n';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const SettingsContext = createContext<any>(null);
 const useSettings = () => useContext(SettingsContext);
@@ -14,8 +15,9 @@ const Stack = createNativeStackNavigator();
 
 const TopHeader = ({ title, navigation }: { title: string, navigation: any }) => {
   const theme = useAppTheme();
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.headerRow}>
+    <View style={[styles.headerRow, { paddingTop: Math.max(insets.top + spacing.sm, spacing.xl) }]}>
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.7}>
         <ChevronLeft color={theme.text} size={28} />
       </TouchableOpacity>
@@ -41,7 +43,7 @@ function WhitelistScreen({ navigation }: any) {
   };
   
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingBottom: 80 }}>
       <TopHeader title="Beyaz Liste (VIP)" navigation={navigation} />
       <View style={styles.section}>
         <SectionDesc text="Buraya eklediğiniz numaralar veya kurum adları HİÇBİR güvenlik filtresine takılmaz. Aile üyelerinizi veya bankalarınızı ekleyebilirsiniz." />
@@ -96,7 +98,7 @@ function ScheduleScreen({ navigation }: any) {
   const { settings, toggleSetting, updateSetting } = useSettings();
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingBottom: 80 }}>
       <TopHeader title="Zaman Programı" navigation={navigation} />
       <View style={styles.section}>
         <SettingRow
@@ -184,7 +186,7 @@ function MappingScreen({ navigation }: any) {
   );
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingBottom: 80 }}>
       <TopHeader title="Kategori Eşleme" navigation={navigation} />
       <View style={styles.section}>
         <SectionDesc text="SMS Filtresi uygulamasının tespit ettiği mesajların, Apple Mesajlar uygulamasındaki hangi klasörlere gönderileceğini belirleyin." />
@@ -214,7 +216,7 @@ function FraudScreen({ navigation }: any) {
   };
   
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingBottom: 80 }}>
       <TopHeader title="Dolandırıcılık Filtresi" navigation={navigation} />
       <View style={styles.section}>
         <SettingRow icon={ShieldAlert} iconColor={theme.primary} title="Aktif Et" value={settings.fraudFilter} onToggle={() => toggleSetting('fraudFilter')} />
@@ -284,7 +286,7 @@ function DatabaseScreen({ navigation }: any) {
   };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingBottom: 80 }}>
       <TopHeader title="Veritabanı Filtresi" navigation={navigation} />
       <View style={styles.section}>
         <SettingRow icon={Database} iconColor={theme.primary} title="Aktif Et" value={settings.databaseFilter} onToggle={() => toggleSetting('databaseFilter')} />
@@ -334,7 +336,7 @@ function ProactiveScreen({ navigation }: any) {
   ];
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingBottom: 80 }}>
       <TopHeader title="Proaktif Filtre" navigation={navigation} />
       <View style={styles.section}>
         <SettingRow icon={Activity} iconColor={theme.primary} title="Yapay Zeka (AI) Aktif" value={settings.proactiveFilter} onToggle={() => toggleSetting('proactiveFilter')} trackTrue={theme.primary} />
@@ -373,7 +375,7 @@ function InvalidNumberScreen({ navigation }: any) {
   const { settings, toggleSetting } = useSettings();
   
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingBottom: 80 }}>
       <TopHeader title="Geçersiz Numara Filtresi" navigation={navigation} />
       <View style={styles.section}>
         <SettingRow icon={Info} iconColor={theme.primary} title="Aktif Et" value={settings.invalidNumberFilter} onToggle={() => toggleSetting('invalidNumberFilter')} />
@@ -389,11 +391,12 @@ function InvalidNumberScreen({ navigation }: any) {
 function SettingsMainScreen({ navigation }: any) {
   const theme = useAppTheme();
   const { settings, toggleSetting, updateSetting } = useSettings();
+  const insets = useSafeAreaInsets();
   const t = getT(settings.language || 'tr');
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.header}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top + spacing.sm, spacing.xl) }]}>
         <Text style={[styles.title, { color: theme.text }]}>{t.settings}</Text>
       </View>
       
@@ -567,8 +570,8 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { padding: spacing.lg, paddingTop: spacing.xl },
-  headerRow: { padding: spacing.lg, paddingTop: spacing.xl, flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
+  header: { padding: spacing.lg },
+  headerRow: { padding: spacing.lg, flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
   backBtn: { padding: 4, marginRight: spacing.sm, marginLeft: -8 },
   title: { fontSize: 32, fontWeight: '800', letterSpacing: -0.5 },
   
