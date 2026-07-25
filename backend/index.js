@@ -84,7 +84,7 @@ app.post('/api/report', async (req, res) => {
     // AI Verification
     if (genAI && lowerKeyword.length > 4) {
       try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }, { apiVersion: 'v1' });
         const prompt = `Kullanıcı şu metni/kelimeyi SMS spam veya dolandırıcılık olarak şikayet etti: "${lowerKeyword}". Sence bu kelime/metin gerçekten bir bahis, casino, dolandırıcılık, yasadışı iddaa veya spam reklam kategorisine girer mi? Sadece "EVET" veya "HAYIR" olarak cevap ver.`;
         const result = await model.generateContent(prompt);
         const aiResponse = result.response.text().trim().toUpperCase();
@@ -183,7 +183,7 @@ app.post('/api/analyze', async (req, res) => {
       return res.status(500).json({ error: 'Yapay Zeka servisi şu an kullanılamıyor.' });
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }, { apiVersion: 'v1' });
     const prompt = `Şu SMS metnini analiz et: "${cleanText}"
 Görev: Bu metin bir dolandırıcılık, oltalama (phishing), yasadışı bahis veya spam mıdır?
 Lütfen SADECE aşağıdaki JSON formatında ve Türkçe cevap ver, ekstra hiçbir kelime yazma:
