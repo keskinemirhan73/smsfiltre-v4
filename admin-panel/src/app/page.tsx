@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ShieldCheck, ShieldAlert, BarChart3, Users, 
-  Settings, Globe, Moon, Sun, CheckCircle, XCircle 
+  Settings, Globe, Moon, Sun, CheckCircle, XCircle, Lock, LogIn
 } from 'lucide-react';
 
 const TRANSLATIONS = {
@@ -10,33 +10,41 @@ const TRANSLATIONS = {
     title: 'Oto-Pilot Yönetici Paneli',
     subtitle: 'Sistem Durumu: Aktif & Korunuyor',
     stats: 'Genel İstatistikler',
-    totalBlocked: 'Engellenen Mesaj',
+    totalBlocked: 'Engellenen Numara',
     spamKeywords: 'Spam Kelime',
-    scamNumbers: 'Dolandırıcı Numara',
+    scamNumbers: 'Aktif Sistem',
     pending: 'Onay Bekleyenler',
     approve: 'Onayla',
     reject: 'Reddet',
     darkMode: 'Karanlık Mod',
     lightMode: 'Aydınlık Mod',
     language: 'Language',
-    recentActivity: 'Son Aktiviteler',
-    activeUsers: 'Aktif Kullanıcı'
+    recentActivity: 'Sistemdeki Kelimeler (Son Eklenenler)',
+    activeUsers: 'Veritabanı Durumu',
+    loginTitle: 'Yönetici Girişi',
+    loginDesc: 'Devam etmek için yönetici şifrenizi girin.',
+    loginBtn: 'Giriş Yap',
+    passwordPlaceholder: 'Şifre...'
   },
   en: {
     title: 'Auto-Pilot Admin Panel',
     subtitle: 'System Status: Active & Protected',
     stats: 'Global Statistics',
-    totalBlocked: 'Blocked Messages',
+    totalBlocked: 'Blocked Numbers',
     spamKeywords: 'Spam Keywords',
-    scamNumbers: 'Scam Numbers',
+    scamNumbers: 'Active System',
     pending: 'Pending Approvals',
     approve: 'Approve',
     reject: 'Reject',
     darkMode: 'Dark Mode',
     lightMode: 'Light Mode',
     language: 'Dil',
-    recentActivity: 'Recent Activity',
-    activeUsers: 'Active Users'
+    recentActivity: 'System Keywords (Recently Added)',
+    activeUsers: 'Database Status',
+    loginTitle: 'Admin Login',
+    loginDesc: 'Enter your admin password to continue.',
+    loginBtn: 'Login',
+    passwordPlaceholder: 'Password...'
   }
 };
 
@@ -44,26 +52,66 @@ export default function AdminDashboard() {
   const [isDark, setIsDark] = useState(true);
   const [lang, setLang] = useState<'tr' | 'en'>('tr');
   const [mounted, setMounted] = useState(false);
+  
+  // Auth state
+  const [password, setPassword] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loginError, setLoginError] = useState(false);
+  
+  // Data state
   const [pendingItems, setPendingItems] = useState<any[]>([]);
+  const [dbData, setDbData] = useState<{ spamKeywords: string[], blacklistedNumbers: string[] }>({
+    spamKeywords: [], blacklistedNumbers: []
+  });
   const [loadingItems, setLoadingItems] = useState<Record<number, boolean>>({});
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 
-  const fetchPending = async () => {
+  const fetchDashboardData = async (pass: string) => {
     try {
-      const res = await fetch(`${API_BASE}/api/pending`);
-      const data = await res.json();
-      setPendingItems(Array.isArray(data) ? data : []);
+      const headers = { 'Authorization': `Bearer ${pass}` };
+      
+      // Fetch Pending PRs
+      const pendingRes = await fetch(`${API_BASE}/api/pending`, { headers });
+      if (pendingRes.status === 401) {
+        setLoginError(true);
+        setIsAuthenticated(false);
+        return false;
+      }
+      
+      const pendingJson = await pendingRes.json();
+      setPendingItems(Array.isArray(pendingJson) ? pendingJson : []);
+      
+      // Fetch Real DB Data
+      const dbRes = await fetch(`${API_BASE}/api/database`, { headers });
+      if (dbRes.ok) {
+        const dbJson = await dbRes.json();
+        setDbData(dbJson);
+      }
+      
+      setIsAuthenticated(true);
+      setLoginError(false);
+      return true;
     } catch (e) {
       console.error(e);
+      setLoginError(true);
+      return false;
     }
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await fetchDashboardData(password);
   };
 
   const handleAction = async (id: number, action: 'approve' | 'reject') => {
     setLoadingItems(prev => ({ ...prev, [id]: true }));
     try {
-      await fetch(`${API_BASE}/api/${action}/${id}`, { method: 'POST' });
-      await fetchPending();
+      await fetch(`${API_BASE}/api/${action}/${id}`, { 
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${password}` }
+      });
+      await fetchDashboardData(password);
     } catch (e) {
       console.error(e);
     }
@@ -72,17 +120,83 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     setMounted(true);
-    // Cihazın varsayılan temasını al (İsteğe bağlı)
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
       setIsDark(true);
     }
-    fetchPending();
+    // Attempt auto-login if password is saved in local storage (optional enhancement)
+    const savedPass = localStorage.getItem('admin_pass');
+    if (savedPass) {
+      setPassword(savedPass);
+      fetchDashboardData(savedPass).then(success => {
+        if (success) setIsAuthenticated(true);
+      });
+    }
   }, []);
+  
+  // Save password when authenticated
+  useEffect(() => {
+    if (isAuthenticated && password) {
+      localStorage.setItem('admin_pass', password);
+    }
+  }, [isAuthenticated, password]);
 
   if (!mounted) return null;
 
   const t = TRANSLATIONS[lang];
 
+  // ==========================================
+  // LOGIN SCREEN
+  // ==========================================
+  if (!isAuthenticated) {
+    return (
+      <div className={`min-h-screen flex items-center justify-center transition-colors duration-300 ${isDark ? 'bg-gray-950' : 'bg-gray-50'}`}>
+        <div className={`p-8 w-full max-w-md rounded-2xl shadow-xl border ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
+          <div className="flex justify-center mb-6">
+            <div className="p-4 bg-indigo-500/20 rounded-full">
+              <Lock className="w-10 h-10 text-indigo-500" />
+            </div>
+          </div>
+          <h1 className={`text-2xl font-bold text-center mb-2 ${isDark ? 'text-white' : 'text-gray-900'}`}>
+            {t.loginTitle}
+          </h1>
+          <p className={`text-center mb-8 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+            {t.loginDesc}
+          </p>
+          
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <input 
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={t.passwordPlaceholder}
+                className={`w-full px-4 py-3 rounded-xl border focus:outline-none focus:ring-2 focus:ring-indigo-500 ${isDark ? 'bg-gray-800 border-gray-700 text-white placeholder-gray-500' : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-400'}`}
+                required
+              />
+            </div>
+            
+            {loginError && (
+              <p className="text-rose-500 text-sm font-medium text-center">
+                {lang === 'tr' ? 'Hatalı şifre veya bağlantı sorunu!' : 'Invalid password or connection error!'}
+              </p>
+            )}
+            
+            <button 
+              type="submit"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors"
+            >
+              <LogIn className="w-5 h-5" />
+              {t.loginBtn}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // ==========================================
+  // DASHBOARD SCREEN
+  // ==========================================
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDark ? 'bg-gray-950 text-gray-100' : 'bg-gray-50 text-gray-900'}`}>
       
@@ -130,19 +244,19 @@ export default function AdminDashboard() {
               <div className={`p-6 rounded-2xl border ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
                 <ShieldAlert className="w-8 h-8 text-rose-500 mb-4" />
                 <p className={`text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{t.totalBlocked}</p>
-                <p className="text-4xl font-black mt-1">1.284</p>
+                <p className="text-4xl font-black mt-1">{dbData.blacklistedNumbers.length}</p>
               </div>
 
               <div className={`p-6 rounded-2xl border ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
                 <Settings className="w-8 h-8 text-amber-500 mb-4" />
                 <p className={`text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{t.spamKeywords}</p>
-                <p className="text-4xl font-black mt-1">42</p>
+                <p className="text-4xl font-black mt-1">{dbData.spamKeywords.length}</p>
               </div>
 
               <div className={`p-6 rounded-2xl border ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
                 <Users className="w-8 h-8 text-emerald-500 mb-4" />
                 <p className={`text-sm font-medium ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>{t.activeUsers}</p>
-                <p className="text-4xl font-black mt-1">856</p>
+                <p className="text-4xl font-black mt-1 text-emerald-500">ONLINE</p>
               </div>
 
             </div>
@@ -151,22 +265,27 @@ export default function AdminDashboard() {
           <div>
             <h2 className="text-xl font-bold mb-4">{t.recentActivity}</h2>
             <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
-              {[1,2,3,4].map((i) => (
-                <div key={i} className={`p-4 flex justify-between items-center border-b last:border-0 ${isDark ? 'border-gray-800' : 'border-gray-100'}`}>
-                  <div>
-                    <p className="font-medium flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-rose-500"></span> 
-                      {i === 1 ? 'deneme bonusu' : i === 2 ? '+90 555 123 4567' : i === 3 ? 't.me/bet' : 'kredi onaylandı'}
-                    </p>
-                    <p className={`text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                      {i * 12} {lang === 'tr' ? 'kişi tarafından engellendi' : 'times blocked'}
-                    </p>
+              
+              {dbData.spamKeywords.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">Veritabanında henüz kelime yok.</div>
+              ) : (
+                dbData.spamKeywords.slice(-6).reverse().map((word, idx) => (
+                  <div key={idx} className={`p-4 flex justify-between items-center border-b last:border-0 ${isDark ? 'border-gray-800' : 'border-gray-100'}`}>
+                    <div>
+                      <p className="font-medium flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-rose-500"></span> 
+                        {word}
+                      </p>
+                      <p className={`text-sm mt-1 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {lang === 'tr' ? 'Veritabanına Eklendi (Aktif Koruma)' : 'Added to DB (Active Protection)'}
+                      </p>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded-full text-emerald-500 ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`}>
+                      KAYITLI
+                    </span>
                   </div>
-                  <span className={`text-xs px-2 py-1 rounded-full ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`}>
-                    {i} {lang === 'tr' ? 'dk önce' : 'mins ago'}
-                  </span>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
@@ -198,7 +317,7 @@ export default function AdminDashboard() {
                     <div>
                       <h3 className="font-bold text-lg text-amber-500">"{item.keyword}"</h3>
                       <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                        {lang === 'tr' ? '5+ kullanıcı şikayeti / AI İncelendi' : '5+ user reports / AI Analyzed'}
+                        {lang === 'tr' ? 'Kullanıcı Şikayeti / AI Tarafından İncelendi' : 'User Report / AI Analyzed'}
                       </p>
                     </div>
                   </div>

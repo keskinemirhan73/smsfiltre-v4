@@ -163,8 +163,19 @@ app.post('/api/report', async (req, res) => {
   }
 });
 
+// Admin yetkilendirme (Şifre kontrol) ara yazılımı
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '12345'; // .env dosyasında tanımlı olmalı
+
+const verifyAdmin = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader || authHeader !== `Bearer ${ADMIN_PASSWORD}`) {
+    return res.status(401).json({ error: 'Yetkisiz erişim! Geçersiz şifre.' });
+  }
+  next();
+};
+
 // Admin API: Açık olan (Onay bekleyen) Pull Request'leri getir
-app.get('/api/pending', async (req, res) => {
+app.get('/api/pending', verifyAdmin, async (req, res) => {
   try {
     const { data: pulls } = await octokit.pulls.list({
       owner: REPO_OWNER,
@@ -192,8 +203,23 @@ app.get('/api/pending', async (req, res) => {
   }
 });
 
+// Admin API: Canlı Veritabanını (database.json) GitHub'dan çek
+app.get('/api/database', verifyAdmin, async (req, res) => {
+  try {
+    const { data: fileData } = await octokit.repos.getContent({
+      owner: REPO_OWNER, repo: REPO_NAME, path: FILE_PATH, ref: 'main'
+    });
+    const decodedContent = Buffer.from(fileData.content, 'base64').toString('utf-8');
+    const db = JSON.parse(decodedContent);
+    res.json(db);
+  } catch (error) {
+    console.error('[API Error]', error);
+    res.status(500).json({ error: 'Veritabanı okunamadı' });
+  }
+});
+
 // Admin API: PR'ı Onayla (Merge)
-app.post('/api/approve/:pull_number', async (req, res) => {
+app.post('/api/approve/:pull_number', verifyAdmin, async (req, res) => {
   try {
     const { pull_number } = req.params;
     await octokit.pulls.merge({
@@ -209,7 +235,7 @@ app.post('/api/approve/:pull_number', async (req, res) => {
 });
 
 // Admin API: PR'ı Reddet (Close)
-app.post('/api/reject/:pull_number', async (req, res) => {
+app.post('/api/reject/:pull_number', verifyAdmin, async (req, res) => {
   try {
     const { pull_number } = req.params;
     await octokit.pulls.update({
