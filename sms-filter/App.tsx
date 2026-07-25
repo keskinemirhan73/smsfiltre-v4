@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Shield, List, Settings, FlaskConical } from 'lucide-react-native';
-import { useColorScheme, DeviceEventEmitter } from 'react-native';
+import { useColorScheme, DeviceEventEmitter, TouchableOpacity } from 'react-native';
 
 import DashboardScreen from './src/screens/DashboardScreen';
 import RulesScreen from './src/screens/RulesScreen';
@@ -13,6 +14,58 @@ import { darkColors, lightColors } from './src/theme';
 import { FilterManager } from './src/modules/FilterManager';
 
 const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
+
+function MainTabs({ navigation, themeColors }: any) {
+  return (
+    <Tab.Navigator
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: themeColors.surface,
+          shadowColor: 'transparent',
+          elevation: 0,
+        },
+        headerTintColor: themeColors.text,
+        tabBarStyle: {
+          backgroundColor: themeColors.surface,
+          borderTopColor: themeColors.border,
+        },
+        tabBarActiveTintColor: themeColors.primary,
+        tabBarInactiveTintColor: themeColors.textMuted,
+        headerRight: () => (
+          <TouchableOpacity 
+            style={{ marginRight: 16 }}
+            onPress={() => navigation.navigate('Ayarlar')}
+          >
+            <Settings color={themeColors.text} size={24} />
+          </TouchableOpacity>
+        )
+      }}
+    >
+      <Tab.Screen 
+        name="Dashboard" 
+        component={DashboardScreen} 
+        options={{
+          tabBarIcon: ({ color, size }) => <Shield color={color} size={size} />,
+        }}
+      />
+      <Tab.Screen 
+        name="Kurallar" 
+        component={RulesScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => <List color={color} size={size} />,
+        }}
+      />
+      <Tab.Screen 
+        name="Simülatör" 
+        component={TestSimulatorScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => <FlaskConical color={color} size={size} />,
+        }}
+      />
+    </Tab.Navigator>
+  );
+}
 
 export default function App() {
   const systemScheme = useColorScheme();
@@ -43,51 +96,29 @@ export default function App() {
           notification: themeColors.danger,
         }
       }}>
-        <Tab.Navigator
+        <Stack.Navigator
           screenOptions={{
             headerStyle: {
               backgroundColor: themeColors.surface,
-              shadowColor: 'transparent',
-              elevation: 0,
             },
             headerTintColor: themeColors.text,
-            tabBarStyle: {
-              backgroundColor: themeColors.surface,
-              borderTopColor: themeColors.border,
-            },
-            tabBarActiveTintColor: themeColors.primary,
-            tabBarInactiveTintColor: themeColors.textMuted,
+            headerShadowVisible: false,
           }}
         >
-          <Tab.Screen 
-            name="Dashboard" 
-            component={DashboardScreen} 
-            options={{
-              tabBarIcon: ({ color, size }) => <Shield color={color} size={size} />,
-            }}
-          />
-          <Tab.Screen 
-            name="Kurallar" 
-            component={RulesScreen}
-            options={{
-              tabBarIcon: ({ color, size }) => <List color={color} size={size} />,
-            }}
-          />
-          <Tab.Screen 
-            name="Simülatör" 
-            component={TestSimulatorScreen}
-            options={{
-              tabBarIcon: ({ color, size }) => <FlaskConical color={color} size={size} />,
-            }}
-          />
-          <Tab.Screen 
+          <Stack.Screen 
+            name="Main" 
+            options={{ headerShown: false }}
+          >
+            {(props) => <MainTabs {...props} themeColors={themeColors} />}
+          </Stack.Screen>
+          <Stack.Screen 
             name="Ayarlar" 
             component={SettingsScreen}
             options={{
-              tabBarIcon: ({ color, size }) => <Settings color={color} size={size} />,
+              presentation: 'card', // Ensure standard iOS push transition
             }}
           />
-        </Tab.Navigator>
+        </Stack.Navigator>
       </NavigationContainer>
     </>
   );

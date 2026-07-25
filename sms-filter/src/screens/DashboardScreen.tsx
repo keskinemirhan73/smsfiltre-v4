@@ -316,7 +316,7 @@ export default function DashboardScreen() {
       <Modal visible={isReportModalVisible} transparent={true} animationType="slide">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <TouchableOpacity style={styles.modalDismissArea} onPress={() => setIsReportModalVisible(false)} activeOpacity={1} />
-          <View style={[styles.bottomSheet, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <View style={[styles.bottomSheet, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <View style={styles.sheetHandle} />
             <View style={styles.sheetHeader}>
               <Text style={[styles.sheetTitle, { color: theme.text }]}>Topluluğa Bildir</Text>
