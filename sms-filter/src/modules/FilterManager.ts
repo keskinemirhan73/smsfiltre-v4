@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 import { ThreatCloudService } from '../services/ThreatCloudService';
 
-const APP_GROUP = 'group.com.smsfilter.app';
+const APP_GROUP = 'group.com.filtreai.app';
 const STORAGE_KEY = '@junkman_rules';
 const SETTINGS_KEY = '@junkman_settings';
 const STATS_KEY = '@junkman_stats';
@@ -43,6 +43,7 @@ export interface AppSettings {
   customFraudKeywords: string[];
   whitelist: string[];
   autoSyncEnabled?: boolean;
+  biometricLock?: boolean;
 }
 
 export interface Stats {
@@ -154,6 +155,7 @@ const defaultSettings: AppSettings = {
   customFraudKeywords: [],
   whitelist: [],
   autoSyncEnabled: true,
+  biometricLock: false,
 };
 
 const defaultStats: Stats = {
@@ -353,8 +355,10 @@ export class FilterManager {
     const settings = await this.loadSettings();
     const rules = await this.loadRules();
 
-    // Under attack -> block everything
-    if (settings.underAttackMode) return settings.categoryMapping.spam as any;
+    // Android can raise sensitivity without moving messages in the iOS extension.
+    if (Platform.OS === 'android' && settings.underAttackMode) {
+      return settings.categoryMapping.spam as any;
+    }
 
     // Check whitelist (Beyaz Liste kontrolü en başta yapılır, yasaklardan bile güçlüdür)
     if (settings.whitelist && settings.whitelist.includes(sender)) {
@@ -457,8 +461,9 @@ export class FilterManager {
       const payload = JSON.stringify({ rules, settings, threatDb: cloudThreats });
       if (Platform.OS === 'ios') {
         try {
-          const SGP = require('react-native-shared-group-preferences').default;
-          await SGP.setItem('smsfilter_config_json', payload, APP_GROUP);
+          const { ExtensionStorage } = require('@bacons/apple-targets');
+          const storage = new ExtensionStorage(APP_GROUP);
+          storage.set('smsfilter_config_json', payload);
         } catch {}
       } else if (Platform.OS === 'android') {
         try {

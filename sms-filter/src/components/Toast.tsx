@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useRef, ReactNode, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated, TouchableOpacity, Easing } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CheckCircle2, AlertTriangle, Info, X } from 'lucide-react-native';
 import { useAppTheme, spacing, radii } from '../theme';
 
@@ -25,6 +25,7 @@ export const useToast = () => {
 
 export const ToastProvider = ({ children }: { children: ReactNode }) => {
   const theme = useAppTheme();
+  const insets = useSafeAreaInsets();
   const [message, setMessage] = useState('');
   const [type, setType] = useState<ToastType>('info');
   const [visible, setVisible] = useState(false);
@@ -88,11 +89,11 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
         <Animated.View
           style={[
             styles.toastWrapper,
-            { transform: [{ translateY }], opacity },
+            { transform: [{ translateY }], opacity, paddingTop: Math.max(insets.top, 16) },
           ]}
           pointerEvents="box-none"
         >
-          <SafeAreaView pointerEvents="box-none">
+          <View pointerEvents="box-none">
             <View style={[styles.toastContainer, { backgroundColor: theme.card, borderColor: theme.border, shadowColor: theme.text }]}>
               <View style={[styles.iconBox, { backgroundColor: bgColor }]}>
                 <Icon color={iconColor} size={20} />
@@ -102,7 +103,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
                 <X color={theme.textMuted} size={18} />
               </TouchableOpacity>
             </View>
-          </SafeAreaView>
+          </View>
         </Animated.View>
       )}
     </ToastContext.Provider>

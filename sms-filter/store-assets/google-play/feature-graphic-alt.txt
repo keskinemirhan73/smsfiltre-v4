@@ -1,0 +1,1 @@
+Mavi bir dijital filtre, güvenli mesaj baloncuklarını geçirirken şüpheli pembe mesajı yönlendirerek ayırıyor.

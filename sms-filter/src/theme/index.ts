@@ -1,6 +1,3 @@
-import { useState, useEffect } from 'react';
-import { useColorScheme, DeviceEventEmitter } from 'react-native';
-import { FilterManager } from '../modules/FilterManager';
 
 export const darkColors = {
   background: '#0F172A',
@@ -31,21 +28,11 @@ export const lightColors = {
 // Default static reference for older un-migrated components
 export const colors = darkColors;
 
-export const useAppTheme = () => {
-  const systemScheme = useColorScheme();
-  const [appTheme, setAppTheme] = useState('system');
+import { createContext, useContext } from 'react';
 
-  useEffect(() => {
-    FilterManager.loadSettings().then(s => setAppTheme(s.theme || 'system'));
-    const sub = DeviceEventEmitter.addListener('onThemeChanged', (newTheme) => {
-      setAppTheme(newTheme);
-    });
-    return () => sub.remove();
-  }, []);
+export const ThemeContext = createContext(darkColors);
 
-  const isDark = appTheme === 'dark' || (appTheme === 'system' && systemScheme === 'dark');
-  return isDark ? darkColors : lightColors;
-};
+export const useAppTheme = () => useContext(ThemeContext);
 
 export const spacing = {
   xs: 4,

@@ -1,8 +1,13 @@
 package com.smsfilter.app
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.provider.Telephony
 import android.util.Log
 import org.json.JSONObject
@@ -11,9 +16,12 @@ class SmsFilterReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Telephony.Sms.Intents.SMS_RECEIVED_ACTION) {
             val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
-            for (sms in messages) {
-                val sender = sms.displayOriginatingAddress ?: ""
-                val body = sms.displayMessageBody ?: ""
+            if (messages.isEmpty()) return
+
+                val sender = messages.first().displayOriginatingAddress ?: ""
+                val body = messages.joinToString(separator = "") {
+                    it.displayMessageBody ?: ""
+                }
                 val lowerBody = body.lowercase()
                 val lowerSender = sender.lowercase()
                 
@@ -121,12 +129,63 @@ class SmsFilterReceiver : BroadcastReceiver() {
                 }
 
                 if (shouldBlock) {
-                    Log.d("SmsFilter", "Blocked SMS from: $sender")
-                    abortBroadcast()
+                    Log.d("SmsFilter", "Suspicious SMS detected from: $sender")
+                    showSuspiciousSmsNotification(context, sender, body)
                 } else {
                     Log.d("SmsFilter", "Allowed SMS from: $sender")
                 }
+        }
+    }
+
+    private fun showSuspiciousSmsNotification(
+        context: Context,
+        sender: String,
+        body: String
+    ) {
+        try {
+            val channelId = "filtreai_sms_alerts"
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val channel = NotificationChannel(
+                    channelId,
+                    "SMS Güvenlik Uyarıları",
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply {
+                    description = "FiltreAI tarafından şüpheli bulunan yeni SMS uyarıları"
+                }
+                manager.createNotificationChannel(channel)
             }
+
+            val launchIntent = context.packageManager
+                .getLaunchIntentForPackage(context.packageName)
+            val pendingIntent = launchIntent?.let {
+                PendingIntent.getActivity(
+                    context,
+                    0,
+                    it,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            }
+
+            val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Notification.Builder(context, channelId)
+            } else {
+                @Suppress("DEPRECATION")
+                Notification.Builder(context)
+            }
+
+            builder
+                .setSmallIcon(context.applicationInfo.icon)
+                .setContentTitle("FiltreAI: Şüpheli SMS algılandı")
+                .setContentText("Mesajlar uygulamasında yeni bir şüpheli SMS var.")
+                .setAutoCancel(true)
+                .setVisibility(Notification.VISIBILITY_PRIVATE)
+
+            pendingIntent?.let(builder::setContentIntent)
+            manager.notify("$sender:$body".hashCode(), builder.build())
+        } catch (error: Exception) {
+            Log.e("SmsFilter", "Could not show suspicious SMS notification", error)
         }
     }
 }

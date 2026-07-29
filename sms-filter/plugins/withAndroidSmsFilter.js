@@ -14,8 +14,7 @@ function withAndroidSmsFilter(config) {
     }
     
     const permissions = [
-      'android.permission.RECEIVE_SMS',
-      'android.permission.READ_SMS'
+      'android.permission.RECEIVE_SMS'
     ];
     
     permissions.forEach(permission => {

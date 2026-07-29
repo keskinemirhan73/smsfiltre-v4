@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
-import { Sparkles, ShieldAlert, ShieldCheck, AlertTriangle, AlertCircle, Info } from 'lucide-react-native';
-import { useTheme } from '../theme/ThemeContext';
-import { spacing, typography } from '../theme/designSystem';
+import { Sparkles, ShieldAlert, ShieldCheck, AlertTriangle, Info } from 'lucide-react-native';
+import { useAppTheme, spacing } from '../theme';
 import axios from 'axios';
-import { API_URL } from '../config';
+import { ThreatCloudService } from '../services/ThreatCloudService';
+const API_URL = 'https://smsfiltre-v4.onrender.com';
 
 export default function AIAnalysisScreen() {
-  const { theme, settings } = useTheme();
+  const theme = useAppTheme();
   const [text, setText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -24,7 +24,25 @@ export default function AIAnalysisScreen() {
 
     try {
       const response = await axios.post(`${API_URL}/api/analyze`, { text });
-      setResult(response.data);
+      let finalResult = response.data;
+
+      // Sunucu analizine ek olarak cihazdaki güncel tehdit veritabanını uygula.
+      const cloudDb = await ThreatCloudService.getDatabase();
+      const lowerText = text.toLowerCase();
+      const isThreat = [...cloudDb.spamKeywords, ...cloudDb.scamUrls].some(keyword =>
+        lowerText.includes(keyword.toLowerCase())
+      );
+
+      if (isThreat && (finalResult.riskLevel === 'Düşük' || finalResult.riskLevel === 'Orta')) {
+        finalResult = {
+          ...finalResult,
+          riskLevel: 'Yüksek',
+          threatType: 'Zararlı İçerik (Yerel Veritabanı)',
+          recommendation: 'Mesaj, yerel tehdit veritabanındaki bahis, spam veya dolandırıcılık işaretlerinden birini içeriyor. Mesaja itibar etmeyin.',
+        };
+      }
+
+      setResult(finalResult);
     } catch (e: any) {
       setError(e.response?.data?.error || 'Analiz sırasında sunucuya ulaşılamadı.');
     } finally {
@@ -34,21 +52,21 @@ export default function AIAnalysisScreen() {
 
   const getRiskColor = (level: string) => {
     switch(level) {
-      case 'Düşük': return theme.success;
-      case 'Orta': return theme.warning;
+      case 'Düşük': return theme.secondary;
+      case 'Orta': return '#F59E0B'; // warning color
       case 'Yüksek': return theme.danger;
       case 'Çok Yüksek': return '#991b1b'; // Darker red
-      default: return theme.textLight;
+      default: return theme.textMuted;
     }
   };
 
   const getRiskIcon = (level: string) => {
     switch(level) {
-      case 'Düşük': return <ShieldCheck color={theme.success} size={32} />;
-      case 'Orta': return <AlertTriangle color={theme.warning} size={32} />;
-      case 'Yüksek': 
+      case 'Düşük': return <ShieldCheck color={theme.secondary} size={32} />;
+      case 'Orta': return <AlertTriangle color="#F59E0B" size={32} />;
+      case 'Yüksek':
       case 'Çok Yüksek': return <ShieldAlert color={theme.danger} size={32} />;
-      default: return <Info color={theme.textLight} size={32} />;
+      default: return <Info color={theme.textMuted} size={32} />;
     }
   };
 
@@ -58,22 +76,22 @@ export default function AIAnalysisScreen() {
         <View style={[styles.iconWrapper, { backgroundColor: theme.primary + '20' }]}>
           <Sparkles color={theme.primary} size={28} />
         </View>
-        <Text style={[styles.title, { color: theme.text }]}>Gemini AI Analiz</Text>
-        <Text style={[styles.subtitle, { color: theme.textLight }]}>
-          Şüphelendiğin bir mesajı buraya yapıştır, yapay zeka senin için saniyeler içinde analiz etsin.
+        <Text style={[styles.title, { color: theme.text }]}>Akıllı Mesaj Analizi</Text>
+        <Text style={[styles.subtitle, { color: theme.textMuted }]}>
+          Şüphelendiğin mesajı buraya yapıştır; bağlantı, aciliyet, kimlik avı ve spam işaretleri saniyeler içinde incelensin.
         </Text>
       </View>
 
       <View style={styles.content}>
         <TextInput
-          style={[styles.input, { 
-            backgroundColor: theme.surface, 
+          style={[styles.input, {
+            backgroundColor: theme.surface,
             color: theme.text,
             borderColor: theme.border,
             borderWidth: 1
           }]}
           placeholder="Şüpheli mesaj metnini buraya yapıştırın..."
-          placeholderTextColor={theme.textLight}
+          placeholderTextColor={theme.textMuted}
           multiline
           numberOfLines={6}
           textAlignVertical="top"
@@ -83,8 +101,8 @@ export default function AIAnalysisScreen() {
 
         {error ? <Text style={[styles.error, { color: theme.danger }]}>{error}</Text> : null}
 
-        <TouchableOpacity 
-          style={[styles.button, { backgroundColor: theme.primary }]} 
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: theme.primary }]}
           onPress={handleAnalyze}
           disabled={isLoading}
         >
@@ -113,20 +131,21 @@ export default function AIAnalysisScreen() {
             <View style={[styles.divider, { backgroundColor: theme.border }]} />
 
             <View style={styles.resultSection}>
-              <Text style={[styles.sectionTitle, { color: theme.textLight }]}>Tespit Edilen Tehdit</Text>
+              <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Tespit Edilen Tehdit</Text>
               <Text style={[styles.sectionContent, { color: theme.text }]}>{result.threatType}</Text>
             </View>
 
             <View style={styles.resultSection}>
-              <Text style={[styles.sectionTitle, { color: theme.textLight }]}>Gemini AI Tavsiyesi</Text>
+              <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>FiltreAI Tavsiyesi</Text>
               <Text style={[styles.sectionContent, { color: theme.text }]}>{result.recommendation}</Text>
             </View>
-            
+
             {result.cached && (
               <Text style={[styles.cachedBadge, { color: theme.primary }]}>
                 ⚡ Bu mesaj daha önce analiz edildi (Önbellekten hızlı yanıt)
               </Text>
             )}
+
           </View>
         )}
       </View>
@@ -155,11 +174,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   title: {
-    ...typography.h1,
+    fontSize: 24,
+    fontWeight: 'bold',
     marginBottom: spacing.sm,
   },
   subtitle: {
-    ...typography.body,
+    fontSize: 16,
     textAlign: 'center',
   },
   content: {
@@ -168,7 +188,7 @@ const styles = StyleSheet.create({
   input: {
     borderRadius: 16,
     padding: spacing.md,
-    ...typography.body,
+    fontSize: 16,
     minHeight: 150,
     marginBottom: spacing.lg,
   },
@@ -186,11 +206,12 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   buttonText: {
-    ...typography.button,
+    fontSize: 16,
+    fontWeight: 'bold',
     color: '#fff',
   },
   error: {
-    ...typography.caption,
+    fontSize: 12,
     marginBottom: spacing.md,
     textAlign: 'center',
     fontWeight: 'bold',
@@ -215,11 +236,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   riskLabel: {
-    ...typography.caption,
+    fontSize: 12,
     fontWeight: '600',
   },
   riskValue: {
-    ...typography.h2,
+    fontSize: 20,
+    fontWeight: 'bold',
   },
   divider: {
     height: 1,
@@ -230,15 +252,15 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   sectionTitle: {
-    ...typography.caption,
+    fontSize: 12,
     fontWeight: '600',
     marginBottom: 4,
   },
   sectionContent: {
-    ...typography.body,
+    fontSize: 16,
   },
   cachedBadge: {
-    ...typography.caption,
+    fontSize: 12,
     textAlign: 'center',
     marginTop: spacing.sm,
     fontStyle: 'italic',

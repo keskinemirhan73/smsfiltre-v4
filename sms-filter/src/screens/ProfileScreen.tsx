@@ -1,10 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Platform } from 'react-native';
-import { Trophy, ShieldAlert, Award, Star, TrendingUp } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Image } from 'react-native';
+import { Trophy, ShieldAlert, Award, Star, TrendingUp, Crown, Medal } from 'lucide-react-native';
 import { useAppTheme, spacing, radii } from '../theme';
 import * as Notifications from 'expo-notifications';
 import axios from 'axios';
-import { API_URL } from '../config';
+
+const API_URL = 'https://smsfiltre-v4.onrender.com';
+
+// Mock Leaderboard Data
+const LEADERBOARD_DATA = [
+  { id: '1', name: 'Caner K.', points: 1450, badge: 'Siber Güvenlik Uzmanı', reports: 145 },
+  { id: '2', name: 'Ahmet Y.', points: 1200, badge: 'Spam Savaşçısı', reports: 120 },
+  { id: '3', name: 'Zeynep A.', points: 850, badge: 'Aktif Kalkan', reports: 85 },
+  { id: '4', name: 'Burak T.', points: 640, badge: 'Aktif Kalkan', reports: 64 },
+  { id: '5', name: 'Selin D.', points: 420, badge: 'Acemi Kalkan', reports: 42 },
+];
 
 export default function ProfileScreen() {
   const theme = useAppTheme();
@@ -34,30 +44,11 @@ export default function ProfileScreen() {
     fetchProfile();
   }, []);
 
-  const getBadgeIcon = () => {
-    switch(profile.badge) {
-      case 'Siber Güvenlik Uzmanı': return <Trophy color="#F59E0B" size={48} />;
-      case 'Spam Savaşçısı': return <Star color={theme.primary} size={48} />;
-      case 'Aktif Kalkan': return <Award color={theme.secondary} size={48} />;
-      default: return <ShieldAlert color={theme.textMuted} size={48} />;
-    }
-  };
-
-  const getBadgeColor = () => {
-    switch(profile.badge) {
-      case 'Siber Güvenlik Uzmanı': return '#F59E0B';
-      case 'Spam Savaşçısı': return theme.primary;
-      case 'Aktif Kalkan': return theme.secondary;
-      default: return theme.textMuted;
-    }
-  };
-
-  const progressToNextBadge = () => {
-    const pts = profile.points;
-    if (pts < 50) return (pts / 50) * 100;
-    if (pts < 100) return ((pts - 50) / 50) * 100;
-    if (pts < 500) return ((pts - 100) / 400) * 100;
-    return 100; // Max
+  const getRankIcon = (index: number) => {
+    if (index === 0) return <Crown color="#F59E0B" size={24} />;
+    if (index === 1) return <Medal color="#9CA3AF" size={24} />;
+    if (index === 2) return <Medal color="#B45309" size={24} />;
+    return <Text style={{ color: theme.textMuted, fontSize: 16, fontWeight: 'bold' }}>{index + 1}</Text>;
   };
 
   if (isLoading) {
@@ -69,37 +60,30 @@ export default function ProfileScreen() {
   }
 
   return (
-    <ScrollView 
+    <ScrollView
       style={[styles.container, { backgroundColor: theme.background }]}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
       <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>Profilim</Text>
+        <Text style={[styles.title, { color: theme.text }]}>Liderlik Tablosu</Text>
         <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-          Topluluğa yaptığın katkılar ve kazandığın rozetler
+          Topluluğu spamdan koruyan en iyi savaşçılar
         </Text>
       </View>
 
-      <View style={[styles.badgeCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <View style={styles.badgeHeader}>
-          <View style={[styles.iconWrapper, { backgroundColor: getBadgeColor() + '20' }]}>
-            {getBadgeIcon()}
-          </View>
-          <View style={styles.badgeInfo}>
-            <Text style={[styles.badgeTitle, { color: theme.text }]}>Mevcut Rütbe</Text>
-            <Text style={[styles.badgeName, { color: getBadgeColor() }]}>{profile.badge}</Text>
-          </View>
+      <View style={[styles.promoCard, { backgroundColor: theme.primary + '15', borderColor: theme.primary + '30' }]}>
+        <View style={styles.promoIcon}>
+          <Trophy color={theme.primary} size={32} />
         </View>
-        
-        <View style={styles.progressContainer}>
-          <View style={[styles.progressBarBg, { backgroundColor: theme.border }]}>
-            <View style={[styles.progressBarFill, { backgroundColor: getBadgeColor(), width: `${progressToNextBadge()}%` }]} />
-          </View>
-          <Text style={[styles.progressText, { color: theme.textMuted }]}>
-            Sonraki rütbe için bildirim yapmaya devam et!
+        <View style={styles.promoTextContainer}>
+          <Text style={[styles.promoTitle, { color: theme.primary }]}>Pro Üyelik Hediye!</Text>
+          <Text style={[styles.promoDesc, { color: theme.text }]}>
+            Her ayın sonunda Liderlik Tablosu'nda <Text style={{fontWeight: 'bold'}}>ilk 3'e giren</Text> kullanıcılara ömür boyu Pro Üyelik hediye edilecektir. Spam bildirmeye devam edin!
           </Text>
         </View>
       </View>
+
+      <Text style={[styles.sectionTitle, { color: theme.text }]}>Senin İstatistiklerin</Text>
 
       <View style={styles.statsGrid}>
         <View style={[styles.statCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -119,11 +103,24 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <View style={[styles.infoCard, { backgroundColor: theme.primary + '10', borderColor: theme.primary + '30' }]}>
-        <Text style={[styles.infoTitle, { color: theme.text }]}>Nasıl Puan Kazanırım?</Text>
-        <Text style={[styles.infoDesc, { color: theme.textMuted }]}>
-          Ana ekrandaki "Spam Bildir" butonunu kullanarak yeni şüpheli kelimeler veya numaralar bildirebilirsiniz. Yapay zeka onayından geçen her geçerli bildiriminiz için +10 Puan kazanırsınız!
-        </Text>
+      <Text style={[styles.sectionTitle, { color: theme.text, marginTop: spacing.lg }]}>Top 5 Spam Savaşçısı</Text>
+
+      <View style={[styles.leaderboardContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        {LEADERBOARD_DATA.map((user, index) => (
+          <View key={user.id} style={[styles.leaderboardItem, index !== LEADERBOARD_DATA.length - 1 && { borderBottomColor: theme.border, borderBottomWidth: 1 }]}>
+            <View style={styles.rankContainer}>
+              {getRankIcon(index)}
+            </View>
+            <View style={styles.userInfo}>
+              <Text style={[styles.userName, { color: theme.text }]}>{user.name}</Text>
+              <Text style={[styles.userBadge, { color: theme.textMuted }]}>{user.badge}</Text>
+            </View>
+            <View style={styles.pointsContainer}>
+              <Text style={[styles.pointsValue, { color: theme.primary }]}>{user.points} P</Text>
+              <Text style={[styles.reportsValue, { color: theme.textMuted }]}>{user.reports} Bildirim</Text>
+            </View>
+          </View>
+        ))}
       </View>
 
       <View style={{height: 100}} />
@@ -150,64 +147,38 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
   },
-  badgeCard: {
+  promoCard: {
+    flexDirection: 'row',
     borderRadius: radii.xl,
     borderWidth: 1,
-    padding: spacing.xl,
-    marginBottom: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  badgeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    padding: spacing.lg,
     marginBottom: spacing.xl,
-  },
-  iconWrapper: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.lg,
   },
-  badgeInfo: {
+  promoIcon: {
+    marginRight: spacing.md,
+  },
+  promoTextContainer: {
     flex: 1,
   },
-  badgeTitle: {
-    fontSize: 14,
-    fontWeight: '600',
+  promoTitle: {
+    fontSize: 16,
+    fontWeight: '800',
     marginBottom: 4,
   },
-  badgeName: {
-    fontSize: 24,
-    fontWeight: '800',
+  promoDesc: {
+    fontSize: 13,
+    lineHeight: 18,
   },
-  progressContainer: {
-    width: '100%',
-  },
-  progressBarBg: {
-    height: 8,
-    borderRadius: 4,
-    width: '100%',
-    marginBottom: 8,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  progressText: {
-    fontSize: 12,
-    fontWeight: '500',
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: spacing.md,
   },
   statsGrid: {
     flexDirection: 'row',
     gap: spacing.md,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.md,
   },
   statCard: {
     flex: 1,
@@ -215,11 +186,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: spacing.lg,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 4,
   },
   statIconWrapper: {
     width: 48,
@@ -238,18 +204,42 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  infoCard: {
+  leaderboardContainer: {
     borderRadius: radii.xl,
     borderWidth: 1,
+    overflow: 'hidden',
+  },
+  leaderboardItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: spacing.lg,
   },
-  infoTitle: {
+  rankContainer: {
+    width: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userInfo: {
+    flex: 1,
+    marginLeft: spacing.sm,
+  },
+  userName: {
     fontSize: 16,
     fontWeight: '700',
-    marginBottom: 8,
+    marginBottom: 2,
   },
-  infoDesc: {
-    fontSize: 14,
-    lineHeight: 22,
+  userBadge: {
+    fontSize: 12,
   },
+  pointsContainer: {
+    alignItems: 'flex-end',
+  },
+  pointsValue: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  reportsValue: {
+    fontSize: 11,
+    marginTop: 2,
+  }
 });

@@ -1,15 +1,25 @@
 import React, { useState, useEffect, useContext, createContext } from 'react';
-import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, TextInput, Alert, DeviceEventEmitter, ActivityIndicator } from 'react-native';
-import { ShieldAlert, Brain, Clock, ShieldCheck, Database, Zap, Network, ListFilter, Globe, AlertTriangle, Info, ChevronRight, ChevronLeft, Palette, Languages, Plus, Trash2, CheckCircle2, Server, Key, Phone, Activity, X } from 'lucide-react-native';
+import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, TextInput, Alert, DeviceEventEmitter, ActivityIndicator, Modal, FlatList, Linking, Platform } from 'react-native';
+import { ShieldAlert, Brain, Clock, ShieldCheck, Database, Zap, Network, ListFilter, Globe, AlertTriangle, Info, ChevronRight, ChevronLeft, Palette, Languages, Plus, Trash2, CheckCircle2, Server, Key, Phone, Activity, X, Users, Search } from 'lucide-react-native';
 import { useAppTheme, spacing, radii } from '../theme';
 import { FilterManager, AppSettings } from '../modules/FilterManager';
 import { ThreatCloudService } from '../services/ThreatCloudService';
 import { getT } from '../i18n';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useScrollToTop, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useToast } from '../components/Toast';
-import SwipeToDeleteItem from '../components/SwipeToDeleteItem';
+import * as Contacts from 'expo-contacts';
+import * as LocalAuthentication from 'expo-local-authentication';
+import RulesScreen from './RulesScreen';
+import {
+  hasSmsDetectionPermission,
+  requestSmsDetectionPermission,
+} from '../services/SmsPermissionService';
+
+let lastAuthTime = 0;
+const AUTH_GRACE_PERIOD = 3 * 60 * 1000; // 3 dakika
 
 const SettingsContext = createContext<any>(null);
 const useSettings = () => useContext(SettingsContext);
@@ -35,6 +45,13 @@ function WhitelistScreen({ navigation }: any) {
   const { showToast } = useToast();
   const [whitelistNumber, setWhitelistNumber] = useState('');
 
+  // Contacts State
+  const [isContactModalVisible, setContactModalVisible] = useState(false);
+  const [contacts, setContacts] = useState<Contacts.Contact[]>([]);
+  const [filteredContacts, setFilteredContacts] = useState<Contacts.Contact[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isContactsLoading, setIsContactsLoading] = useState(false);
+
   const addNumber = () => {
     if (!whitelistNumber.trim()) return;
     const wl = settings.whitelist || [];
@@ -45,60 +62,185 @@ function WhitelistScreen({ navigation }: any) {
     }
     setWhitelistNumber('');
   };
+
   const removeNumber = (num: string) => {
     const wl = settings.whitelist || [];
     updateSetting('whitelist', wl.filter((n: string) => n !== num));
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     showToast(`${num} silindi.`, { type: 'info' });
   };
-  
+
+  const openContactPicker = async () => {
+    const { status } = await Contacts.requestPermissionsAsync();
+    if (status === 'granted') {
+      setContactModalVisible(true);
+      setIsContactsLoading(true);
+      try {
+        const { data } = await Contacts.getContactsAsync({
+          fields: [Contacts.Fields.PhoneNumbers],
+          sort: Contacts.SortTypes.FirstName,
+        });
+        const validContacts = data.filter(c => c.phoneNumbers && c.phoneNumbers.length > 0);
+        setContacts(validContacts);
+        setFilteredContacts(validContacts);
+      } catch(e) {
+        console.log(e);
+        showToast("Rehber yüklenemedi", {type: 'error'});
+      } finally {
+        setIsContactsLoading(false);
+      }
+    } else {
+      Alert.alert('İzin Reddedildi', 'Rehberden numara seçebilmek için kişi erişim izni vermelisiniz.');
+    }
+  };
+
+  const handleSearch = (text: string) => {
+    setSearchQuery(text);
+    if(text.trim() === '') {
+      setFilteredContacts(contacts);
+    } else {
+      const q = text.toLowerCase();
+      setFilteredContacts(contacts.filter(c => (c.name && c.name.toLowerCase().includes(q))));
+    }
+  };
+
+  const selectContact = (contact: Contacts.Contact) => {
+    if (contact.phoneNumbers && contact.phoneNumbers.length > 0) {
+      let num = contact.phoneNumbers[0].number || '';
+      num = num.replace(/\s+/g, '');
+      setWhitelistNumber(num);
+      setContactModalVisible(false);
+      setSearchQuery('');
+    }
+  };
+
+  const renderContactItem = ({ item }: { item: Contacts.Contact }) => (
+    <TouchableOpacity
+      style={[styles.contactItem, { borderBottomColor: theme.border }]}
+      onPress={() => selectContact(item)}
+    >
+      <View style={[styles.contactAvatar, { backgroundColor: theme.primary + '20' }]}>
+        <Text style={{color: theme.primary, fontWeight: 'bold'}}>
+          {item.name ? item.name.charAt(0).toUpperCase() : '?'}
+        </Text>
+      </View>
+      <View style={{flex: 1}}>
+        <Text style={[styles.contactName, { color: theme.text }]}>{item.name}</Text>
+        <Text style={[styles.contactPhone, { color: theme.textMuted }]}>
+          {item.phoneNumbers ? item.phoneNumbers[0].number : ''}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingBottom: 80 }}>
-      <TopHeader title="Beyaz Liste (VIP)" navigation={navigation} />
-      <View style={styles.section}>
-        <SectionDesc text="Buraya eklediğiniz numaralar veya kurum adları HİÇBİR güvenlik filtresine takılmaz. Aile üyelerinizi veya bankalarınızı ekleyebilirsiniz." />
-        
-        <View style={[styles.premiumInputContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <Phone size={20} color={theme.textMuted} style={{ marginLeft: 12 }} />
-          <TextInput 
-            style={[styles.premiumInput, { color: theme.text }]}
-            placeholder="Numara veya İsim (Örn: +90555... veya GARANTI)"
-            placeholderTextColor={theme.textMuted}
-            value={whitelistNumber}
-            onChangeText={setWhitelistNumber}
-          />
-          <TouchableOpacity 
-            style={[styles.premiumAddBtn, { backgroundColor: theme.primary, opacity: whitelistNumber.trim() ? 1 : 0.6 }]}
-            onPress={addNumber}
-            disabled={!whitelistNumber.trim()}
+    <View style={{flex:1, backgroundColor: theme.background}}>
+      <ScrollView style={[styles.container]} contentContainerStyle={{ paddingBottom: 80 }}>
+        <TopHeader title="Beyaz Liste (VIP)" navigation={navigation} />
+        <View style={styles.section}>
+          <SectionDesc text="Buraya eklediğiniz numaralar veya kurum adları HİÇBİR güvenlik filtresine takılmaz. Aile üyelerinizi veya bankalarınızı ekleyebilirsiniz." />
+
+          <View style={[styles.premiumInputContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Phone size={20} color={theme.textMuted} style={{ marginLeft: 12 }} />
+            <TextInput
+              style={[styles.premiumInput, { color: theme.text }]}
+              placeholder="Numara veya İsim (Örn: +90555... veya GARANTI)"
+              placeholderTextColor={theme.textMuted}
+              value={whitelistNumber}
+              onChangeText={setWhitelistNumber}
+            />
+            <TouchableOpacity
+              style={[styles.premiumAddBtn, { backgroundColor: theme.primary, opacity: whitelistNumber.trim() ? 1 : 0.6 }]}
+              onPress={addNumber}
+              disabled={!whitelistNumber.trim()}
+            >
+              <Plus size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.contactPickerBtn, { backgroundColor: theme.secondary + '20', borderColor: theme.secondary + '40' }]}
+            onPress={openContactPicker}
           >
-            <Plus size={20} color="#fff" />
+            <Users size={20} color={theme.secondary} />
+            <Text style={[styles.contactPickerBtnText, { color: theme.secondary }]}>Rehberden Kişi Seç</Text>
           </TouchableOpacity>
-        </View>
-        
-        <View style={{flexDirection: 'column', marginTop: spacing.xl, gap: spacing.sm}}>
-          <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: spacing.xs }]}>Güvenli Numara ve Kurumlar</Text>
-          
-          {(!settings.whitelist || settings.whitelist.length === 0) ? (
-            <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <ShieldCheck size={40} color={theme.border} style={{ marginBottom: spacing.md }} />
-              <Text style={{ color: theme.textMuted, fontSize: 14, textAlign: 'center' }}>Beyaz listenizde hiç numara yok.</Text>
-            </View>
-          ) : (
-            (settings.whitelist || []).map((num: string) => (
-              <SwipeToDeleteItem key={`wl-${num}`} onDelete={() => removeNumber(num)}>
-                <View style={[styles.listItem, { backgroundColor: theme.card, borderColor: theme.border, marginBottom: 0 }]}>
+
+          <View style={{flexDirection: 'column', marginTop: spacing.xl, gap: spacing.sm}}>
+            <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: spacing.xs }]}>Güvenli Numara ve Kurumlar</Text>
+
+            {(!settings.whitelist || settings.whitelist.length === 0) ? (
+              <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <ShieldCheck size={40} color={theme.border} style={{ marginBottom: spacing.md }} />
+                <Text style={{ color: theme.textMuted, fontSize: 14, textAlign: 'center' }}>Beyaz listenizde hiç numara yok.</Text>
+              </View>
+            ) : (
+              (settings.whitelist || []).map((num: string) => (
+                <View key={`wl-${num}`} style={[styles.listItem, { backgroundColor: theme.card, borderColor: theme.border, marginBottom: spacing.sm }]}>
                   <View style={[styles.listIcon, { backgroundColor: 'rgba(16,185,129,0.1)' }]}>
                     <ShieldCheck size={18} color="#10B981" />
                   </View>
                   <Text style={[styles.listText, { color: theme.text }]}>{num}</Text>
+                  <TouchableOpacity onPress={() => removeNumber(num)} style={{ padding: 8 }}>
+                    <Trash2 size={20} color={theme.danger} />
+                  </TouchableOpacity>
                 </View>
-              </SwipeToDeleteItem>
-            ))
+              ))
+            )}
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Contact Picker Modal */}
+      <Modal
+        visible={isContactModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setContactModalVisible(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: theme.background }]}>
+          <View style={[styles.modalHeader, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
+            <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.md}}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Kişi Seç</Text>
+              <TouchableOpacity onPress={() => setContactModalVisible(false)}>
+                <X size={24} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={{paddingHorizontal: spacing.lg, paddingBottom: spacing.md}}>
+              <View style={[styles.searchContainer, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                <Search size={20} color={theme.textMuted} />
+                <TextInput
+                  style={[styles.searchInput, { color: theme.text }]}
+                  placeholder="Kişilerde ara..."
+                  placeholderTextColor={theme.textMuted}
+                  value={searchQuery}
+                  onChangeText={handleSearch}
+                />
+              </View>
+            </View>
+          </View>
+
+          {isContactsLoading ? (
+            <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+              <ActivityIndicator size="large" color={theme.primary} />
+              <Text style={{color: theme.textMuted, marginTop: 10}}>Rehber yükleniyor...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredContacts}
+              keyExtractor={(item: any) => item.id || Math.random().toString()}
+              renderItem={renderContactItem}
+              initialNumToRender={20}
+              ListEmptyComponent={
+                <Text style={{color: theme.textMuted, textAlign: 'center', marginTop: 40}}>
+                  Kişi bulunamadı.
+                </Text>
+              }
+            />
           )}
         </View>
-      </View>
-    </ScrollView>
+      </Modal>
+    </View>
   );
 }
 
@@ -118,11 +260,11 @@ function ScheduleScreen({ navigation }: any) {
           onToggle={() => toggleSetting('filterScheduleEnabled')}
         />
         <SectionDesc text="Zaman programı aktifken, SMS koruması SADECE belirlediğiniz saatler arasında çalışır. (Örn: Sadece gece uyurken rahatsız edilmek istemiyorsanız)" />
-        
+
         {settings.filterScheduleEnabled && (
           <View style={{ marginTop: spacing.xl }}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>Koruma Saatleri</Text>
-            
+
             <View style={{ flexDirection: 'row', gap: 12, marginTop: spacing.sm }}>
               <View style={{ flex: 1, backgroundColor: theme.card, borderRadius: radii.lg, padding: spacing.md, borderWidth: 1, borderColor: theme.border, alignItems: 'center' }}>
                 <Text style={{ color: theme.textMuted, fontSize: 13, marginBottom: 8, fontWeight: '600' }}>BAŞLANGIÇ</Text>
@@ -134,7 +276,7 @@ function ScheduleScreen({ navigation }: any) {
                   maxLength={5}
                 />
               </View>
-              
+
               <View style={{ flex: 1, backgroundColor: theme.card, borderRadius: radii.lg, padding: spacing.md, borderWidth: 1, borderColor: theme.border, alignItems: 'center' }}>
                 <Text style={{ color: theme.textMuted, fontSize: 13, marginBottom: 8, fontWeight: '600' }}>BİTİŞ</Text>
                 <TextInput
@@ -167,7 +309,7 @@ function MappingScreen({ navigation }: any) {
         <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>{title}</Text>
       </View>
       <SectionDesc text={desc} />
-      
+
       <View style={{ marginTop: spacing.md, backgroundColor: theme.card, borderRadius: radii.lg, borderWidth: 1, borderColor: theme.border, overflow: 'hidden' }}>
         {['junk', 'transaction', 'promotion', 'allowed'].map((cat, index) => {
           const isSelected = settings.categoryMapping[id as keyof typeof settings.categoryMapping] === cat;
@@ -229,28 +371,28 @@ function FraudScreen({ navigation }: any) {
     updateSetting('customFraudKeywords', kws.filter((k: string) => k !== kw));
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
-  
+
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingBottom: 80 }}>
       <TopHeader title="Dolandırıcılık Filtresi" navigation={navigation} />
       <View style={styles.section}>
         <SettingRow icon={ShieldAlert} iconColor={theme.primary} title="Aktif Et" value={settings.fraudFilter} onToggle={() => toggleSetting('fraudFilter')} />
         <SectionDesc text="Bu özellik Spam ve Tehdit Veritabanı'nın bir parçasıdır." />
-        
+
         <View style={{height: spacing.xl}}/>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>Hassas Kelime Avcısı</Text>
         <SectionDesc text="Aşağıdaki kelimelerden herhangi birini içeren mesajlar tehlikeli kabul edilir ve anında filtrelenir." />
-        
+
         <View style={[styles.premiumInputContainer, { backgroundColor: theme.card, borderColor: theme.border, marginTop: spacing.md }]}>
           <Key size={20} color={theme.textMuted} style={{ marginLeft: 12 }} />
-          <TextInput 
+          <TextInput
             style={[styles.premiumInput, { color: theme.text }]}
             placeholder="Yeni kelime (Örn: Şifre, Banka)"
             placeholderTextColor={theme.textMuted}
             value={keyword}
             onChangeText={setKeyword}
           />
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.premiumAddBtn, { backgroundColor: theme.primary, opacity: keyword.trim() ? 1 : 0.6 }]}
             onPress={addKeyword}
             disabled={!keyword.trim()}
@@ -258,21 +400,22 @@ function FraudScreen({ navigation }: any) {
             <Plus size={20} color="#fff" />
           </TouchableOpacity>
         </View>
-        
+
         <View style={{flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.xl, gap: spacing.sm}}>
           {(settings.customFraudKeywords || []).length === 0 ? (
              <Text style={{ color: theme.textMuted, fontSize: 14 }}>Özel dolandırıcılık kelimesi eklenmemiş.</Text>
           ) : (
             <View style={{ flexDirection: 'column', width: '100%', gap: spacing.sm }}>
               {(settings.customFraudKeywords || []).map((kw: string) => (
-                <SwipeToDeleteItem key={`kw-${kw}`} onDelete={() => removeKeyword(kw)}>
-                  <View style={[styles.listItem, { backgroundColor: theme.card, borderColor: theme.border, marginBottom: 0 }]}>
-                    <View style={[styles.listIcon, { backgroundColor: 'rgba(239,68,68,0.1)' }]}>
-                      <Key size={18} color={theme.danger} />
-                    </View>
-                    <Text style={[styles.listText, { color: theme.danger }]}>{kw}</Text>
+                <View key={`kw-${kw}`} style={[styles.listItem, { backgroundColor: theme.card, borderColor: theme.border, marginBottom: 0 }]}>
+                  <View style={[styles.listIcon, { backgroundColor: 'rgba(239,68,68,0.1)' }]}>
+                    <Key size={18} color={theme.danger} />
                   </View>
-                </SwipeToDeleteItem>
+                  <Text style={[styles.listText, { color: theme.danger }]}>{kw}</Text>
+                  <TouchableOpacity onPress={() => removeKeyword(kw)} style={{ padding: 8 }}>
+                    <Trash2 size={20} color={theme.danger} />
+                  </TouchableOpacity>
+                </View>
               ))}
             </View>
           )}
@@ -288,7 +431,7 @@ function DatabaseScreen({ navigation }: any) {
   const { showToast } = useToast();
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSync, setLastSync] = useState('Yükleniyor...');
-  
+
   useEffect(() => {
     ThreatCloudService.getLastSyncDate().then(setLastSync);
   }, []);
@@ -327,7 +470,7 @@ function DatabaseScreen({ navigation }: any) {
               </Text>
             </View>
           </View>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.dbSyncBtn, { backgroundColor: isSyncing ? theme.border : theme.primary }]}
             onPress={handleSync}
             disabled={isSyncing}
@@ -365,10 +508,10 @@ function ProactiveScreen({ navigation }: any) {
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingBottom: 80 }}>
       <TopHeader title="Proaktif Filtre" navigation={navigation} />
       <View style={styles.section}>
-        <SettingRow icon={Activity} iconColor={theme.primary} title="Yapay Zeka (AI) Aktif" value={settings.proactiveFilter} onToggle={() => toggleSetting('proactiveFilter')} trackTrue={theme.primary} />
+        <SettingRow icon={Activity} iconColor={theme.primary} title="Akıllı Filtre Aktif" value={settings.proactiveFilter} onToggle={() => toggleSetting('proactiveFilter')} trackTrue={theme.primary} />
         <SectionDesc text="Makine öğrenmesi tabanlı Olasılık Algoritması ile henüz bilinmeyen, yeni nesil spam mesajları analiz eder ve anında filtrelenir." />
         <View style={{height: spacing.xl}}/>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>AI Hassasiyeti</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Filtre Hassasiyeti</Text>
         <SectionDesc text="Filtrenin şüpheli mesajları engellerken ne kadar katı davranacağını seçin." />
         <View style={{marginTop: spacing.md, gap: spacing.sm}}>
           {aiLevels.map(lvl => {
@@ -399,7 +542,7 @@ function ProactiveScreen({ navigation }: any) {
 function InvalidNumberScreen({ navigation }: any) {
   const theme = useAppTheme();
   const { settings, toggleSetting } = useSettings();
-  
+
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingBottom: 80 }}>
       <TopHeader title="Geçersiz Numara Filtresi" navigation={navigation} />
@@ -419,13 +562,42 @@ function SettingsMainScreen({ navigation }: any) {
   const { settings, toggleSetting, updateSetting } = useSettings();
   const insets = useSafeAreaInsets();
   const t = getT(settings.language || 'tr');
+  const scrollRef = React.useRef<ScrollView>(null);
+  const [smsPermissionGranted, setSmsPermissionGranted] = useState(
+    Platform.OS !== 'android',
+  );
+  useScrollToTop(scrollRef as any);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      hasSmsDetectionPermission()
+        .then(setSmsPermissionGranted)
+        .catch(() => setSmsPermissionGranted(false));
+    }, []),
+  );
+
+  const handleSmsPermission = async () => {
+    const granted = await requestSmsDetectionPermission();
+    setSmsPermissionGranted(granted);
+  };
+
+  const openPrivacyPolicy = async () => {
+    try {
+      await Linking.openURL('https://smsfiltre-v4.vercel.app/privacy');
+    } catch {
+      Alert.alert(
+        'Bağlantı açılamadı',
+        'Gizlilik politikasını şu adresten görüntüleyebilirsiniz: https://smsfiltre-v4.vercel.app/privacy'
+      );
+    }
+  };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
+    <ScrollView ref={scrollRef} style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
       <View style={[styles.header, { paddingTop: Math.max(insets.top + spacing.sm, spacing.xl) }]}>
         <Text style={[styles.title, { color: theme.text }]}>{t.settings}</Text>
       </View>
-      
+
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>{t.appearance}</Text>
         <View style={[styles.settingGroupCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -454,7 +626,33 @@ function SettingsMainScreen({ navigation }: any) {
             </View>
           </View>
         </View>
+        <View style={{height: spacing.lg}}/>
+        <SettingRow
+          icon={Key}
+          iconColor={theme.primary}
+          title="Biyometrik Kilit (Uygulama İçi)"
+          value={settings.biometricLock}
+          onToggle={() => toggleSetting('biometricLock')}
+        />
+        <SectionDesc text="Ayarlar ve kurallar menüsüne girişte FaceID / Parmak İzi onayı ister." />
       </View>
+
+      {Platform.OS === 'android' && (
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
+            Android SMS Koruması
+          </Text>
+          <SettingRow
+            icon={ShieldCheck}
+            iconColor={smsPermissionGranted ? '#10B981' : theme.danger}
+            title="Gelen SMS İzni"
+            value={smsPermissionGranted}
+            isNav
+            onPress={handleSmsPermission}
+          />
+          <SectionDesc text="Yeni gelen mesajları cihaz üzerinde spam belirtileri için kontrol edebilmek amacıyla gereklidir." />
+        </View>
+      )}
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>{t.smartFilter}</Text>
@@ -464,7 +662,11 @@ function SettingsMainScreen({ navigation }: any) {
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>{t.personalProtections}</Text>
-        <SettingRow icon={ShieldCheck} iconColor="#10B981" title={t.whitelist} isNav onPress={() => navigation.navigate('Whitelist')} />
+        <View style={[styles.settingGroupCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <SettingRow icon={ShieldCheck} iconColor="#10B981" title={t.whitelist} isNav isGrouped onPress={() => navigation.navigate('Whitelist')} />
+          <View style={[styles.separator, { backgroundColor: theme.border }]} />
+          <SettingRow icon={ListFilter} iconColor={theme.primary} title="Uygulama Kuralları" isNav isGrouped onPress={() => navigation.navigate('Rules')} />
+        </View>
         <SectionDesc text={t.whitelistDesc} />
       </View>
 
@@ -493,30 +695,45 @@ function SettingsMainScreen({ navigation }: any) {
         </View>
       </View>
 
-      <View style={[styles.section, { marginBottom: 60 }]}>
-        <Text style={[styles.sectionTitle, { color: theme.danger }]}>{t.dangerZone}</Text>
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Hakkında</Text>
         <SettingRow
-          icon={Network} iconColor={theme.danger} title={t.underAttack} value={settings.underAttackMode} danger
-          onToggle={() => {
-            if (!settings.underAttackMode) {
-              Alert.alert(t.underAttack, t.underAttackDesc, [
-                { text: 'İptal', style: 'cancel' },
-                { text: 'Aktifleştir', style: 'destructive', onPress: () => toggleSetting('underAttackMode') }
-              ]);
-            } else {
-              toggleSetting('underAttackMode');
-            }
-          }}
+          icon={Info}
+          iconColor={theme.primary}
+          title="Gizlilik Politikası"
+          isNav
+          onPress={openPrivacyPolicy}
         />
-        <SectionDesc text={t.underAttackDesc} />
       </View>
+
+      {Platform.OS === 'android' && (
+        <View style={[styles.section, { marginBottom: 60 }]}>
+          <Text style={[styles.sectionTitle, { color: theme.danger }]}>{t.dangerZone}</Text>
+          <SettingRow
+            icon={Network} iconColor={theme.danger} title={t.underAttack} value={settings.underAttackMode} danger
+            onToggle={() => {
+              if (!settings.underAttackMode) {
+                Alert.alert(t.underAttack, t.underAttackDesc, [
+                  { text: 'İptal', style: 'cancel' },
+                  { text: 'Aktifleştir', style: 'destructive', onPress: () => toggleSetting('underAttackMode') }
+                ]);
+              } else {
+                toggleSetting('underAttackMode');
+              }
+            }}
+          />
+          <SectionDesc text={t.underAttackDesc} />
+        </View>
+      )}
+
+
     </ScrollView>
   );
 }
 
 export default function SettingsScreen() {
   const theme = useAppTheme();
-  
+
   const [settings, setSettings] = useState<AppSettings>({
     underAttackMode: false,
     smartFilter: true,
@@ -543,15 +760,90 @@ export default function SettingsScreen() {
     customFraudKeywords: [],
     whitelist: [],
     autoSyncEnabled: true,
+    biometricLock: false,
   });
 
+  const [isReady, setIsReady] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
+
   useEffect(() => {
-    FilterManager.loadSettings().then(setSettings);
+    FilterManager.loadSettings().then(s => {
+      setSettings(s as any);
+      if (!s.biometricLock) {
+        setIsAuthenticated(true);
+      }
+      setIsReady(true);
+    });
   }, []);
 
+  const authState = React.useRef({ isAuthenticated: false, biometricLock: false });
+  useEffect(() => {
+    authState.current.isAuthenticated = isAuthenticated;
+    authState.current.biometricLock = settings.biometricLock || false;
+  }, [isAuthenticated, settings.biometricLock]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (authState.current.biometricLock && !authState.current.isAuthenticated && isReady) {
+        const now = Date.now();
+        if (now - lastAuthTime < AUTH_GRACE_PERIOD) {
+          setIsAuthenticated(true); // 3 dakika dolmadıysa tekrar sorma
+        } else {
+          authenticate();
+        }
+      }
+      return () => {
+        if (authState.current.biometricLock) {
+          setIsAuthenticated(false);
+        }
+      };
+    }, [isReady])
+  );
+
+  const authenticate = async () => {
+    setIsAuthenticating(true);
+    const hasHardware = await LocalAuthentication.hasHardwareAsync();
+    const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+    if (!hasHardware || !isEnrolled) {
+      setIsAuthenticated(true);
+      setIsAuthenticating(false);
+      return;
+    }
+
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: 'Ayarlara Erişmek İçin Doğrulayın',
+      fallbackLabel: 'Parola Kullan',
+      cancelLabel: 'İptal',
+      disableDeviceFallback: false,
+    });
+
+    if (result.success) {
+      lastAuthTime = Date.now();
+      setIsAuthenticated(true);
+    }
+    setIsAuthenticating(false);
+  };
+
   const toggleSetting = async (key: keyof AppSettings) => {
-    const val = settings[key];
-    if (typeof val !== 'boolean') return;
+    let val = settings[key];
+    if (val === undefined) val = false; // Fallback
+
+    // Eğer biyometrik kilit açılmak isteniyorsa, cihazın destekleyip desteklemediğini kontrol et
+    if (key === 'biometricLock' && !val) {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+      if (!hasHardware || !isEnrolled) {
+        Alert.alert(
+          'Desteklenmiyor',
+          'Cihazınızda Face ID, Touch ID veya herhangi bir biyometrik güvenlik ayarlı değil. Lütfen önce cihaz ayarlarınızdan bir güvenlik yöntemi ekleyin.'
+        );
+        return; // Açılmasına izin verme
+      }
+    }
+
     const newSettings = { ...settings, [key]: !val };
     setSettings(newSettings as any);
     await FilterManager.saveSettings(newSettings as any);
@@ -591,19 +883,55 @@ export default function SettingsScreen() {
     updateMapping,
   };
 
+  if (!isReady) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="small" color={theme.primary} />
+      </View>
+    );
+  }
+
+  const isGracePeriodActive = Date.now() - lastAuthTime < AUTH_GRACE_PERIOD;
+
+  if (!isAuthenticated && settings.biometricLock && !isGracePeriodActive) {
+    return (
+      <View style={{ flex: 1, backgroundColor: theme.background, justifyContent: 'center', alignItems: 'center', padding: spacing.xxl }}>
+        <ShieldAlert size={64} color={theme.danger} style={{ marginBottom: spacing.lg }} />
+        <Text style={[styles.title, { color: theme.text, textAlign: 'center', marginBottom: spacing.md }]}>Erişim Engellendi</Text>
+        <Text style={{ color: theme.textMuted, textAlign: 'center', marginBottom: spacing.xl, fontSize: 16 }}>
+          Ayarları ve kuralları görüntülemek için kimliğinizi doğrulamanız gereklidir.
+        </Text>
+        <TouchableOpacity
+          style={[styles.dbSyncBtn, { backgroundColor: theme.primary, paddingHorizontal: spacing.xxl, width: '100%', opacity: isAuthenticating ? 0.7 : 1 }]}
+          onPress={authenticate}
+          disabled={isAuthenticating}
+        >
+          {isAuthenticating ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={[styles.dbSyncBtnText, { color: '#fff' }]}>Tekrar Dene</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
-    <SettingsContext.Provider value={contextValue}>
-      <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.background } }}>
-        <Stack.Screen name="SettingsMain" component={SettingsMainScreen} />
-        <Stack.Screen name="Whitelist" component={WhitelistScreen} />
-        <Stack.Screen name="Schedule" component={ScheduleScreen} />
-        <Stack.Screen name="Mapping" component={MappingScreen} />
-        <Stack.Screen name="Fraud" component={FraudScreen} />
-        <Stack.Screen name="Database" component={DatabaseScreen} />
-        <Stack.Screen name="Proactive" component={ProactiveScreen} />
-        <Stack.Screen name="InvalidNumber" component={InvalidNumberScreen} />
-      </Stack.Navigator>
-    </SettingsContext.Provider>
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      <SettingsContext.Provider value={contextValue}>
+        <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.background }, animation: 'slide_from_right' }}>
+          <Stack.Screen name="SettingsMain" component={SettingsMainScreen} />
+          <Stack.Screen name="Whitelist" component={WhitelistScreen} />
+          <Stack.Screen name="Schedule" component={ScheduleScreen} />
+          <Stack.Screen name="Mapping" component={MappingScreen} />
+          <Stack.Screen name="Fraud" component={FraudScreen} />
+          <Stack.Screen name="Database" component={DatabaseScreen} />
+          <Stack.Screen name="Proactive" component={ProactiveScreen} />
+          <Stack.Screen name="InvalidNumber" component={InvalidNumberScreen} />
+          <Stack.Screen name="Rules" component={RulesScreen} />
+        </Stack.Navigator>
+      </SettingsContext.Provider>
+    </View>
   );
 }
 
@@ -613,11 +941,11 @@ const styles = StyleSheet.create({
   headerRow: { padding: spacing.lg, flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
   backBtn: { padding: 4, marginRight: spacing.sm, marginLeft: -8 },
   title: { fontSize: 32, fontWeight: '800', letterSpacing: -0.5 },
-  
+
   section: { paddingHorizontal: spacing.lg, marginBottom: spacing.xl },
   sectionTitle: { fontSize: 14, fontWeight: '700', marginBottom: spacing.md, textTransform: 'uppercase', letterSpacing: 0.5 },
   sectionDesc: { fontSize: 13, lineHeight: 18, marginTop: spacing.sm, paddingHorizontal: 4 },
-  
+
   settingCard: {
     flexDirection: 'row', borderRadius: radii.xl, padding: spacing.md,
     alignItems: 'center', borderWidth: 1, marginBottom: 4,
@@ -625,17 +953,17 @@ const styles = StyleSheet.create({
   settingGroupCard: { borderRadius: radii.xl, borderWidth: 1, overflow: 'hidden' },
   settingGroupItem: { flexDirection: 'row', padding: spacing.md, alignItems: 'center' },
   separator: { height: 1, marginLeft: 56 },
-  
+
   settingIcon: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center', marginRight: spacing.sm },
   settingContent: { flex: 1, marginRight: spacing.sm, justifyContent: 'center' },
   settingTitle: { fontSize: 16, fontWeight: '600' },
   settingDesc: { fontSize: 13, lineHeight: 18, marginTop: 4 },
-  
+
   navAction: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   navValue: { fontSize: 15 },
-  
+
   toggleBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radii.sm },
-  
+
   premiumInputContainer: {
     flexDirection: 'row', alignItems: 'center', height: 56,
     borderRadius: radii.lg, borderWidth: 1, overflow: 'hidden'
@@ -650,7 +978,7 @@ const styles = StyleSheet.create({
   deleteBtn: { padding: spacing.sm },
 
   tagItem: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: radii.full, borderWidth: 1 },
-  
+
   dbCard: { borderRadius: radii.xl, borderWidth: 1, padding: spacing.xl },
   dbHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.xl },
   dbIconWrapper: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginRight: spacing.md },
@@ -664,14 +992,75 @@ const styles = StyleSheet.create({
   aiRadioOuter: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, justifyContent: 'center', alignItems: 'center', marginRight: spacing.md },
   aiRadioInner: { width: 12, height: 12, borderRadius: 6 },
   aiLevelTitle: { fontSize: 16, fontWeight: '700', marginBottom: 2 },
-  aiLevelDesc: { fontSize: 13 }
+  aiLevelDesc: { fontSize: 13 },
+
+  contactPickerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 50,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+  contactPickerBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    borderBottomWidth: 1,
+    paddingTop: spacing.xl,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 40,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.sm,
+    borderWidth: 1,
+  },
+  searchInput: {
+    flex: 1,
+    marginLeft: spacing.sm,
+    fontSize: 16,
+  },
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  contactAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  contactName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  contactPhone: {
+    fontSize: 14,
+  }
 });
 
 const SettingRow = ({ icon: Icon, iconColor, title, desc, value, onToggle, trackTrue, danger, isNav, isGrouped, onPress }: any) => {
   const theme = useAppTheme();
   const Wrapper = onPress ? TouchableOpacity : (View as any);
   return (
-    <Wrapper 
+    <Wrapper
       onPress={() => {
         if (onPress) {
           Haptics.selectionAsync();

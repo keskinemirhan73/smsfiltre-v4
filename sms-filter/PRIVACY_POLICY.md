@@ -1,16 +1,60 @@
-# Privacy Policy for SMS Filter App (Junkman Clone)
+# FiltreAI Gizlilik Politikası
 
-**Effective Date:** July 24, 2026
+**Yürürlük ve son güncelleme tarihi:** 29 Temmuz 2026
 
-## 1. Data Collection and Usage
-Our app operates 100% locally on your device. We **DO NOT** collect, transmit, store, or share your SMS messages, contact lists, or personal information with any external servers.
+## 1. Yerel SMS filtreleme
 
-## 2. Permissions Required
-- **iOS (IdentityLookup):** The app uses Apple's native IdentityLookup framework. Message content is passed to the app's local extension for analysis and is immediately discarded.
-- **Android (SMS / Call Screening):** The app requires `READ_SMS` and `RECEIVE_SMS` permissions to identify and suppress spam messages. This data never leaves your device.
+iOS IdentityLookup uzantısı ile Android SMS alıcısının otomatik filtreleme
+işlemleri cihaz üzerinde çalışır. Bu işlem sırasında gönderici ve mesaj metni
+yerel kurallarla karşılaştırılır; otomatik filtrelenen mesajlar sunucuya
+gönderilmez.
 
-## 3. Third-Party Services
-The app uses on-device Machine Learning (CoreML/TFLite). No third-party analytics or tracking tools have access to your message content.
+## 2. İsteğe bağlı olarak iletilen veriler
 
-## 4. User Consent
-By enabling the SMS filtering extension in your device settings, you consent to the local processing of messages from unknown senders as described above.
+- **Akıllı analiz metni:** Kullanıcı "Mesajı Analiz Et" düğmesine bastığında
+  ilgili mesaj metni HTTPS üzerinden FiltreAI sunucusuna gönderilir ve kural
+  tabanlı analiz motoruyla incelenir. Metin başka bir yapay zekâ sağlayıcısına
+  aktarılmaz. Mesaj metni ve analiz sonucu sunucudaki analiz önbelleğinde
+  saklanır.
+- **Gönüllü spam bildirimleri:** Kullanıcının bildirdiği anahtar kelime veya
+  mesaj metni; cihaz platformu, push token ve isteğin IP adresiyle birlikte
+  raporu saymak, kötüye kullanımı önlemek ve topluluk kurallarını geliştirmek
+  amacıyla saklanabilir.
+- **Push bildirim token'ı:** Kullanıcı bildirim izni verdiğinde Expo push token;
+  bildirim göndermek, puan ve rapor sayısı gibi uygulama içi profil
+  özelliklerini sağlamak için saklanır.
+- **Rehber erişimi:** Kullanıcı isterse bir kişiyi Beyaz Liste'ye eklemek için
+  cihaz rehberine erişim izni verebilir. Seçilen kişinin adı ve telefon numarası
+  yalnızca cihazdaki filtre ayarına eklenir; rehber sunucuya yüklenmez.
+
+Finansal bilgi ve otomatik filtrelenen diğer mesajlar kullanıcı Akıllı Analiz veya
+Spam Bildir özelliğini başlatmadıkça sunucuya gönderilmez.
+
+## 3. Kullanım amaçları
+
+Toplanan veriler; kullanıcının istediği kural tabanlı mesaj analizini gerçekleştirmek, spam
+raporlarını değerlendirmek, topluluk filtre kurallarını iyileştirmek, bildirim
+göndermek, kötüye kullanımı IP adresiyle sınırlamak ve hizmeti işletmek için
+kullanılır. Veriler satılmaz ve reklam takibi amacıyla kullanılmaz.
+
+## 4. Hizmet sağlayıcılar
+
+Bulut özellikleri Render üzerinde çalışan FiltreAI sunucusu, MongoDB Atlas,
+Expo bildirim hizmeti ve tehdit kurallarını dağıtmak için GitHub
+altyapısını kullanabilir. Bu sağlayıcılar yalnızca ilgili hizmeti sunmak için
+gerekli verileri işler.
+
+## 5. Saklama ve güvenlik
+
+Veriler aktarım sırasında HTTPS ile korunur. Akıllı analiz metni ve sonucu,
+analiz önbelleğine eklendikten yaklaşık **7 gün** sonra otomatik olarak
+silinir. Push token'ları, IP adresleri ve rapor kayıtları hizmet için gerekli
+olduğu sürece veya silinme talebi işlenene kadar saklanabilir; bu diğer
+kayıtlar için şu anda sabit bir otomatik silme süresi uygulanmamaktadır.
+
+## 6. Kullanıcı tercihleri ve silinme
+
+Kullanıcı bildirim iznini cihaz ayarlarından kapatabilir, Akıllı Analiz ve Spam
+Bildir özelliklerini kullanmayabilir ve SMS filtreleme uzantısını devre dışı
+bırakabilir. Saklanan verilerin silinmesini istemek için
+keskinemirhan73@gmail.com adresine başvurulabilir.

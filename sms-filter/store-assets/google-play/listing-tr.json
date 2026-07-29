@@ -1,0 +1,8 @@
+{
+  "appName": "FiltreAI",
+  "shortDescription": "Şüpheli SMS'leri cihazında analiz et, spam ve dolandırıcılık uyarıları al",
+  "fullDescription": "FiltreAI, yeni gelen SMS'leri spam, dolandırıcılık ve şüpheli bağlantı belirtileri açısından cihaz üzerinde analiz etmeye yardımcı olur.\n\nÖne çıkan özellikler:\n• Yeni gelen SMS'lerde cihaz üzerinde kural tabanlı risk analizi\n• Şüpheli mesajlar için anlık güvenlik bildirimleri\n• Kullanıcı tarafından başlatılan isteğe bağlı Akıllı Analiz\n• Topluluk tarafından bildirilen spam kelimeleri\n• Güvenilir kişiler için cihazda saklanan beyaz liste\n• Kişiselleştirilebilir hassasiyet ve bildirim ayarları\n\nGizlilik:\nGelen SMS içerikleri otomatik olarak sunucuya gönderilmez. Akıllı Analiz veya spam bildirimi yalnızca kullanıcı ilgili işlemi özellikle başlattığında seçilen metni sunucuya gönderir. Akıllı Analiz, FiltreAI sunucusundaki kural tabanlı motorla gerçekleştirilir. Rehber bilgileri beyaz liste için yalnızca cihazda işlenir.\n\nFiltreAI mesajları cihazın Mesajlar uygulamasından silmez veya teslim edilmesini engellemez. Risk belirtilerini analiz eder ve kullanıcıyı şüpheli içerik konusunda bilgilendirir. Hiçbir otomatik sistem yüzde yüz doğruluk sağlayamaz; şüpheli bağlantılara tıklamadan önce göndereni doğrulayın.",
+  "category": "Araçlar",
+  "privacyPolicyUrl": "https://smsfiltre-v4.vercel.app/privacy",
+  "supportEmail": "keskinemirhan73@gmail.com"
+}

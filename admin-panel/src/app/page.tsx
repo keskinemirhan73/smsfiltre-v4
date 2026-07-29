@@ -1,9 +1,9 @@
 import React from 'react';
-import { Shield, Smartphone, Brain, Zap, ArrowRight, CheckCircle } from 'lucide-react';
+import { Shield, Smartphone, Brain, Zap } from 'lucide-react';
 import Link from 'next/link';
 
 export const metadata = {
-  title: 'FiltreAI | Yapay Zeka Destekli SMS Kalkanı',
+  title: 'FiltreAI | Akıllı SMS Güvenlik Kalkanı',
   description: 'İstenmeyen mesajlara ve dolandırıcılara son. FiltreAI ile güvende kalın.',
 };
 
@@ -42,11 +42,12 @@ export default function LandingPage() {
           </div>
           
           <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.1] mb-8 text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-gray-400">
-            Spam Mesajlara <br/> <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#22d3ee] to-[#7cff5b]">Yapay Zeka Kalkanı</span>
+            Spam Mesajlara <br/> <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#22d3ee] to-[#7cff5b]">Akıllı Güvenlik Kalkanı</span>
           </h1>
           
           <p className="text-xl text-[#a9bfd3] max-w-2xl mx-auto mb-12 leading-relaxed">
-            Bahis, kumar, dolandırıcılık ve istenmeyen reklamlara son. Gemini AI destekli otonom filtremiz ile gelen kutunuzda sadece gerçek mesajlar kalsın.
+            Gelen mesajları cihazınızda çalışan kurallarla filtreleyin; şüpheli
+            metinleri isterseniz çok katmanlı güvenlik kurallarıyla ayrıca analiz edin.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -71,9 +72,10 @@ export default function LandingPage() {
               <div className="w-14 h-14 rounded-2xl bg-[#22d3ee]/20 flex items-center justify-center mb-6 text-[#22d3ee]">
                 <Brain size={32} />
               </div>
-              <h3 className="text-2xl font-bold mb-4 text-white">Gemini AI Analizi</h3>
+              <h3 className="text-2xl font-bold mb-4 text-white">Akıllı Mesaj Analizi</h3>
               <p className="text-[#a9bfd3] leading-relaxed">
-                Şüpheli mesajlar yapay zeka tarafından analiz edilir. Dolandırıcılık niyetleri milisaniyeler içinde tespit edilir.
+                Yalnızca sizin analiz düğmesine basarak gönderdiğiniz metinler
+                bağlantı, aciliyet, kimlik avı ve spam işaretleri için incelenir.
               </p>
             </div>
 
@@ -93,9 +95,11 @@ export default function LandingPage() {
               <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center mb-6 text-white">
                 <Shield size={32} />
               </div>
-              <h3 className="text-2xl font-bold mb-4 text-white">%100 Cihaz İçi Gizlilik</h3>
+              <h3 className="text-2xl font-bold mb-4 text-white">Cihaz İçi Ana Filtreleme</h3>
               <p className="text-[#a9bfd3] leading-relaxed">
-                İnternetiniz olmasa bile kurallar cihazınızda çalışır. Kişisel mesajlarınız asla sunucularımıza gitmez.
+                Otomatik SMS filtreleme kuralları cihazınızda çalışır. Mesaj
+                metni yalnızca isteğe bağlı Akıllı Analiz veya spam bildirimi
+                başlattığınızda sunucuya gönderilir.
               </p>
             </div>
 

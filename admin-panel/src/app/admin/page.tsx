@@ -1,16 +1,20 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { 
-  ShieldCheck, ShieldAlert, BarChart3, Users, 
-  Settings, Globe, Moon, Sun, CheckCircle, XCircle, Lock, LogIn, Bell, Send
+import {
+  ShieldCheck, ShieldAlert, Users,
+  Settings, Moon, Sun, CheckCircle, XCircle, Lock, LogIn, Bell, Send
 } from 'lucide-react';
 import { 
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
+  BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
 } from 'recharts';
+
+interface PendingItem {
+  id: string;
+  title: string;
+}
 
 export default function AdminDashboard() {
   const [isDark, setIsDark] = useState(true);
-  const [lang, setLang] = useState<'tr' | 'en'>('tr');
   const [mounted, setMounted] = useState(false);
   
   // Auth state
@@ -26,7 +30,7 @@ export default function AdminDashboard() {
     recentNotifications: unknown[];
     topReported: unknown[];
   }
-  const [pendingItems, setPendingItems] = useState<any[]>([]);
+  const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
   const [stats, setStats] = useState<StatsData>({
     pendingCount: 0,
     approvedCount: 0,
@@ -115,7 +119,7 @@ export default function AdminDashboard() {
       } else {
         setNotifStatus({ type: 'error', msg: data.error || 'Hata' });
       }
-    } catch (e) {
+    } catch {
       setNotifStatus({ type: 'error', msg: 'Sunucuya ulaşılamadı.' });
     }
     setIsSendingNotif(false);
@@ -184,7 +188,7 @@ export default function AdminDashboard() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">V5 Analitik Paneli</h1>
-            <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Sistem Durumu: MongoDB Atlas & Yapay Zeka Aktif</p>
+            <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Sistem Durumu: MongoDB Atlas & Akıllı Analiz Aktif</p>
           </div>
         </div>
         <button onClick={() => setIsDark(!isDark)} className={`p-2 rounded-lg ${isDark ? 'bg-gray-800 text-yellow-400' : 'bg-gray-100 text-slate-700'}`}>
@@ -315,7 +319,7 @@ export default function AdminDashboard() {
               pendingItems.map((item) => (
                 <div key={item.id} className={`p-5 rounded-2xl border ${isDark ? 'bg-gray-900 border-amber-500/30' : 'bg-white border-amber-200'}`}>
                   <h3 className="font-bold text-lg text-amber-500 mb-1">{item.title}</h3>
-                  <p className="text-sm text-gray-500 mb-4">Gemini AI tarafından onaylanıp havuza düştü.</p>
+                  <p className="text-sm text-gray-500 mb-4">Otomatik kontrollerden geçti; moderatör onayı bekliyor.</p>
                   <div className="flex gap-2">
                     <button 
                       onClick={() => handleAction(item.id, 'approve')}

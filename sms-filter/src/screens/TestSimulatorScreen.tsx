@@ -41,7 +41,7 @@ export default function TestSimulatorScreen() {
       await FilterManager.addHistory({
         sender: sender || 'Bilinmeyen',
         preview: body,
-        status: classification,
+        status: classification === 'junk' ? 'blocked' : classification as any,
         category: classification === 'junk' ? 'Spam' : classification === 'transaction' ? 'İşlem' : classification === 'promotion' ? 'Promosyon' : 'Güvenli'
       });
     }, 600);
@@ -52,7 +52,7 @@ export default function TestSimulatorScreen() {
     await NaiveBayesClassifier.train(body, isSpam);
     Alert.alert(
       "Öğrenme Başarılı",
-      isSpam ? "Mesaj içeriği Yapay Zeka tarafından 'Tehlikeli' olarak işaretlendi." : "Mesaj içeriği Yapay Zeka tarafından 'Güvenli' olarak işaretlendi.",
+      isSpam ? "Mesaj içeriği akıllı filtre tarafından 'Tehlikeli' olarak işaretlendi." : "Mesaj içeriği akıllı filtre tarafından 'Güvenli' olarak işaretlendi.",
       [{ text: 'Tamam', onPress: () => { setBody(''); setSender(''); setResult('none'); } }]
     );
   };
@@ -95,7 +95,7 @@ export default function TestSimulatorScreen() {
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.text }]}>Filtre Simülatörü</Text>
           <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-            Sistemin mesajları nasıl algıladığını test edin veya yerel yapay zekanızı eğitin.
+            Sistemin mesajları nasıl algıladığını test edin veya yerel filtrenizi geliştirin.
           </Text>
         </View>
 
@@ -136,7 +136,7 @@ export default function TestSimulatorScreen() {
           ) : (
             <Activity color="#fff" size={24} />
           )}
-          <Text style={styles.testBtnText}>{isTesting ? 'Analiz Ediliyor...' : 'Yapay Zeka Analizi Başlat'}</Text>
+          <Text style={styles.testBtnText}>{isTesting ? 'Analiz Ediliyor...' : 'Akıllı Analizi Başlat'}</Text>
         </TouchableOpacity>
 
         {/* Animated Result Card */}
@@ -157,7 +157,7 @@ export default function TestSimulatorScreen() {
           </Animated.View>
         )}
 
-        {/* Learning Section (AI Training) */}
+        {/* Learning Section */}
         {body.trim().length > 0 && result !== 'none' && (
           <Animated.View style={[styles.learningSection, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
             <View style={styles.learningHeader}>

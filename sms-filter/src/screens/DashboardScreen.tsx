@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity, Modal, TextInput, ActivityIndicator, Animated, Platform, KeyboardAvoidingView, Easing, Linking } from 'react-native';
 import { ShieldAlert, Zap, History, ShieldCheck, TrendingUp, Receipt, Megaphone, ShieldBan, X, ArrowRight, Activity, Globe, Bell } from 'lucide-react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { LineChart, PieChart } from 'react-native-chart-kit';
+import { useFocusEffect, useScrollToTop } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { useAppTheme, spacing, radii } from '../theme';
@@ -15,13 +16,17 @@ const defaultStats: Stats = { blockedCount: 0, analyzedCount: 0, transactionCoun
 
 export default function DashboardScreen() {
   const theme = useAppTheme();
+  const scrollRef = useRef<ScrollView>(null);
+  useScrollToTop(scrollRef as any);
+
   const [settings, setSettings] = useState<AppSettings>({
     underAttackMode: false, smartFilter: true, silentBlocking: true,
     filterScheduleEnabled: false, scheduleStart: '22:00', scheduleEnd: '08:00',
     fraudFilter: true, databaseFilter: true, proactiveFilter: true, invalidNumberFilter: false,
     categoryMapping: { spam: 'junk', transaction: 'transaction', promotion: 'promotion' },
     aiSensitivity: 0.8, blockForeignNumbers: false, blockArabic: false, theme: 'system', language: 'tr',
-    customFraudKeywords: [], whitelist: []
+    customFraudKeywords: [], whitelist: [],
+    filterTransactions: true, filterPromotions: true
   });
   const [stats, setStats] = useState<Stats>(defaultStats);
   const [recentActivity, setRecentActivity] = useState<HistoryItem[]>([]);
@@ -32,6 +37,8 @@ export default function DashboardScreen() {
   const [reportKeyword, setReportKeyword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { showToast } = useToast();
+  const underAttackModeActive =
+    Platform.OS === 'android' && settings.underAttackMode;
 
   // Pulse animation for the shield
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -51,10 +58,10 @@ export default function DashboardScreen() {
     if (!reportKeyword.trim()) return;
     setIsSubmitting(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    
+
     try {
       const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync();
-      
+
       const resp = await fetch(BACKEND_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -66,7 +73,7 @@ export default function DashboardScreen() {
         })
       });
       setIsSubmitting(false);
-      
+
       if (resp.ok) {
         setIsReportModalVisible(false);
         setReportKeyword('');
@@ -88,7 +95,7 @@ export default function DashboardScreen() {
     await Notifications.scheduleNotificationAsync({
       content: {
         title: 'SMS Filtresi 🛡️',
-        body: 'Yeni bir şüpheli mesaj engellendi!',
+        body: 'Yeni bir şüpheli mesaj algılandı!',
         sound: true,
       },
       trigger: {
@@ -113,7 +120,7 @@ export default function DashboardScreen() {
   );
 
   const statCards = [
-    { label: 'Engellenen', value: stats.blockedCount, icon: ShieldBan, color: theme.danger, bg: 'rgba(239,68,68,0.08)' },
+    { label: 'Şüpheli', value: stats.blockedCount, icon: ShieldBan, color: theme.danger, bg: 'rgba(239,68,68,0.08)' },
     { label: 'Analiz Edilen', value: stats.analyzedCount, icon: Activity, color: theme.primary, bg: 'rgba(59,130,246,0.08)' },
     { label: 'İşlem', value: stats.transactionCount, icon: Receipt, color: theme.secondary, bg: 'rgba(10,185,129,0.08)' },
     { label: 'Promosyon', value: stats.promotionCount, icon: Megaphone, color: '#F59E0B', bg: 'rgba(245,158,11,0.08)' },
@@ -121,46 +128,89 @@ export default function DashboardScreen() {
 
   const getStatusConfig = (status: string) => {
     switch (status) {
-      case 'blocked': return { color: theme.danger, text: 'Engellendi', icon: ShieldBan, bg: 'rgba(239,68,68,0.1)' };
+      case 'blocked': return { color: theme.danger, text: 'Şüpheli', icon: ShieldBan, bg: 'rgba(239,68,68,0.1)' };
       case 'transaction': return { color: theme.primary, text: 'İşlem', icon: Receipt, bg: 'rgba(59,130,246,0.1)' };
       case 'promotion': return { color: '#F59E0B', text: 'Promosyon', icon: Megaphone, bg: 'rgba(245,158,11,0.1)' };
       default: return { color: theme.secondary, text: 'İzinli', icon: ShieldCheck, bg: 'rgba(10,185,129,0.1)' };
     }
   };
 
-  const weeklyData = [
-    { day: 'Pzt', val: 2 }, { day: 'Sal', val: 5 }, { day: 'Çar', val: 1 }, 
-    { day: 'Per', val: 8 }, { day: 'Cum', val: 3 }, { day: 'Cmt', val: 0 }, { day: 'Paz', val: 4 }
+  const getWeeklyData = () => {
+    const days = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
+    const today = new Date();
+    const result = [];
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const dayName = days[d.getDay()];
+
+      const startOfDay = new Date(d).setHours(0,0,0,0);
+      const endOfDay = new Date(d).setHours(23,59,59,999);
+
+      const count = recentActivity.filter(item => {
+        return item.timestamp >= startOfDay && item.timestamp <= endOfDay && item.status === 'blocked';
+      }).length;
+
+      result.push({ day: dayName, val: count });
+    }
+
+    // Eğer tüm günler 0 ise, grafiğin düzgün çizilmesi için bugüne toplam blockedCount'u ekle
+    const maxVal = Math.max(...result.map(r => r.val));
+    if (maxVal === 0) {
+      result[result.length - 1].val = stats.blockedCount > 0 ? stats.blockedCount : (recentActivity.length > 0 ? 1 : 0);
+    }
+    return result;
+  };
+
+  const weeklyData = getWeeklyData();
+
+  const chartConfig = {
+    backgroundGradientFrom: theme.card,
+    backgroundGradientTo: theme.card,
+    color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
+    labelColor: (opacity = 1) => theme.textMuted,
+    strokeWidth: 2,
+    barPercentage: 0.5,
+    useShadowColorFromDataset: false,
+    propsForDots: { r: "4", strokeWidth: "2", stroke: theme.primary },
+    decimalPlaces: 0,
+  };
+
+  const pieData = [
+    { name: 'Spam', population: stats.blockedCount || 1, color: theme.danger, legendFontColor: theme.text, legendFontSize: 12 },
+    { name: 'İşlem', population: stats.transactionCount || 1, color: theme.primary, legendFontColor: theme.text, legendFontSize: 12 },
+    { name: 'Promosyon', population: stats.promotionCount || 1, color: '#F59E0B', legendFontColor: theme.text, legendFontSize: 12 },
+    { name: 'İzinli', population: stats.analyzedCount - (stats.blockedCount + stats.transactionCount + stats.promotionCount) || 1, color: theme.secondary, legendFontColor: theme.text, legendFontSize: 12 },
   ];
-  const maxWeeklyVal = Math.max(...weeklyData.map(d => d.val), 1);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+
         <View style={styles.heroSection}>
           <Text style={[styles.title, { color: theme.text }]}>Genel Durum</Text>
-          
+
           <View style={[styles.heroCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <View style={styles.heroGlow}>
-              <Animated.View style={[styles.heroShieldPulse, { backgroundColor: settings.underAttackMode ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)', transform: [{ scale: pulseAnim }] }]} />
-              <View style={[styles.heroShieldInner, { backgroundColor: settings.underAttackMode ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)' }]}>
-                {settings.underAttackMode ? (
+              <Animated.View style={[styles.heroShieldPulse, { backgroundColor: underAttackModeActive ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)', transform: [{ scale: pulseAnim }] }]} />
+              <View style={[styles.heroShieldInner, { backgroundColor: underAttackModeActive ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)' }]}>
+                {underAttackModeActive ? (
                   <ShieldAlert size={40} color={theme.danger} />
                 ) : (
                   <ShieldCheck size={40} color={theme.secondary} />
                 )}
               </View>
             </View>
-            
+
             <View style={{ alignItems: 'center', marginTop: spacing.md }}>
-              <Text style={[styles.heroStatusTitle, { color: settings.underAttackMode ? theme.danger : theme.text }]}>
-                {settings.underAttackMode ? 'Saldırı Modu Aktif' : 'Koruma Aktif'}
+              <Text style={[styles.heroStatusTitle, { color: underAttackModeActive ? theme.danger : theme.text }]}>
+                {underAttackModeActive ? 'Saldırı Modu Aktif' : 'Koruma Aktif'}
               </Text>
               <Text style={[styles.heroStatusDesc, { color: theme.textMuted }]}>
-                {settings.underAttackMode ? 'Bilinmeyen tüm numaralar engelleniyor.' : 'Yapay zeka arka planda smsleri tarıyor.'}
+                {underAttackModeActive ? 'Beyaz liste dışındaki SMS’ler şüpheli olarak işaretleniyor.' : 'Akıllı filtre yeni SMS’leri cihaz üzerinde analiz ediyor.'}
               </Text>
-              
+
               {stats.blockedCount > 0 && (
                 <View style={{ marginTop: spacing.md, backgroundColor: 'rgba(16,185,129,0.1)', paddingVertical: 8, paddingHorizontal: 16, borderRadius: radii.full }}>
                   <Text style={{ color: theme.secondary, fontWeight: '800', fontSize: 13 }}>
@@ -180,7 +230,7 @@ export default function DashboardScreen() {
         </View>
 
         {Platform.OS === 'ios' && (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.setupCard, { backgroundColor: 'rgba(139,92,246,0.1)', borderColor: 'rgba(139,92,246,0.3)' }]}
             activeOpacity={0.8}
             onPress={() => setIsSetupModalVisible(true)}
@@ -202,31 +252,43 @@ export default function DashboardScreen() {
         )}
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Haftalık Analiz</Text>
-          <View style={[styles.chartCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <View style={styles.chartHeader}>
-              <Text style={{ color: theme.textMuted, fontSize: 13, fontWeight: '600' }}>Engellenen Spam</Text>
-              <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>23</Text>
-            </View>
-            <View style={styles.chartBars}>
-              {weeklyData.map((d, i) => (
-                <View key={i} style={styles.chartBarCol}>
-                  <View style={[styles.chartBarBg, { backgroundColor: theme.border }]}>
-                    <View style={[styles.chartBarFill, { 
-                      backgroundColor: theme.primary, 
-                      height: `${(d.val / maxWeeklyVal) * 100}%` 
-                    }]} />
-                  </View>
-                  <Text style={[styles.chartBarLbl, { color: theme.textMuted }]}>{d.day}</Text>
-                </View>
-              ))}
-            </View>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Haftalık Engelleme Trendi</Text>
+          <View style={[styles.chartCard, { backgroundColor: theme.card, borderColor: theme.border, padding: 0, overflow: 'hidden' }]}>
+            <LineChart
+              data={{
+                labels: weeklyData.map(d => d.day),
+                datasets: [{ data: weeklyData.map(d => d.val) }]
+              }}
+              width={width - spacing.lg * 2}
+              height={180}
+              chartConfig={chartConfig}
+              bezier
+              style={{ marginVertical: 8, borderRadius: 16 }}
+              withInnerLines={false}
+              withOuterLines={false}
+            />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Tehdit Dağılımı</Text>
+          <View style={[styles.chartCard, { backgroundColor: theme.card, borderColor: theme.border, alignItems: 'center' }]}>
+            <PieChart
+              data={pieData}
+              width={width - spacing.lg * 2}
+              height={150}
+              chartConfig={chartConfig}
+              accessor={"population"}
+              backgroundColor={"transparent"}
+              paddingLeft={"15"}
+              absolute
+            />
           </View>
         </View>
 
         <View style={styles.section}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm }}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.quickBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
               onPress={() => {
                 Haptics.selectionAsync();
@@ -237,7 +299,7 @@ export default function DashboardScreen() {
               <Text style={[styles.quickTxt, { color: theme.text }]}>Spam Bildir</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.quickBtn, { backgroundColor: theme.card, borderColor: theme.border }]}
               onPress={testNotification}
             >
@@ -268,7 +330,7 @@ export default function DashboardScreen() {
         <View style={styles.activityHeader}>
           <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>Son Aktiviteler</Text>
         </View>
-        
+
         <View style={[styles.historyList, { backgroundColor: theme.card, borderColor: theme.border }]}>
           {recentActivity.length === 0 ? (
             <View style={{ padding: spacing.xxl, alignItems: 'center' }}>
@@ -310,7 +372,7 @@ export default function DashboardScreen() {
                 <X size={24} color={theme.textMuted} />
               </TouchableOpacity>
             </View>
-            
+
             <View style={[styles.inputWrapper, { backgroundColor: theme.background, borderColor: theme.border }]}>
               <ShieldAlert size={20} color={theme.textMuted} style={{ marginRight: 10 }} />
               <TextInput
@@ -322,8 +384,8 @@ export default function DashboardScreen() {
                 autoCapitalize="none"
               />
             </View>
-            
-            <TouchableOpacity 
+
+            <TouchableOpacity
               style={[styles.submitBtn, { backgroundColor: theme.primary, opacity: reportKeyword.trim() ? 1 : 0.6 }]}
               onPress={handleReport}
               disabled={!reportKeyword.trim() || isSubmitting}
@@ -341,7 +403,7 @@ export default function DashboardScreen() {
               <X size={28} color={theme.text} />
             </TouchableOpacity>
           </View>
-          
+
           <ScrollView contentContainerStyle={{ padding: spacing.xl, paddingBottom: 150, alignItems: 'center' }}>
             <View style={[styles.setupIllustration, { backgroundColor: 'rgba(139,92,246,0.1)' }]}>
               <ShieldCheck size={48} color="#8B5CF6" />
@@ -350,26 +412,26 @@ export default function DashboardScreen() {
             <Text style={[styles.setupModalDesc, { color: theme.textMuted }]}>
               Gelen şüpheli mesajları anında durdurmak için aşağıdaki adımları takip edin.
             </Text>
-            
+
             <View style={[styles.setupStepsBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
               <View style={styles.setupStep}>
                 <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}><Text style={styles.stepNumberText}>1</Text></View>
                 <Text style={[styles.stepText, { color: theme.text }]}>Telefonunuzun <Text style={{fontWeight:'800'}}>Ayarlar</Text> uygulamasına girin.</Text>
               </View>
               <View style={styles.setupStepDivider} />
-              
+
               <View style={styles.setupStep}>
                 <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}><Text style={styles.stepNumberText}>2</Text></View>
                 <Text style={[styles.stepText, { color: theme.text }]}><Text style={{fontWeight:'800'}}>Mesajlar</Text> bölümünü bulun ve açın.</Text>
               </View>
               <View style={styles.setupStepDivider} />
-              
+
               <View style={styles.setupStep}>
                 <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}><Text style={styles.stepNumberText}>3</Text></View>
                 <Text style={[styles.stepText, { color: theme.text }]}><Text style={{fontWeight:'800'}}>Bilinmeyenleri Filtrele</Text> (veya İstenmeyenler) menüsüne dokunun.</Text>
               </View>
               <View style={styles.setupStepDivider} />
-              
+
               <View style={styles.setupStep}>
                 <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}><Text style={styles.stepNumberText}>4</Text></View>
                 <Text style={[styles.stepText, { color: theme.text }]}><Text style={{fontWeight:'800'}}>FiltreAI</Text> uygulamasını seçip yeşil tik ile onaylayın.</Text>
@@ -378,9 +440,9 @@ export default function DashboardScreen() {
           </ScrollView>
 
           <View style={[styles.setupFooter, { backgroundColor: theme.background, borderColor: theme.border }]}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={[styles.openSettingsBtn, { backgroundColor: '#8B5CF6' }]}
-              onPress={() => Linking.openSettings()}
+              onPress={() => Platform.OS === 'ios' ? Linking.openURL('App-Prefs:root=MESSAGES') : Linking.openSettings()}
             >
               <Text style={styles.openSettingsBtnText}>Ayarları Aç</Text>
               <ArrowRight size={20} color="#fff" />
@@ -458,12 +520,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3, shadowRadius: 12, elevation: 8,
   },
   floatingBtnText: { color: '#fff', fontSize: 16, fontWeight: '700', marginLeft: 8 },
-  
+
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
   modalDismissArea: { flex: 1 },
   bottomSheet: {
-    borderTopLeftRadius: radii.xxl, borderTopRightRadius: radii.xxl,
-    padding: spacing.xl, paddingBottom: spacing.xxl * 1.5,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: spacing.xl, paddingBottom: 36,
     borderWidth: 1, borderBottomWidth: 0,
     shadowColor: '#000', shadowOffset: { width: 0, height: -10 },
     shadowOpacity: 0.1, shadowRadius: 20, elevation: 24,
@@ -476,14 +538,14 @@ const styles = StyleSheet.create({
   sheetTitle: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
   closeBtn: { padding: 4 },
   sheetDesc: { fontSize: 14, lineHeight: 20, marginBottom: spacing.xl },
-  
+
   inputWrapper: {
     flexDirection: 'row', alignItems: 'center', borderWidth: 1,
     borderRadius: radii.lg, paddingHorizontal: spacing.md, height: 56,
     marginBottom: spacing.xl
   },
   sheetInput: { flex: 1, fontSize: 16, fontWeight: '500', height: '100%' },
-  
+
   submitBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     height: 56, borderRadius: radii.lg, gap: 8
@@ -497,14 +559,14 @@ const styles = StyleSheet.create({
   setupIllustration: { width: 90, height: 90, borderRadius: 45, justifyContent: 'center', alignItems: 'center', marginBottom: spacing.lg },
   setupModalTitle: { fontSize: 26, fontWeight: '800', marginBottom: spacing.sm, textAlign: 'center' },
   setupModalDesc: { fontSize: 15, textAlign: 'center', lineHeight: 22, marginBottom: spacing.xl, paddingHorizontal: spacing.sm },
-  
+
   setupStepsBox: { width: '100%', borderRadius: radii.xl, borderWidth: 1, padding: spacing.md },
   setupStep: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10 },
   stepNumberBadge: { width: 26, height: 26, borderRadius: 13, justifyContent: 'center', alignItems: 'center', marginRight: spacing.md },
   stepNumberText: { color: '#fff', fontSize: 13, fontWeight: '800' },
   stepText: { flex: 1, fontSize: 14, lineHeight: 20 },
   setupStepDivider: { height: 1, backgroundColor: 'rgba(150,150,150,0.2)', marginLeft: 42 },
-  
+
   setupFooter: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     padding: spacing.xl, paddingBottom: Platform.OS === 'ios' ? 40 : spacing.xl,

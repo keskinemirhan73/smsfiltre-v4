@@ -3,8 +3,14 @@ const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const mongoose = require('mongoose');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { Expo } = require('expo-server-sdk');
+const { createAdminAuth } = require('./src/middleware/adminAuth');
+const { analyzeMessage } = require('./src/services/messageAnalysis');
+const {
+  validateAnalyzeInput,
+  validatePushTokenInput,
+  validateReportInput,
+} = require('./src/validation/publicInput');
 
 // Models
 const Rule = require('./src/models/Rule');
@@ -14,7 +20,7 @@ const NotificationHistory = require('./src/models/NotificationHistory');
 let expo = new Expo();
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '16kb' }));
 
 // Trust proxy for rate limiter (if behind Heroku, Render, Vercel etc)
 app.set('trust proxy', 1);
@@ -30,10 +36,22 @@ const apiLimiter = rateLimit({
 
 app.use('/api/', apiLimiter); // Apply rate limiter to all API routes
 
+const expensiveOperationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: {
+    error: 'Çok fazla analiz isteği gönderdiniz, lütfen daha sonra tekrar deneyin.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use('/api/analyze', expensiveOperationLimiter);
+app.use('/api/report', expensiveOperationLimiter);
+
 // Environment variables
 const MONGODB_URI = process.env.MONGODB_URI;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '12345';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const PORT = process.env.PORT || 5000;
 const THRESHOLD = 5; 
 
@@ -46,19 +64,6 @@ if (MONGODB_URI) {
   console.warn('⚠️ MONGODB_URI bulunamadı! Lütfen .env dosyanızı kontrol edin.');
 }
 
-const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
-
-app.get('/api/models', async (req, res) => {
-  if (!GEMINI_API_KEY) return res.status(500).json({ error: 'No API KEY' });
-  try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
-    const data = await response.json();
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // Kesinlikle engellenmesi yasak olan kelimeler
 const FORBIDDEN_WORDS = [
   'merhaba', 'selam', 'nasılsın', 'naber', 'ne haber', 'evet', 'hayır', 'tamam', 'olur', 'peki',
@@ -67,45 +72,30 @@ const FORBIDDEN_WORDS = [
 ];
 
 // Admin Authorization Middleware
-const verifyAdmin = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  if (!authHeader || authHeader !== `Bearer ${ADMIN_PASSWORD}`) {
-    return res.status(401).json({ error: 'Yetkisiz erişim! Geçersiz şifre.' });
-  }
-  next();
-};
+const verifyAdmin = createAdminAuth(ADMIN_PASSWORD);
 
 // PUBLIC API: Report a spam keyword
 app.post('/api/report', async (req, res) => {
   try {
-    const { keyword, type, token } = req.body;
-    const userIP = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
-
-    if (!keyword) return res.status(400).json({ error: 'Kelime boş olamaz' });
-    const lowerKeyword = keyword.toLowerCase().trim();
-    
-    if (lowerKeyword.length < 3) {
-      return res.status(400).json({ error: 'Çok kısa kelimeler engellenemez (En az 3 harf)' });
+    const validation = validateReportInput(
+      req.body,
+      Expo.isExpoPushToken,
+    );
+    if (!validation.ok) {
+      return res.status(400).json({ error: validation.error });
     }
+
+    const {
+      keyword: lowerKeyword,
+      type,
+      token,
+    } = validation;
+    const userIP = String(
+      req.ip || req.socket.remoteAddress || 'unknown',
+    ).slice(0, 64);
 
     if (FORBIDDEN_WORDS.includes(lowerKeyword)) {
       return res.status(400).json({ error: 'Güvenlik Kalkanı: Bu kelime günlük bir kelimedir ve engellenemez.' });
-    }
-
-    // AI Verification
-    if (genAI && lowerKeyword.length > 4) {
-      try {
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-        const prompt = `Kullanıcı şu metni/kelimeyi SMS spam veya dolandırıcılık olarak şikayet etti: "${lowerKeyword}". Sence bu kelime/metin gerçekten bir bahis, casino, dolandırıcılık, yasadışı iddaa veya spam reklam kategorisine girer mi? Sadece "EVET" veya "HAYIR" olarak cevap ver.`;
-        const result = await model.generateContent(prompt);
-        const aiResponse = result.response.text().trim().toUpperCase();
-        
-        if (aiResponse.includes("HAYIR")) {
-          return res.status(400).json({ error: 'Gemini AI Kalkanı: Şikayetiniz Yapay Zeka tarafından incelendi ve spam bulunmadığı için reddedildi.' });
-        }
-      } catch (aiError) {
-        console.error('[Gemini AI Hatası]', aiError.message);
-      }
     }
 
     // Upsert Rule in DB
@@ -114,7 +104,7 @@ app.post('/api/report', async (req, res) => {
     if (!rule) {
       rule = new Rule({
         keyword: lowerKeyword,
-        type: type === 'number' ? 'number' : 'word',
+        type,
         status: 'pending',
         reportCount: 1,
         reportedByIPs: [userIP]
@@ -165,92 +155,49 @@ app.post('/api/report', async (req, res) => {
 
 const AIAnalysisCache = require('./src/models/AIAnalysisCache');
 
-// PUBLIC API: Analyze text with Gemini AI (with Cache)
+// PUBLIC API: Analyze text with the deterministic FiltreAI rules engine.
 app.post('/api/analyze', async (req, res) => {
-  try {
-    const { text } = req.body;
-    if (!text || text.trim().length < 5) {
-      return res.status(400).json({ error: 'Lütfen analiz edilecek anlamlı bir metin girin.' });
-    }
-
-    const cleanText = text.trim();
-
-    // 1. Check Cache
-    const cached = await AIAnalysisCache.findOne({ messageText: cleanText });
-    if (cached) {
-      cached.queryCount += 1;
-      await cached.save();
-      return res.json({
-        success: true,
-        cached: true,
-        riskLevel: cached.riskLevel,
-        threatType: cached.threatType,
-        recommendation: cached.recommendation
-      });
-    }
-
-    // 2. Ask Gemini
-    if (!genAI) {
-      return res.status(500).json({ error: 'Yapay Zeka servisi şu an kullanılamıyor.' });
-    }
-
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-    const prompt = `Şu SMS metnini analiz et: "${cleanText}"
-Görev: Bu metin bir dolandırıcılık, oltalama (phishing), yasadışı bahis veya spam mıdır?
-Lütfen SADECE aşağıdaki JSON formatında ve Türkçe cevap ver, ekstra hiçbir kelime yazma:
-{
-  "riskLevel": "Düşük" | "Orta" | "Yüksek" | "Çok Yüksek",
-  "threatType": "Kısa bir tehdit özeti (Örn: Zararlı Link, Aciliyet Hissi, Zararsız vb.)",
-  "recommendation": "Kullanıcıya 1 cümlelik tavsiye"
-}`;
-
-    const result = await model.generateContent(prompt);
-    let aiResponse = result.response.text().trim();
-    
-    // Remove markdown code blocks if Gemini added them
-    if (aiResponse.startsWith('\`\`\`json')) {
-      aiResponse = aiResponse.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
-    }
-
-    let parsedResponse;
-    try {
-      parsedResponse = JSON.parse(aiResponse);
-    } catch (e) {
-      console.error('Gemini JSON Parse Hatası:', aiResponse);
-      return res.status(500).json({ error: 'Yapay zeka yanıtı anlaşılamadı.' });
-    }
-
-    // 3. Save to Cache
-    const newCache = new AIAnalysisCache({
-      messageText: cleanText,
-      riskLevel: parsedResponse.riskLevel || 'Orta',
-      threatType: parsedResponse.threatType || 'Bilinmiyor',
-      recommendation: parsedResponse.recommendation || 'Dikkatli olun.'
-    });
-    await newCache.save();
-
-    res.json({
-      success: true,
-      cached: false,
-      ...parsedResponse
-    });
-
-  } catch (error) {
-    console.error('[ANALYZE HATA]', error.message);
-    
-    // YZ hatası durumunda (429 Quota vb.) uygulamanın çökmemesi için Fallback
-    const fallbackText = req.body.text ? req.body.text.trim().toLowerCase() : '';
-    const isSpam = fallbackText.includes('bahis') || fallbackText.includes('casino') || fallbackText.includes('bonus') || fallbackText.includes('kredi') || fallbackText.includes('borç') || fallbackText.includes('kazandınız') || fallbackText.includes('bet');
-    
-    res.json({
-      success: true,
-      cached: false,
-      isFallback: true,
-      riskLevel: isSpam ? 'Yüksek' : 'Düşük',
-      threatType: isSpam ? 'Şüpheli Kelimeler İçeriyor (Sistem Taraması)' : 'Temiz Görünüyor (AI Beklemede)',
-      recommendation: isSpam ? 'Bu mesaja itibar etmeyin ve linklere tıklamayın.' : 'Yapay zeka analiz servisi şu an yoğun, ancak mesaj standart sistem taramasından geçti. Yine de dikkatli olun.'
-    });
+  const validation = validateAnalyzeInput(req.body);
+  if (!validation.ok) {
+    return res.status(400).json({ error: validation.error });
   }
+
+  const cleanText = validation.text;
+  const analysis = analyzeMessage(cleanText);
+
+  if (mongoose.connection.readyState === 1) {
+    try {
+      const cached = await AIAnalysisCache.findOne({ messageText: cleanText });
+      if (cached) {
+        cached.queryCount += 1;
+        await cached.save();
+        return res.json({
+          success: true,
+          cached: true,
+          analysisEngine: 'rules-v1',
+          riskLevel: cached.riskLevel,
+          threatType: cached.threatType,
+          recommendation: cached.recommendation,
+        });
+      }
+
+      await AIAnalysisCache.create({
+        messageText: cleanText,
+        riskLevel: analysis.riskLevel,
+        threatType: analysis.threatType,
+        recommendation: analysis.recommendation,
+      });
+    } catch (error) {
+      console.warn('[ANALİZ ÖNBELLEK HATASI]', error.message);
+    }
+  }
+
+  return res.json({
+    success: true,
+    cached: false,
+    analysisEngine: 'rules-v1',
+    ...analysis,
+  });
 });
 
 // PUBLIC API: Get community rules (Approved rules)
@@ -266,10 +213,14 @@ app.get('/api/rules/community', async (req, res) => {
 // PUBLIC API: Register Push Token
 app.post('/api/push-token', async (req, res) => {
   try {
-    const { token } = req.body;
-    if (!token || !Expo.isExpoPushToken(token)) {
-      return res.status(400).json({ error: 'Geçersiz Token' });
+    const validation = validatePushTokenInput(
+      req.body,
+      Expo.isExpoPushToken,
+    );
+    if (!validation.ok) {
+      return res.status(400).json({ error: validation.error });
     }
+    const { token } = validation;
     
     await DeviceToken.findOneAndUpdate(
       { token },
@@ -286,8 +237,14 @@ app.post('/api/push-token', async (req, res) => {
 // PUBLIC API: Get User Profile (Gamification)
 app.post('/api/user/profile', async (req, res) => {
   try {
-    const { token } = req.body;
-    if (!token) return res.status(400).json({ error: 'Token gerekli' });
+    const validation = validatePushTokenInput(
+      req.body,
+      Expo.isExpoPushToken,
+    );
+    if (!validation.ok) {
+      return res.status(400).json({ error: validation.error });
+    }
+    const { token } = validation;
 
     let user = await DeviceToken.findOne({ token });
     if (!user) {
@@ -440,7 +397,11 @@ app.get('/api/database', verifyAdmin, async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 (MODERASYONLU & AI DESTEKLİ) Mongoose Sunucusu ${PORT} portunda çalışıyor...`);
-  console.log(`🧠 Gemini AI Ayarı: ${GEMINI_API_KEY ? 'BAŞARILI' : 'EKSİK (Pasif)'}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🚀 FiltreAI sunucusu ${PORT} portunda çalışıyor...`);
+    console.log('🛡️ Ücretsiz kural tabanlı mesaj analizi etkin.');
+  });
+}
+
+module.exports = { app };

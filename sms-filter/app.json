@@ -7,19 +7,29 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.smsfilter.app",
-      "appleTeamId": "YOUR_TEAM_ID",
-      "buildNumber": "1"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.filtreai.app",
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.com.filtreai.app"
+        ]
+      }
     },
     "android": {
-      "package": "com.smsfilter.app",
+      "package": "com.filtreai.app",
+      "blockedPermissions": [
+        "android.permission.READ_SMS",
+        "android.permission.WRITE_CONTACTS",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.SYSTEM_ALERT_WINDOW"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#1E1E2E",
-        "foregroundImage": "./assets/icon.png"
+        "foregroundImage": "./assets/android-icon-foreground-filtreai.png",
+        "monochromeImage": "./assets/android-icon-monochrome-filtreai.png"
       },
-      "predictiveBackGestureEnabled": false,
-      "versionCode": 1
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -35,11 +45,11 @@
             "ios": {
               "appExtensions": [
                 {
-                  "bundleIdentifier": "com.smsfilter.app.action",
+                  "bundleIdentifier": "com.filtreai.app.messagefilter",
                   "targetName": "smsfilter",
                   "entitlements": {
                     "com.apple.security.application-groups": [
-                      "group.com.smsfilter.app"
+                      "group.com.filtreai.app"
                     ]
                   }
                 }
@@ -49,9 +59,6 @@
         },
         "projectId": "04eef69b-5b2d-49a6-b8fd-4f3090a2b43e"
       }
-    },
-    "cli": {
-      "appVersionSource": "remote"
     }
   }
 }

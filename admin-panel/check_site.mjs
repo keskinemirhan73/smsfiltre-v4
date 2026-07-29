@@ -1,5 +1,5 @@
 import { chromium } from '@playwright/test';
-import { mkdirSync } from 'fs';
+
 
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage();

@@ -81,7 +81,7 @@ export default function CommunityRulesScreen() {
           </View>
           <Text style={[styles.heroTitle, { color: theme.text }]}>Topluluk Kuralları</Text>
           <Text style={[styles.heroDesc, { color: theme.textMuted }]}>
-            Diğer kullanıcıların şikayet edip, yapay zeka tarafından onaylanan spam kelimelerini tek tıkla cihazınıza indirebilirsiniz. İnternetiniz olmasa bile koruma sağlar.
+            Diğer kullanıcıların bildirdiği ve moderatörler tarafından onaylanan spam kelimelerini tek tıkla cihazınıza indirebilirsiniz. İnternetiniz olmasa bile koruma sağlar.
           </Text>
           
           <TouchableOpacity 

@@ -12,7 +12,7 @@ export interface ThreatDatabase {
 
 const DEFAULT_DB: ThreatDatabase = {
   blacklistedNumbers: ['+905551234567'],
-  spamKeywords: ['bet', 'casino', 'bahis', 'kumar', 'bonus', 'çevrimsiz'],
+  spamKeywords: ['bet', 'casino', 'bahis', 'kumar', 'bonus', 'çevrimsiz', 'mt2', 'metin2', 'ep hediye', 'sms iptal', 'b011', 'b013', 'b015'],
   scamUrls: ['bit.ly', 'cutt.ly', 'kisa.link', 't.me'],
   regexPatterns: ['b[.\\s]*a[.\\s]*h[.\\s]*i[.\\s]*s', 'b[.\\s]*o[.\\s]*n[.\\s]*u[.\\s]*s', 'c[.\\s]*a[.\\s]*s[.\\s]*i[.\\s]*n[.\\s]*o'],
 };
@@ -45,7 +45,7 @@ export class ThreatCloudService {
         
         cloudData = {
           blacklistedNumbers: ['+905551234567', '+905320000000', '+905441112233'],
-          spamKeywords: ['bet', 'casino', 'bahis', 'kumar', 'bonus', 'çevrimsiz', 'deneme bonusu', 'kredi onayı', 'hesabınız bloke', 'icra takibi', 'yasa dışı'],
+          spamKeywords: ['bet', 'casino', 'bahis', 'kumar', 'bonus', 'çevrimsiz', 'deneme bonusu', 'kredi onayı', 'hesabınız bloke', 'icra takibi', 'yasa dışı', 'mt2', 'metin2', 'ep hediye', 'sms iptal', 'b011', 'b013', 'b015'],
           scamUrls: ['bit.ly', 'cutt.ly', 'kisa.link', 't.me', 'wa.me'],
           regexPatterns: ['b[.\\s]*a[.\\s]*h[.\\s]*i[.\\s]*s', 'b[.\\s]*o[.\\s]*n[.\\s]*u[.\\s]*s', 'c[.\\s]*a[.\\s]*s[.\\s]*i[.\\s]*n[.\\s]*o'],
         };

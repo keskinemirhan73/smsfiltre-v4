@@ -12,10 +12,9 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
         let lowerBody = body.lowercased()
         let lowerSender = sender.lowercased()
         
-        let defaults = UserDefaults(suiteName: "group.com.smsfilter.app")
+        let defaults = UserDefaults(suiteName: "group.com.filtreai.app")
         let jsonStr = defaults?.string(forKey: "smsfilter_config_json") ?? ""
         
-        var underAttackMode = false
         var smartFilter = true
         var rules: [[String: Any]] = []
         var threatDb: [[String: Any]] = []
@@ -25,21 +24,13 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
            let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
             
             if let settings = json["settings"] as? [String: Any] {
-                underAttackMode = settings["underAttackMode"] as? Bool ?? false
                 smartFilter = settings["smartFilter"] as? Bool ?? true
             }
             if let r = json["rules"] as? [[String: Any]] { rules = r }
             if let t = json["threatDb"] as? [[String: Any]] { threatDb = t }
         }
         
-        // 1. Under Attack Mode — block everything
-        if underAttackMode {
-            response.action = .junk
-            completion(response)
-            return
-        }
-        
-        // 2. Custom Rules (first match wins)
+        // 1. Custom Rules (first match wins)
         for rule in rules {
             guard let keyword = rule["keyword"] as? String,
                   let type = rule["type"] as? String,
@@ -78,7 +69,7 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
             }
         }
         
-        // 3. Threat Database
+        // 2. Threat Database
         if smartFilter {
             for threat in threatDb {
                 guard let keyword = threat["keyword"] as? String,
@@ -100,7 +91,7 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
             }
         }
         
-        // 4. Default: Allow
+        // 3. Default: Allow
         response.action = .allow
         completion(response)
     }

@@ -1,0 +1,47 @@
+{
+  "targetSize": "1080x1920 portrait",
+  "maximumCount": 8,
+  "plannedScreenshots": [
+    {
+      "order": 1,
+      "screen": "Genel Durum",
+      "state": "Koruma aktif, temiz ve gerçekçi demo istatistikleri",
+      "caption": "Yeni SMS'leri cihaz üzerinde analiz edin"
+    },
+    {
+      "order": 2,
+      "screen": "Son Etkinlik",
+      "state": "Kişisel veri içermeyen şüpheli, işlem ve promosyon örnekleri",
+      "caption": "Şüpheli mesajları kolayca fark edin"
+    },
+    {
+      "order": 3,
+      "screen": "Test Simülatörü",
+      "state": "Şüpheli örnek mesaj ve risk sonucu",
+      "caption": "Filtre kurallarını güvenle test edin"
+    },
+    {
+      "order": 4,
+      "screen": "Akıllı Analiz",
+      "state": "Kullanıcının başlattığı örnek analiz sonucu",
+      "caption": "İsteğe bağlı yapay zekâ risk analizi"
+    },
+    {
+      "order": 5,
+      "screen": "Özel Kurallar",
+      "state": "Kelime ve gönderici kuralları",
+      "caption": "Korumanızı kişiselleştirin"
+    },
+    {
+      "order": 6,
+      "screen": "Ayarlar",
+      "state": "SMS izni, hassasiyet ve gizlilik bağlantısı",
+      "caption": "Kontrol her zaman sizde"
+    }
+  ],
+  "privacyRules": [
+    "Gerçek telefon numarası, kişi adı, SMS içeriği, push tokenı veya IP adresi kullanmayın.",
+    "Demo verilerinin uygulamanın gerçek arayüzünde gösterildiğinden emin olun.",
+    "İşlevi olduğundan güçlü göstermeyin; teslim engelleme veya yüzde yüz koruma iddiası kullanmayın."
+  ]
+}

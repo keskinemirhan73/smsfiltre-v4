@@ -300,8 +300,8 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modalDismissArea: { flex: 1 },
   bottomSheet: {
-    borderTopLeftRadius: radii.xxl, borderTopRightRadius: radii.xxl,
-    padding: spacing.xl, paddingBottom: spacing.xxl * 1.5,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: spacing.xl, paddingBottom: 36,
     borderWidth: 1, borderBottomWidth: 0,
     shadowColor: '#000', shadowOffset: { width: 0, height: -10 },
     shadowOpacity: 0.1, shadowRadius: 20, elevation: 24,

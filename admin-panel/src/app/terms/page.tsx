@@ -2,7 +2,7 @@ import { FileText, AlertTriangle, CheckCircle, Scale, Users } from 'lucide-react
 import Link from 'next/link';
 
 export const metadata = {
-  title: 'Kullanım Koşulları | SMS Filtre AI',
+  title: 'Kullanım Koşulları | FiltreAI',
   description: 'FiltreAI SMS Filtreleme Uygulaması Kullanım Koşulları',
 };
 
@@ -46,7 +46,7 @@ export default function TermsOfService() {
               1. Hizmetin Sağlanması
             </h3>
             <p className="text-[#a9bfd3] leading-relaxed mb-4">
-              FiltreAI, kullanıcılarına SMS mesajlarını filtreleme, yapay zeka (Gemini AI) ile analiz etme ve istenmeyen iletileri (spam) engelleme imkanı sunar.
+              FiltreAI, kullanıcılarına SMS mesajlarını filtreleme, kural tabanlı güvenlik analizi yapma ve istenmeyen iletileri (spam) belirleme imkanı sunar.
             </p>
             <ul className="space-y-2 text-[#a9bfd3] list-disc list-inside ml-2">
               <li>Uygulama, %100 doğruluk garantisi vermez.</li>

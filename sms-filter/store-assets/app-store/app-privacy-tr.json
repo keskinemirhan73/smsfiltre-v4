@@ -1,0 +1,43 @@
+{
+  "tracking": false,
+  "dataTypes": [
+    {
+      "type": "User Content > Emails or Text Messages",
+      "collected": true,
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "purpose": "App Functionality",
+      "details": "Kullanıcı tarafından başlatılan Akıllı Analiz veya spam bildirimi."
+    },
+    {
+      "type": "User Content > Other User Content",
+      "collected": true,
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "purpose": "App Functionality",
+      "details": "Kullanıcının bildirdiği spam kelimesi veya metni."
+    },
+    {
+      "type": "Identifiers > Device ID",
+      "collected": true,
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "purpose": "App Functionality",
+      "details": "Expo push tokenı ve güvenlik/tekrar bildirim denetiminde kullanılan IP adresi."
+    },
+    {
+      "type": "Usage Data > Product Interaction",
+      "collected": true,
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "purpose": "App Functionality",
+      "details": "Spam bildirim sayısı ve puanlar."
+    }
+  ],
+  "notCollected": [
+    "Contacts: beyaz liste seçimi cihaz üzerinde kalır.",
+    "Otomatik mesaj filtreleme içeriği: Mesaj Filtreleme uzantısı cihaz üzerinde çalışır.",
+    "Location, purchases, financial, health, advertising and diagnostics data."
+  ],
+  "needsFinalLegalVerification": true
+}

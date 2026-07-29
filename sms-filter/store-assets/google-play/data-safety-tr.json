@@ -1,0 +1,66 @@
+{
+  "collectsData": true,
+  "sharesData": false,
+  "sharesDataAssumption": "Render, MongoDB ve Expo yalnızca geliştirici adına hizmet sağlayıcı olarak kullanılıyor ve veriyi bağımsız reklam/takip amacıyla kullanmıyor.",
+  "encryptedInTransit": true,
+  "accountCreationAvailable": false,
+  "deletionRequestAvailable": true,
+  "deletionRequestEmail": "keskinemirhan73@gmail.com",
+  "deletionRequestBlocker": null,
+  "dataTypes": [
+    {
+      "category": "Mesajlar",
+      "type": "SMS veya MMS",
+      "collected": "İsteğe bağlı",
+      "linkedToUser": true,
+      "shared": false,
+      "purposes": [
+        "Uygulama işlevselliği",
+        "Dolandırıcılığı önleme, güvenlik ve uyumluluk"
+      ],
+      "details": "Yalnızca kullanıcı Akıllı Analiz veya Spam Bildir işlemini başlattığında seçilen metin gönderilir; otomatik SMS algılama cihaz üzerinde kalır."
+    },
+    {
+      "category": "Kullanıcı tarafından oluşturulan içerik",
+      "type": "Diğer kullanıcı içerikleri",
+      "collected": "İsteğe bağlı",
+      "linkedToUser": true,
+      "shared": false,
+      "purposes": [
+        "Uygulama işlevselliği",
+        "Dolandırıcılığı önleme, güvenlik ve uyumluluk"
+      ],
+      "details": "Kullanıcının bildirdiği spam kelimesi veya metni."
+    },
+    {
+      "category": "Cihaz veya diğer kimlikler",
+      "type": "Cihaz veya diğer kimlikler",
+      "collected": "İsteğe bağlı",
+      "linkedToUser": true,
+      "shared": false,
+      "purposes": [
+        "Uygulama işlevselliği",
+        "Dolandırıcılığı önleme, güvenlik ve uyumluluk",
+        "Geliştirici iletişimi"
+      ],
+      "details": "Expo push tokenı ve kötüye kullanım/tekrar bildirim denetimi için IP adresi."
+    },
+    {
+      "category": "Uygulama etkinliği",
+      "type": "Uygulama etkileşimleri",
+      "collected": "İsteğe bağlı",
+      "linkedToUser": true,
+      "shared": false,
+      "purposes": [
+        "Uygulama işlevselliği"
+      ],
+      "details": "Push tokenına bağlı spam bildirim sayısı ve puanlar."
+    }
+  ],
+  "notCollected": [
+    "Rehber: yalnızca beyaz liste seçimi için cihaz üzerinde işlenir.",
+    "Otomatik gelen SMS analizi: mesaj metni cihazdan otomatik çıkmaz.",
+    "Konum, ödeme, sağlık, reklam kimliği ve reklam verileri."
+  ],
+  "needsFinalLegalVerification": true
+}

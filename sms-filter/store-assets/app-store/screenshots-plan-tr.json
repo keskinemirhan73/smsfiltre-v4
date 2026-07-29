@@ -1,0 +1,49 @@
+{
+  "primaryTarget": "6.9-inch iPhone portrait",
+  "acceptedExampleSize": "1320x2868",
+  "minimumCount": 1,
+  "maximumCount": 10,
+  "plannedScreenshots": [
+    {
+      "order": 1,
+      "screen": "Genel Durum",
+      "state": "Koruma aktif ve temiz demo istatistikleri",
+      "caption": "Mesajlarınız için akıllı filtre"
+    },
+    {
+      "order": 2,
+      "screen": "Filtreyi Etkinleştirme",
+      "state": "iOS Mesajlar ayarlarına yönlendiren kurulum açıklaması",
+      "caption": "Birkaç adımda etkinleştirin"
+    },
+    {
+      "order": 3,
+      "screen": "Özel Kurallar",
+      "state": "Gönderici ve içerik kuralları",
+      "caption": "Filtrelerinizi kişiselleştirin"
+    },
+    {
+      "order": 4,
+      "screen": "Test Simülatörü",
+      "state": "Kişisel veri içermeyen şüpheli mesaj sonucu",
+      "caption": "Kurallarınızı gerçek mesaj göndermeden deneyin"
+    },
+    {
+      "order": 5,
+      "screen": "Akıllı Analiz",
+      "state": "Kullanıcının başlattığı örnek analiz sonucu",
+      "caption": "İsteğe bağlı risk değerlendirmesi"
+    },
+    {
+      "order": 6,
+      "screen": "Ayarlar ve Gizlilik",
+      "state": "Hassasiyet, beyaz liste ve gizlilik bağlantısı",
+      "caption": "Kontrol ve gizlilik sizde"
+    }
+  ],
+  "privacyRules": [
+    "Gerçek telefon numarası, kişi adı veya özel mesaj kullanmayın.",
+    "PNG veya JPEG kullanın; alfa kanalı bırakmayın.",
+    "Yalnızca uygulamanın mevcut gerçek işlevlerini gösterin."
+  ]
+}
