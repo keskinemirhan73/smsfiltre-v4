@@ -285,8 +285,17 @@ test('mobile settings exposes the public privacy policy', () => {
   assert.match(mobileSettingsScreen, /Gizlilik Politikası/i);
   assert.match(
     mobileSettingsScreen,
-    /https:\/\/smsfiltre-v4\.vercel\.app\/privacy/,
+    /https:\/\/filtreai\.vercel\.app\/privacy/,
   );
+  assert.equal(
+    googlePlayListing.privacyPolicyUrl,
+    'https://filtreai.vercel.app/privacy',
+  );
+  assert.equal(
+    appStoreListing.privacyPolicyUrl,
+    'https://filtreai.vercel.app/privacy',
+  );
+  assert.equal(appStoreListing.supportUrl, 'https://filtreai.vercel.app');
 });
 
 test('EAS owns and auto-increments store build numbers', () => {

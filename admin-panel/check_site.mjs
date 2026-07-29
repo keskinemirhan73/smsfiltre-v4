@@ -6,7 +6,7 @@ const page = await browser.newPage();
 
 console.log('Navigating to site...');
 try {
-  await page.goto('https://smsfiltre-v4.vercel.app/', { waitUntil: 'networkidle', timeout: 90000 });
+  await page.goto('https://filtreai.vercel.app/', { waitUntil: 'networkidle', timeout: 90000 });
 } catch(e) {
   console.log('Timeout/error during navigation, continuing anyway:', e.message);
 }

@@ -4,7 +4,7 @@ const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage();
 
 console.log('Navigating to site...');
-await page.goto('https://smsfiltre-v4.vercel.app/', { waitUntil: 'networkidle', timeout: 90000 });
+await page.goto('https://filtreai.vercel.app/', { waitUntil: 'networkidle', timeout: 90000 });
 
 // Wait a moment for React to render
 await page.waitForTimeout(3000);

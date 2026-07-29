@@ -583,11 +583,11 @@ function SettingsMainScreen({ navigation }: any) {
 
   const openPrivacyPolicy = async () => {
     try {
-      await Linking.openURL('https://smsfiltre-v4.vercel.app/privacy');
+      await Linking.openURL('https://filtreai.vercel.app/privacy');
     } catch {
       Alert.alert(
         'Bağlantı açılamadı',
-        'Gizlilik politikasını şu adresten görüntüleyebilirsiniz: https://smsfiltre-v4.vercel.app/privacy'
+        'Gizlilik politikasını şu adresten görüntüleyebilirsiniz: https://filtreai.vercel.app/privacy'
       );
     }
   };
