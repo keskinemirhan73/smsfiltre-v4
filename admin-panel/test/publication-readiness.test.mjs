@@ -38,6 +38,10 @@ const mobileGitignore = readFileSync(
   new URL('../../sms-filter/.gitignore', import.meta.url),
   'utf8',
 );
+const mobileEasignore = readFileSync(
+  new URL('../../sms-filter/.easignore', import.meta.url),
+  'utf8',
+);
 const mobileAppConfig = JSON.parse(
   readFileSync(new URL('../../sms-filter/app.json', import.meta.url), 'utf8'),
 );
@@ -325,6 +329,9 @@ test('site-wide metadata consistently uses the FiltreAI brand', () => {
 test('EAS credential exports are ignored by Git', () => {
   assert.match(mobileGitignore, /^\/credentials\.json$/m);
   assert.match(mobileGitignore, /^\/credentials\/$/m);
+  assert.match(mobileEasignore, /^credentials\.json$/m);
+  assert.match(mobileEasignore, /^credentials\/$/m);
+  assert.match(mobileEasignore, /^\*\.jks$/m);
 });
 
 test('mobile settings exposes the public privacy policy', () => {

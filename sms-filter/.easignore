@@ -6,3 +6,16 @@ dist
 *.log
 *.zip
 *.tar.gz
+credentials.json
+credentials/
+*.jks
+*.pem
+.env
+.env.*
+.tmp-android-export*/
+assets/Screenshot_*.jpg
+assets/premium_splash.png
+generate_splash.py
+get_credentials.js
+strip_meta_inf.py
+scripts/translate_settings.js
