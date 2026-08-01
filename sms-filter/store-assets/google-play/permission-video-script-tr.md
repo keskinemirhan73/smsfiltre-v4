@@ -8,7 +8,7 @@ Hedef süre: 60-90 saniye. Tek kesintisiz ekran kaydı tercih edilir. Bildirimle
 4. Açıklamada şu noktaların okunabildiğini gösterin:
    - Gönderici ve mesaj metni cihaz üzerinde analiz edilir.
    - SMS içerikleri otomatik olarak sunucuya gönderilmez.
-   - Akıllı Analiz ve spam bildirimi yalnızca kullanıcı başlatınca sunucuya gider.
+   - Akıllı Analiz cihaz üzerinde çalışır; yalnızca kullanıcının başlattığı spam bildirimi maskelenmiş rapor metnini sunucuya gönderir.
 5. İlk denemede `Şimdi Değil` seçeneğine dokunun.
 6. Uygulamanın çalışmaya devam ettiğini gösterin.
 7. `Ayarlar > Android SMS Koruması > Gelen SMS İzni` yolunu açarak açıklamayı tekrar tetikleyin.

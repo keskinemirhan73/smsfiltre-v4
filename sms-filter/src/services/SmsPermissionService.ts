@@ -1,37 +1,12 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Alert,
   Linking,
   PermissionsAndroid,
   Platform,
 } from 'react-native';
+import { FilterManager } from '../modules/FilterManager';
 
-const DISCLOSURE_KEY = '@filtreai_sms_permission_disclosure_v1';
 const RECEIVE_SMS_PERMISSION = PermissionsAndroid.PERMISSIONS.RECEIVE_SMS;
-
-function showSmsDisclosure(): Promise<boolean> {
-  return new Promise((resolve) => {
-    Alert.alert(
-      'SMS Korumasını Etkinleştir',
-      'FiltreAI, yeni gelen SMS’lerin gönderici ve mesaj metnini spam ve dolandırıcılık belirtileri için cihaz üzerinde analiz eder. Gelen SMS’ler otomatik olarak sunucuya gönderilmez. Yalnızca sizin başlattığınız Akıllı Analiz veya spam bildirimi sunucuya iletilir.',
-      [
-        {
-          text: 'Şimdi Değil',
-          style: 'cancel',
-          onPress: () => resolve(false),
-        },
-        {
-          text: 'Devam Et',
-          onPress: () => resolve(true),
-        },
-      ],
-      {
-        cancelable: true,
-        onDismiss: () => resolve(false),
-      },
-    );
-  });
-}
 
 export async function hasSmsDetectionPermission(): Promise<boolean> {
   if (Platform.OS !== 'android') {
@@ -50,37 +25,20 @@ export async function requestSmsDetectionPermission(): Promise<boolean> {
     return true;
   }
 
-  const consented = await showSmsDisclosure();
-  if (!consented) {
-    return false;
-  }
-
   const result = await PermissionsAndroid.request(RECEIVE_SMS_PERMISSION);
 
   if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
+    const settings = await FilterManager.loadSettings();
+    const isEn = settings.language === 'en';
     Alert.alert(
-      'SMS İzni Kapalı',
-      'SMS korumasını etkinleştirmek için Android ayarlarından FiltreAI uygulamasına SMS izni verin.',
+      isEn ? 'SMS Permission Disabled' : 'SMS İzni Kapalı',
+      isEn ? 'To enable SMS protection, please allow SMS permissions for FiltreAI in Android Settings. All messages are analyzed on-device. Messages are not automatically sent to the server.' : 'SMS korumasını etkinleştirmek için Android ayarlarından FiltreAI uygulamasına SMS izni verin. Uygulama mesajları cihaz üzerinde analiz eder. Mesaj içerikleri otomatik olarak sunucuya gönderilmez.',
       [
-        { text: 'Vazgeç', style: 'cancel' },
-        { text: 'Ayarları Aç', onPress: () => Linking.openSettings() },
+        { text: isEn ? 'Cancel' : 'Vazgeç', style: 'cancel' },
+        { text: isEn ? 'Open Settings' : 'Ayarları Aç', onPress: () => Linking.openSettings() },
       ],
     );
   }
 
   return result === PermissionsAndroid.RESULTS.GRANTED;
-}
-
-export async function ensureSmsDetectionPermission(): Promise<boolean> {
-  if (Platform.OS !== 'android' || (await hasSmsDetectionPermission())) {
-    return true;
-  }
-
-  const disclosureShown = await AsyncStorage.getItem(DISCLOSURE_KEY);
-  if (disclosureShown) {
-    return false;
-  }
-
-  await AsyncStorage.setItem(DISCLOSURE_KEY, 'shown');
-  return requestSmsDetectionPermission();
 }

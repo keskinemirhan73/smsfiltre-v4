@@ -11,6 +11,7 @@ import android.os.Build
 import android.provider.Telephony
 import android.util.Log
 import org.json.JSONObject
+import java.util.Calendar
 
 class SmsFilterReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -30,6 +31,15 @@ class SmsFilterReceiver : BroadcastReceiver() {
                 
                 var underAttackMode = false
                 var smartFilter = true
+                var filterScheduleEnabled = false
+                var scheduleStart = "22:00"
+                var scheduleEnd = "08:00"
+                var invalidNumberFilter = false
+                var blockForeignNumbers = false
+                var blockArabic = false
+                var databaseFilter = true
+                var fraudFilter = true
+                var customFraudKeywords = emptyList<String>()
                 var shouldBlock = false
                 var isWhitelisted = false
                 
@@ -41,18 +51,27 @@ class SmsFilterReceiver : BroadcastReceiver() {
                         val settings = jsonObj.getJSONObject("settings")
                         underAttackMode = settings.optBoolean("underAttackMode", false)
                         smartFilter = settings.optBoolean("smartFilter", true)
-                        
-                        // Yabancı Dil (Arapça) Kontrolü
-                        if (settings.optBoolean("blockArabic", false)) {
-                            if (Regex("[\\u0600-\\u06FF]").containsMatchIn(body) || Regex("[\\u0600-\\u06FF]").containsMatchIn(sender)) {
-                                shouldBlock = true
-                            }
+                        filterScheduleEnabled = settings.optBoolean("filterScheduleEnabled", false)
+                        scheduleStart = settings.optString("scheduleStart", "22:00")
+                        scheduleEnd = settings.optString("scheduleEnd", "08:00")
+                        invalidNumberFilter = settings.optBoolean("invalidNumberFilter", false)
+                        blockForeignNumbers = settings.optBoolean("blockForeignNumbers", false)
+                        blockArabic = settings.optBoolean("blockArabic", false)
+                        databaseFilter = settings.optBoolean("databaseFilter", true)
+                        fraudFilter = settings.optBoolean("fraudFilter", true)
+
+                        if (settings.has("customFraudKeywords")) {
+                            val keywords = settings.getJSONArray("customFraudKeywords")
+                            customFraudKeywords = (0 until keywords.length())
+                                .mapNotNull { keywords.optString(it).trim().takeIf(String::isNotEmpty) }
                         }
                         
                         if (settings.has("whitelist")) {
                             val whitelist = settings.getJSONArray("whitelist")
                             for (j in 0 until whitelist.length()) {
-                                if (sender.equals(whitelist.getString(j), ignoreCase = true) || sender.contains(whitelist.getString(j))) {
+                                val entry = whitelist.optString(j).trim()
+                                if (entry.isNotEmpty() &&
+                                    (sender.equals(entry, ignoreCase = true) || sender.contains(entry))) {
                                     isWhitelisted = true
                                     break
                                 }
@@ -60,21 +79,40 @@ class SmsFilterReceiver : BroadcastReceiver() {
                         }
                     }
                     
-                    if (isWhitelisted) {
-                        // Beyaz listedeki numara, hiçbir filtreye takılmaz
+                    if (isWhitelisted || !isWithinSchedule(filterScheduleEnabled, scheduleStart, scheduleEnd)) {
+                        // Beyaz listedeki veya zamanlama dışındaki mesaj filtrelenmez.
                         shouldBlock = false
                     } else {
-                        // 1. Under Attack Mode
+                    // 1. Under Attack Mode
                     if (underAttackMode) {
                         shouldBlock = true
                     }
+
+                    // 2. Foreign number and alphabet rules
+                    if (!shouldBlock && invalidNumberFilter && blockForeignNumbers &&
+                        sender.startsWith("+") && !sender.startsWith("+90")) {
+                        shouldBlock = true
+                    }
+
+                    if (!shouldBlock && blockArabic &&
+                        (Regex("[\\u0600-\\u06FF]").containsMatchIn(body) ||
+                         Regex("[\\u0600-\\u06FF]").containsMatchIn(sender))) {
+                        shouldBlock = true
+                    }
+
+                    if (!shouldBlock && fraudFilter && customFraudKeywords.any {
+                        lowerBody.contains(it.lowercase())
+                    }) {
+                        shouldBlock = true
+                    }
                     
-                    // 2. Custom Rules
+                    // 3. Custom Rules
                     if (!shouldBlock && jsonObj.has("rules")) {
                         val rules = jsonObj.getJSONArray("rules")
                         for (i in 0 until rules.length()) {
                             val rule = rules.getJSONObject(i)
                             val keyword = rule.optString("keyword", "")
+                            if (keyword.isBlank()) continue
                             val type = rule.optString("type", "word")
                             val category = rule.optString("category", "junk")
                             val matchTarget = rule.optString("matchTarget", "content")
@@ -103,12 +141,13 @@ class SmsFilterReceiver : BroadcastReceiver() {
                         }
                     }
                     
-                    // 3. Threat Database
-                    if (!shouldBlock && smartFilter && jsonObj.has("threatDb")) {
+                    // 4. Threat Database
+                    if (!shouldBlock && smartFilter && (databaseFilter || fraudFilter) && jsonObj.has("threatDb")) {
                         val threatDb = jsonObj.getJSONArray("threatDb")
                         for (i in 0 until threatDb.length()) {
                             val threat = threatDb.getJSONObject(i)
                             val keyword = threat.optString("keyword", "")
+                            if (keyword.isBlank()) continue
                             val type = threat.optString("type", "word")
                             
                             val isMatch = if (type == "regex") {
@@ -135,6 +174,30 @@ class SmsFilterReceiver : BroadcastReceiver() {
                     Log.d("SmsFilter", "Allowed SMS from: $sender")
                 }
         }
+    }
+
+    private fun isWithinSchedule(enabled: Boolean, start: String, end: String): Boolean {
+        if (!enabled) return true
+
+        val startMinutes = parseTimeMinutes(start) ?: return true
+        val endMinutes = parseTimeMinutes(end) ?: return true
+        val calendar = Calendar.getInstance()
+        val currentMinutes = calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
+
+        return if (startMinutes <= endMinutes) {
+            currentMinutes in startMinutes..endMinutes
+        } else {
+            currentMinutes >= startMinutes || currentMinutes <= endMinutes
+        }
+    }
+
+    private fun parseTimeMinutes(value: String): Int? {
+        val parts = value.split(":")
+        if (parts.size != 2) return null
+        val hour = parts[0].toIntOrNull() ?: return null
+        val minute = parts[1].toIntOrNull() ?: return null
+        if (hour !in 0..23 || minute !in 0..59) return null
+        return hour * 60 + minute
     }
 
     private fun showSuspiciousSmsNotification(

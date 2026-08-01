@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SecureStorage as AsyncStorage } from '../utils/SecureStorage';
 import { Platform } from 'react-native';
 import { ThreatCloudService } from '../services/ThreatCloudService';
 
@@ -42,8 +42,9 @@ export interface AppSettings {
   language: 'tr' | 'en';
   customFraudKeywords: string[];
   whitelist: string[];
-  autoSyncEnabled?: boolean;
+  autoSyncEnabled: boolean;
   biometricLock?: boolean;
+  dailySummaryOnly?: boolean;
 }
 
 export interface Stats {
@@ -156,6 +157,7 @@ const defaultSettings: AppSettings = {
   whitelist: [],
   autoSyncEnabled: true,
   biometricLock: false,
+  dailySummaryOnly: false,
 };
 
 const defaultStats: Stats = {
@@ -299,8 +301,8 @@ export class FilterManager {
 
   static async incrementStat(key: keyof Stats, amount: number = 1) {
     const stats = await this.loadStats();
-    stats[key] += amount;
-    await AsyncStorage.setItem(STATS_KEY, JSON.stringify(stats));
+    const updatedStats = { ...stats, [key]: stats[key] + amount };
+    await AsyncStorage.setItem(STATS_KEY, JSON.stringify(updatedStats));
   }
 
   // History
@@ -318,10 +320,9 @@ export class FilterManager {
       id: Date.now().toString() + Math.random().toString(36).substring(7),
       timestamp: Date.now(),
     };
-    history.unshift(newItem); // Add to beginning
-    if (history.length > 50) history.pop(); // Keep only last 50
+    const updatedHistory = [newItem, ...history].slice(0, 50);
     try {
-      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(updatedHistory));
     } catch (e) {
       console.warn('Storage Error:', e);
     }

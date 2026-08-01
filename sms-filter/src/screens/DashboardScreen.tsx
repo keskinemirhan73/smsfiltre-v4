@@ -9,6 +9,14 @@ import { useAppTheme, spacing, radii } from '../theme';
 import { FilterManager, AppSettings, Stats, HistoryItem } from '../modules/FilterManager';
 import { ThreatCloudService } from '../services/ThreatCloudService';
 import { useToast } from '../components/Toast';
+import { useSettings } from '../context/SettingsContext';
+import { getT } from '../i18n';
+import { hasSmsDetectionPermission, requestSmsDetectionPermission } from '../services/SmsPermissionService';
+import { SecurityUtils } from '../utils/SecurityUtils';
+import { SmsDetailModal } from '../components/SmsDetailModal';
+import { getExistingExpoPushTokenAsync, registerForPushNotificationsAsync, requestNotificationPermissionAsync } from '../services/PushNotificationService';
+import { createPublicJsonRequest } from '../services/publicApiRequest';
+import { buildThreatDistribution, buildWeeklySuspiciousSeries } from '../services/dashboardMetrics';
 
 const { width } = Dimensions.get('window');
 
@@ -18,22 +26,18 @@ export default function DashboardScreen() {
   const theme = useAppTheme();
   const scrollRef = useRef<ScrollView>(null);
   useScrollToTop(scrollRef as any);
+  const { settings } = useSettings();
+  const t = getT(settings.language);
 
-  const [settings, setSettings] = useState<AppSettings>({
-    underAttackMode: false, smartFilter: true, silentBlocking: true,
-    filterScheduleEnabled: false, scheduleStart: '22:00', scheduleEnd: '08:00',
-    fraudFilter: true, databaseFilter: true, proactiveFilter: true, invalidNumberFilter: false,
-    categoryMapping: { spam: 'junk', transaction: 'transaction', promotion: 'promotion' },
-    aiSensitivity: 0.8, blockForeignNumbers: false, blockArabic: false, theme: 'system', language: 'tr',
-    customFraudKeywords: [], whitelist: [],
-    filterTransactions: true, filterPromotions: true
-  });
   const [stats, setStats] = useState<Stats>(defaultStats);
   const [recentActivity, setRecentActivity] = useState<HistoryItem[]>([]);
   const [cloudThreatCount, setCloudThreatCount] = useState<number>(0);
+  const [hasSmsPermission, setHasSmsPermission] = useState<boolean>(true);
 
   const [isSetupModalVisible, setIsSetupModalVisible] = useState(false);
   const [isReportModalVisible, setIsReportModalVisible] = useState(false);
+  const [isSmsDetailVisible, setIsSmsDetailVisible] = useState(false);
+  const [selectedSms, setSelectedSms] = useState<HistoryItem | null>(null);
   const [reportKeyword, setReportKeyword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { showToast } = useToast();
@@ -60,17 +64,16 @@ export default function DashboardScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     try {
-      const { data: expoPushToken } = await Notifications.getExpoPushTokenAsync();
+      const expoPushToken = await getExistingExpoPushTokenAsync();
+      const safeKeyword = SecurityUtils.maskPII(reportKeyword);
 
       const resp = await fetch(BACKEND_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          keyword: reportKeyword,
+        ...createPublicJsonRequest({
+          keyword: safeKeyword,
           type: 'word',
           token: expoPushToken,
-          deviceInfo: Platform.OS,
-        })
+        }),
       });
       setIsSubmitting(false);
 
@@ -78,92 +81,131 @@ export default function DashboardScreen() {
         setIsReportModalVisible(false);
         setReportKeyword('');
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        showToast('Bildiriminiz incelenmek üzere buluta gönderildi.', { type: 'success' });
+        showToast(t.notificationSent, { type: 'success' });
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        showToast('Sunucuya bağlanılamadı.', { type: 'error' });
+        showToast(t.serverError, { type: 'error' });
       }
     } catch(e) {
       setIsSubmitting(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      showToast('Bağlantı hatası.', { type: 'error' });
+      showToast(t.connectionError, { type: 'error' });
     }
+  };
+  const handleDetailedReport = async (keyword: string, _category: string, _notes: string) => {
+    if (!keyword.trim()) return;
+    setIsSubmitting(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    try {
+      const expoPushToken = await getExistingExpoPushTokenAsync();
+      const safeKeyword = SecurityUtils.maskPII(keyword);
+
+      const resp = await fetch(BACKEND_URL, {
+        method: 'POST',
+        ...createPublicJsonRequest({
+          keyword: safeKeyword,
+          type: 'word',
+          token: expoPushToken,
+        }),
+      });
+      setIsSubmitting(false);
+
+      if (resp.ok) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        showToast("Raporunuz topluluğa gönderildi. Teşekkürler!", { type: 'success' });
+      } else {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        showToast(t.serverError, { type: 'error' });
+      }
+    } catch(e) {
+      setIsSubmitting(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      showToast(t.connectionError, { type: 'error' });
+    }
+  };
+  const handleCreateRule = async (sender: string) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    const rules = await FilterManager.loadRules();
+
+    // Check if rule already exists
+    if (rules.some(r => r.keyword === sender && r.matchTarget === 'sender')) {
+      showToast(`${sender} zaten kara listede`, { type: 'info' });
+      return;
+    }
+
+    const newRule = {
+      id: Date.now().toString(),
+      keyword: sender,
+      type: 'word' as const,
+      category: 'junk' as const,
+      matchTarget: 'sender' as const,
+    };
+    await FilterManager.saveRules([...rules, newRule]);
+    showToast(`${sender} kara listeye eklendi`, { type: 'success' });
   };
 
   const testNotification = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'SMS Filtresi 🛡️',
-        body: 'Yeni bir şüpheli mesaj algılandı!',
-        sound: true,
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: 2,
-      },
-    });
-    showToast('Bildirim 2 saniye içinde gelecek.', { type: 'info' });
+    const permissionGranted = await requestNotificationPermissionAsync();
+    if (!permissionGranted) {
+      showToast(
+        settings.language === 'en' ? 'Notification permission was not granted.' : 'Bildirim izni verilmedi.',
+        { type: 'info' },
+      );
+      return;
+    }
+    try {
+      const token = await registerForPushNotificationsAsync();
+      if (token) await ThreatCloudService.registerPushToken(token);
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: t.smsFilterTitle,
+          body: t.newSuspiciousMessage,
+          sound: true,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: 2,
+        },
+      });
+      showToast(t.notificationIncoming, { type: 'info' });
+    } catch {
+      showToast(settings.language === 'en' ? 'Test notification could not be scheduled.' : 'Test bildirimi planlanamadı.', { type: 'error' });
+    }
   };
 
   useFocusEffect(
     useCallback(() => {
-      FilterManager.loadSettings().then(setSettings);
       FilterManager.loadStats().then(setStats);
       FilterManager.loadHistory().then(setRecentActivity);
-      ThreatCloudService.syncDatabase().then(() => {
-        ThreatCloudService.getDatabase().then(db => {
-          setCloudThreatCount(db.spamKeywords.length + db.scamUrls.length + (db.regexPatterns?.length || 0));
-        });
+      ThreatCloudService.getDatabase().then(db => {
+        setCloudThreatCount(db.spamKeywords.length + db.scamUrls.length + (db.regexPatterns?.length || 0));
       });
+      if (Platform.OS === 'android') {
+        hasSmsDetectionPermission().then(setHasSmsPermission);
+      }
     }, [])
   );
 
   const statCards = [
-    { label: 'Şüpheli', value: stats.blockedCount, icon: ShieldBan, color: theme.danger, bg: 'rgba(239,68,68,0.08)' },
-    { label: 'Analiz Edilen', value: stats.analyzedCount, icon: Activity, color: theme.primary, bg: 'rgba(59,130,246,0.08)' },
-    { label: 'İşlem', value: stats.transactionCount, icon: Receipt, color: theme.secondary, bg: 'rgba(10,185,129,0.08)' },
-    { label: 'Promosyon', value: stats.promotionCount, icon: Megaphone, color: '#F59E0B', bg: 'rgba(245,158,11,0.08)' },
+    { label: t.suspicious, value: stats.blockedCount, icon: ShieldBan, color: theme.danger, bg: 'rgba(239,68,68,0.08)' },
+    { label: t.totalAnalyzed, value: stats.analyzedCount, icon: Activity, color: theme.primary, bg: 'rgba(59,130,246,0.08)' },
+    { label: t.transaction, value: stats.transactionCount, icon: Receipt, color: theme.secondary, bg: 'rgba(10,185,129,0.08)' },
+    { label: t.promotion, value: stats.promotionCount, icon: Megaphone, color: '#F59E0B', bg: 'rgba(245,158,11,0.08)' },
   ];
 
   const getStatusConfig = (status: string) => {
     switch (status) {
-      case 'blocked': return { color: theme.danger, text: 'Şüpheli', icon: ShieldBan, bg: 'rgba(239,68,68,0.1)' };
-      case 'transaction': return { color: theme.primary, text: 'İşlem', icon: Receipt, bg: 'rgba(59,130,246,0.1)' };
-      case 'promotion': return { color: '#F59E0B', text: 'Promosyon', icon: Megaphone, bg: 'rgba(245,158,11,0.1)' };
-      default: return { color: theme.secondary, text: 'İzinli', icon: ShieldCheck, bg: 'rgba(10,185,129,0.1)' };
+      case 'blocked': return { color: theme.danger, text: t.suspicious, icon: ShieldBan, bg: 'rgba(239,68,68,0.1)' };
+      case 'transaction': return { color: theme.primary, text: t.transaction, icon: Receipt, bg: 'rgba(59,130,246,0.1)' };
+      case 'promotion': return { color: '#F59E0B', text: t.promotion, icon: Megaphone, bg: 'rgba(245,158,11,0.1)' };
+      default: return { color: theme.secondary, text: t.allowed, icon: ShieldCheck, bg: 'rgba(10,185,129,0.1)' };
     }
   };
 
-  const getWeeklyData = () => {
-    const days = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
-    const today = new Date();
-    const result = [];
-
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const dayName = days[d.getDay()];
-
-      const startOfDay = new Date(d).setHours(0,0,0,0);
-      const endOfDay = new Date(d).setHours(23,59,59,999);
-
-      const count = recentActivity.filter(item => {
-        return item.timestamp >= startOfDay && item.timestamp <= endOfDay && item.status === 'blocked';
-      }).length;
-
-      result.push({ day: dayName, val: count });
-    }
-
-    // Eğer tüm günler 0 ise, grafiğin düzgün çizilmesi için bugüne toplam blockedCount'u ekle
-    const maxVal = Math.max(...result.map(r => r.val));
-    if (maxVal === 0) {
-      result[result.length - 1].val = stats.blockedCount > 0 ? stats.blockedCount : (recentActivity.length > 0 ? 1 : 0);
-    }
-    return result;
-  };
-
-  const weeklyData = getWeeklyData();
+  const weeklyData = buildWeeklySuspiciousSeries(recentActivity);
+  const threatDistribution = buildThreatDistribution(stats);
 
   const chartConfig = {
     backgroundGradientFrom: theme.card,
@@ -178,10 +220,10 @@ export default function DashboardScreen() {
   };
 
   const pieData = [
-    { name: 'Spam', population: stats.blockedCount || 1, color: theme.danger, legendFontColor: theme.text, legendFontSize: 12 },
-    { name: 'İşlem', population: stats.transactionCount || 1, color: theme.primary, legendFontColor: theme.text, legendFontSize: 12 },
-    { name: 'Promosyon', population: stats.promotionCount || 1, color: '#F59E0B', legendFontColor: theme.text, legendFontSize: 12 },
-    { name: 'İzinli', population: stats.analyzedCount - (stats.blockedCount + stats.transactionCount + stats.promotionCount) || 1, color: theme.secondary, legendFontColor: theme.text, legendFontSize: 12 },
+    { name: t.spam, population: threatDistribution.blocked, color: theme.danger, legendFontColor: theme.text, legendFontSize: 12 },
+    { name: t.transaction, population: threatDistribution.transaction, color: theme.primary, legendFontColor: theme.text, legendFontSize: 12 },
+    { name: t.promotion, population: threatDistribution.promotion, color: '#F59E0B', legendFontColor: theme.text, legendFontSize: 12 },
+    { name: t.allowed, population: threatDistribution.allowed, color: theme.secondary, legendFontColor: theme.text, legendFontSize: 12 },
   ];
 
   return (
@@ -189,7 +231,7 @@ export default function DashboardScreen() {
       <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
         <View style={styles.heroSection}>
-          <Text style={[styles.title, { color: theme.text }]}>Genel Durum</Text>
+          <Text style={[styles.title, { color: theme.text }]}>{t.overview}</Text>
 
           <View style={[styles.heroCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <View style={styles.heroGlow}>
@@ -205,54 +247,54 @@ export default function DashboardScreen() {
 
             <View style={{ alignItems: 'center', marginTop: spacing.md }}>
               <Text style={[styles.heroStatusTitle, { color: underAttackModeActive ? theme.danger : theme.text }]}>
-                {underAttackModeActive ? 'Saldırı Modu Aktif' : 'Koruma Aktif'}
+                {underAttackModeActive ? t.attackModeActive : t.protectionActive}
               </Text>
               <Text style={[styles.heroStatusDesc, { color: theme.textMuted }]}>
-                {underAttackModeActive ? 'Beyaz liste dışındaki SMS’ler şüpheli olarak işaretleniyor.' : 'Akıllı filtre yeni SMS’leri cihaz üzerinde analiz ediyor.'}
+                {underAttackModeActive ? t.attackModeActiveDesc : t.protectionActiveDesc}
               </Text>
 
-              {stats.blockedCount > 0 && (
-                <View style={{ marginTop: spacing.md, backgroundColor: 'rgba(16,185,129,0.1)', paddingVertical: 8, paddingHorizontal: 16, borderRadius: radii.full }}>
-                  <Text style={{ color: theme.secondary, fontWeight: '800', fontSize: 13 }}>
-                    🎉 Harika! Bu ay {stats.blockedCount} spam mesajdan kurtuldunuz!
-                  </Text>
-                </View>
-              )}
             </View>
 
             <View style={[styles.cloudBadge, { backgroundColor: 'rgba(59,130,246,0.08)' }]}>
               <Globe size={14} color={theme.primary} style={{ marginRight: 6 }} />
               <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '700' }}>
-                Bulut Veritabanı Güncel ({cloudThreatCount.toLocaleString('tr-TR')} Tehdit)
+                {t.cloudDbUpToDate} ({cloudThreatCount.toLocaleString(settings.language === 'en' ? 'en-US' : 'tr-TR')} {t.threats})
               </Text>
             </View>
           </View>
         </View>
 
-        {Platform.OS === 'ios' && (
+        {(Platform.OS === 'ios' || (Platform.OS === 'android' && !hasSmsPermission)) && (
           <TouchableOpacity
             style={[styles.setupCard, { backgroundColor: 'rgba(139,92,246,0.1)', borderColor: 'rgba(139,92,246,0.3)' }]}
             activeOpacity={0.8}
-            onPress={() => setIsSetupModalVisible(true)}
+            onPress={async () => {
+              if (Platform.OS === 'ios') {
+                setIsSetupModalVisible(true);
+              } else {
+                const granted = await requestSmsDetectionPermission();
+                setHasSmsPermission(granted);
+              }
+            }}
           >
             <View style={styles.setupHeader}>
               <View style={[styles.setupIconWrapper, { backgroundColor: '#8B5CF6' }]}>
                 <ShieldCheck size={20} color="#fff" />
               </View>
-              <Text style={[styles.setupTitle, { color: '#8B5CF6' }]}>Filtreyi Aktifleştirin</Text>
+              <Text style={[styles.setupTitle, { color: '#8B5CF6' }]}>{t.activateFilter}</Text>
             </View>
             <Text style={[styles.setupDesc, { color: theme.text, marginBottom: spacing.md }]}>
-              Filtrelemenin çalışması için telefonunuzun Ayarlar &gt; Mesajlar &gt; Bilinmeyenleri Filtrele menüsüne giderek FiltreAI'yi seçmeniz gerekmektedir.
+              {t.activateFilterDesc}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#8B5CF6', paddingVertical: 10, paddingHorizontal: 16, borderRadius: radii.md, alignSelf: 'flex-start' }}>
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14, marginRight: 6 }}>Hemen Kurulumu Yap</Text>
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14, marginRight: 6 }}>{t.setupNow}</Text>
               <ArrowRight size={16} color="#fff" />
             </View>
           </TouchableOpacity>
         )}
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Haftalık Engelleme Trendi</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.weeklyTrend}</Text>
           <View style={[styles.chartCard, { backgroundColor: theme.card, borderColor: theme.border, padding: 0, overflow: 'hidden' }]}>
             <LineChart
               data={{
@@ -271,18 +313,24 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Tehdit Dağılımı</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.threatDistribution}</Text>
           <View style={[styles.chartCard, { backgroundColor: theme.card, borderColor: theme.border, alignItems: 'center' }]}>
-            <PieChart
-              data={pieData}
-              width={width - spacing.lg * 2}
-              height={150}
-              chartConfig={chartConfig}
-              accessor={"population"}
-              backgroundColor={"transparent"}
-              paddingLeft={"15"}
-              absolute
-            />
+            {threatDistribution.total === 0 ? (
+              <Text style={{ color: theme.textMuted, padding: spacing.xl }}>
+                {t.noRecentActivity}
+              </Text>
+            ) : (
+              <PieChart
+                data={pieData}
+                width={width - spacing.lg * 2}
+                height={150}
+                chartConfig={chartConfig}
+                accessor={"population"}
+                backgroundColor={"transparent"}
+                paddingLeft={"15"}
+                absolute
+              />
+            )}
           </View>
         </View>
 
@@ -296,7 +344,7 @@ export default function DashboardScreen() {
               }}
             >
               <View style={[styles.quickIcon, { backgroundColor: 'rgba(239,68,68,0.1)' }]}><ShieldAlert size={20} color={theme.danger} /></View>
-              <Text style={[styles.quickTxt, { color: theme.text }]}>Spam Bildir</Text>
+              <Text style={[styles.quickTxt, { color: theme.text }]}>{t.reportSpam}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -304,12 +352,12 @@ export default function DashboardScreen() {
               onPress={testNotification}
             >
               <View style={[styles.quickIcon, { backgroundColor: 'rgba(59,130,246,0.1)' }]}><Bell size={20} color={theme.primary} /></View>
-              <Text style={[styles.quickTxt, { color: theme.text }]}>Bildirim Test</Text>
+              <Text style={[styles.quickTxt, { color: theme.text }]}>{t.testNotification}</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>İstatistikler</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.statistics}</Text>
         <View style={styles.statsGrid}>
           {statCards.map((card, i) => {
             const Icon = card.icon;
@@ -328,21 +376,30 @@ export default function DashboardScreen() {
         </View>
 
         <View style={styles.activityHeader}>
-          <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>Son Aktiviteler</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: 0 }]}>{t.recentActivity}</Text>
         </View>
 
         <View style={[styles.historyList, { backgroundColor: theme.card, borderColor: theme.border }]}>
           {recentActivity.length === 0 ? (
             <View style={{ padding: spacing.xxl, alignItems: 'center' }}>
               <History size={40} color={theme.border} style={{ marginBottom: spacing.md }} />
-              <Text style={{ color: theme.textMuted, fontSize: 14, textAlign: 'center', fontWeight: '500' }}>Henüz mesaj filtrelenmedi.</Text>
+              <Text style={{ color: theme.textMuted, fontSize: 14, textAlign: 'center', fontWeight: '500' }}>{t.noRecentActivity}</Text>
             </View>
           ) : (
             recentActivity.slice(0, 5).map((item, i) => {
               const conf = getStatusConfig(item.status);
               const ItemIcon = conf.icon;
               return (
-                <View key={item.id || i} style={[styles.historyItem, { borderBottomColor: theme.border, borderBottomWidth: i === Math.min(recentActivity.length, 5) - 1 ? 0 : 1 }]}>
+                <TouchableOpacity
+                  key={item.id || i}
+                  style={[styles.historyItem, { borderBottomColor: theme.border, borderBottomWidth: i === Math.min(recentActivity.length, 5) - 1 ? 0 : 1 }]}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setSelectedSms(item);
+                    setIsSmsDetailVisible(true);
+                  }}
+                  activeOpacity={0.7}
+                >
                   <View style={[styles.historyIcon, { backgroundColor: conf.bg }]}>
                     <ItemIcon size={18} color={conf.color} />
                   </View>
@@ -353,7 +410,7 @@ export default function DashboardScreen() {
                   <View style={[styles.historyActionBadge, { backgroundColor: conf.bg }]}>
                     <Text style={[styles.statusLabel, { color: conf.color }]}>{conf.text}</Text>
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })
           )}
@@ -367,7 +424,7 @@ export default function DashboardScreen() {
           <View style={[styles.bottomSheet, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <View style={styles.sheetHandle} />
             <View style={styles.sheetHeader}>
-              <Text style={[styles.sheetTitle, { color: theme.text }]}>Topluluğa Bildir</Text>
+              <Text style={[styles.sheetTitle, { color: theme.text }]}>{t.reportToCommunity}</Text>
               <TouchableOpacity onPress={() => setIsReportModalVisible(false)} style={styles.closeBtn}>
                 <X size={24} color={theme.textMuted} />
               </TouchableOpacity>
@@ -377,7 +434,7 @@ export default function DashboardScreen() {
               <ShieldAlert size={20} color={theme.textMuted} style={{ marginRight: 10 }} />
               <TextInput
                 style={[styles.sheetInput, { color: theme.text }]}
-                placeholder="Örn: deneme bonusu, yasadışı bahis"
+                placeholder={t.reportPlaceholder}
                 placeholderTextColor={theme.textMuted}
                 value={reportKeyword}
                 onChangeText={setReportKeyword}
@@ -390,11 +447,21 @@ export default function DashboardScreen() {
               onPress={handleReport}
               disabled={!reportKeyword.trim() || isSubmitting}
             >
-              {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>Bildir</Text>}
+              {isSubmitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.submitBtnText}>{t.reportSpam}</Text>}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <SmsDetailModal
+        visible={isSmsDetailVisible}
+        item={selectedSms}
+        onClose={() => setIsSmsDetailVisible(false)}
+        onCreateRule={handleCreateRule}
+        onReport={(preview, category, notes) => {
+          handleDetailedReport(preview, category, notes);
+        }}
+      />
 
       <Modal visible={isSetupModalVisible} animationType="slide" presentationStyle="fullScreen">
         <View style={[styles.fullModalContainer, { backgroundColor: theme.background }]}>
@@ -408,33 +475,33 @@ export default function DashboardScreen() {
             <View style={[styles.setupIllustration, { backgroundColor: 'rgba(139,92,246,0.1)' }]}>
               <ShieldCheck size={48} color="#8B5CF6" />
             </View>
-            <Text style={[styles.setupModalTitle, { color: theme.text }]}>Filtreyi Etkinleştir</Text>
+            <Text style={[styles.setupModalTitle, { color: theme.text }]}>{t.activateFilterModalTitle}</Text>
             <Text style={[styles.setupModalDesc, { color: theme.textMuted }]}>
-              Gelen şüpheli mesajları anında durdurmak için aşağıdaki adımları takip edin.
+              {t.activateFilterModalDesc}
             </Text>
 
             <View style={[styles.setupStepsBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
               <View style={styles.setupStep}>
                 <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}><Text style={styles.stepNumberText}>1</Text></View>
-                <Text style={[styles.stepText, { color: theme.text }]}>Telefonunuzun <Text style={{fontWeight:'800'}}>Ayarlar</Text> uygulamasına girin.</Text>
+                <Text style={[styles.stepText, { color: theme.text }]}>{t.activateFilterStep1}</Text>
               </View>
               <View style={styles.setupStepDivider} />
 
               <View style={styles.setupStep}>
                 <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}><Text style={styles.stepNumberText}>2</Text></View>
-                <Text style={[styles.stepText, { color: theme.text }]}><Text style={{fontWeight:'800'}}>Mesajlar</Text> bölümünü bulun ve açın.</Text>
+                <Text style={[styles.stepText, { color: theme.text }]}>Mesajlar cihazınızda analiz edilir. Yalnızca siz raporlamayı seçerseniz maskelenmiş içerik gönderilir.</Text>
               </View>
               <View style={styles.setupStepDivider} />
 
               <View style={styles.setupStep}>
                 <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}><Text style={styles.stepNumberText}>3</Text></View>
-                <Text style={[styles.stepText, { color: theme.text }]}><Text style={{fontWeight:'800'}}>Bilinmeyenleri Filtrele</Text> (veya İstenmeyenler) menüsüne dokunun.</Text>
+                <Text style={[styles.stepText, { color: theme.text }]}>{t.activateFilterStep3}</Text>
               </View>
               <View style={styles.setupStepDivider} />
 
               <View style={styles.setupStep}>
                 <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}><Text style={styles.stepNumberText}>4</Text></View>
-                <Text style={[styles.stepText, { color: theme.text }]}><Text style={{fontWeight:'800'}}>FiltreAI</Text> uygulamasını seçip yeşil tik ile onaylayın.</Text>
+                <Text style={[styles.stepText, { color: theme.text }]}>{t.activateFilterStep4}</Text>
               </View>
             </View>
           </ScrollView>
@@ -444,7 +511,7 @@ export default function DashboardScreen() {
               style={[styles.openSettingsBtn, { backgroundColor: '#8B5CF6' }]}
               onPress={() => Platform.OS === 'ios' ? Linking.openURL('App-Prefs:root=MESSAGES') : Linking.openSettings()}
             >
-              <Text style={styles.openSettingsBtnText}>Ayarları Aç</Text>
+              <Text style={styles.openSettingsBtnText}>{t.openSettingsBtn}</Text>
               <ArrowRight size={20} color="#fff" />
             </TouchableOpacity>
           </View>

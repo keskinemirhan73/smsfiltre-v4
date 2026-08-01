@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext, createContext } from 'react';
 import { View, Text, StyleSheet, Switch, ScrollView, TouchableOpacity, TextInput, Alert, DeviceEventEmitter, ActivityIndicator, Modal, FlatList, Linking, Platform } from 'react-native';
-import { ShieldAlert, Brain, Clock, ShieldCheck, Database, Zap, Network, ListFilter, Globe, AlertTriangle, Info, ChevronRight, ChevronLeft, Palette, Languages, Plus, Trash2, CheckCircle2, Server, Key, Phone, Activity, X, Users, Search } from 'lucide-react-native';
+import { ShieldAlert, Brain, Clock, ShieldCheck, Database, Zap, Network, ListFilter, Globe, AlertTriangle, Info, ChevronRight, ChevronLeft, Palette, Languages, Plus, Trash2, CheckCircle2, Server, Key, Phone, Activity, X, Users, Search, FlaskConical } from 'lucide-react-native';
 import { useAppTheme, spacing, radii } from '../theme';
 import { FilterManager, AppSettings } from '../modules/FilterManager';
 import { ThreatCloudService } from '../services/ThreatCloudService';
@@ -42,6 +42,7 @@ const TopHeader = ({ title, navigation }: { title: string, navigation: any }) =>
 function WhitelistScreen({ navigation }: any) {
   const theme = useAppTheme();
   const { settings, updateSetting } = useSettings();
+  const isEn = settings.language === 'en';
   const { showToast } = useToast();
   const [whitelistNumber, setWhitelistNumber] = useState('');
 
@@ -136,15 +137,15 @@ function WhitelistScreen({ navigation }: any) {
   return (
     <View style={{flex:1, backgroundColor: theme.background}}>
       <ScrollView style={[styles.container]} contentContainerStyle={{ paddingBottom: 80 }}>
-        <TopHeader title="Beyaz Liste (VIP)" navigation={navigation} />
+        <TopHeader title={isEn ? "Whitelist (VIP)" : "Beyaz Liste (VIP)"} navigation={navigation} />
         <View style={styles.section}>
-          <SectionDesc text="Buraya eklediğiniz numaralar veya kurum adları HİÇBİR güvenlik filtresine takılmaz. Aile üyelerinizi veya bankalarınızı ekleyebilirsiniz." />
+          <SectionDesc text={isEn ? "Numbers or institutions you add here will BYPASS all security filters. You can add your family members or banks." : "Buraya eklediğiniz numaralar veya kurum adları HİÇBİR güvenlik filtresine takılmaz. Aile üyelerinizi veya bankalarınızı ekleyebilirsiniz."} />
 
           <View style={[styles.premiumInputContainer, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <Phone size={20} color={theme.textMuted} style={{ marginLeft: 12 }} />
             <TextInput
               style={[styles.premiumInput, { color: theme.text }]}
-              placeholder="Numara veya İsim (Örn: +90555... veya GARANTI)"
+              placeholder={isEn ? "Number or Name (e.g. +90555... or BANK)" : "Numara veya İsim (Örn: +90555... veya GARANTI)"}
               placeholderTextColor={theme.textMuted}
               value={whitelistNumber}
               onChangeText={setWhitelistNumber}
@@ -163,16 +164,16 @@ function WhitelistScreen({ navigation }: any) {
             onPress={openContactPicker}
           >
             <Users size={20} color={theme.secondary} />
-            <Text style={[styles.contactPickerBtnText, { color: theme.secondary }]}>Rehberden Kişi Seç</Text>
+            <Text style={[styles.contactPickerBtnText, { color: theme.secondary }]}>{isEn ? "Select from Contacts" : "Rehberden Kişi Seç"}</Text>
           </TouchableOpacity>
 
           <View style={{flexDirection: 'column', marginTop: spacing.xl, gap: spacing.sm}}>
-            <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: spacing.xs }]}>Güvenli Numara ve Kurumlar</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text, marginBottom: spacing.xs }]}>{isEn ? "Safe Numbers and Institutions" : "Güvenli Numara ve Kurumlar"}</Text>
 
             {(!settings.whitelist || settings.whitelist.length === 0) ? (
               <View style={[styles.emptyCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
                 <ShieldCheck size={40} color={theme.border} style={{ marginBottom: spacing.md }} />
-                <Text style={{ color: theme.textMuted, fontSize: 14, textAlign: 'center' }}>Beyaz listenizde hiç numara yok.</Text>
+                <Text style={{ color: theme.textMuted, fontSize: 14, textAlign: 'center' }}>{isEn ? "There are no numbers in your whitelist." : "Beyaz listenizde hiç numara yok."}</Text>
               </View>
             ) : (
               (settings.whitelist || []).map((num: string) => (
@@ -201,7 +202,7 @@ function WhitelistScreen({ navigation }: any) {
         <View style={[styles.modalContainer, { backgroundColor: theme.background }]}>
           <View style={[styles.modalHeader, { backgroundColor: theme.surface, borderBottomColor: theme.border }]}>
             <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.lg, paddingVertical: spacing.md}}>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>Kişi Seç</Text>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>{isEn ? "Select Contact" : "Kişi Seç"}</Text>
               <TouchableOpacity onPress={() => setContactModalVisible(false)}>
                 <X size={24} color={theme.text} />
               </TouchableOpacity>
@@ -211,7 +212,7 @@ function WhitelistScreen({ navigation }: any) {
                 <Search size={20} color={theme.textMuted} />
                 <TextInput
                   style={[styles.searchInput, { color: theme.text }]}
-                  placeholder="Kişilerde ara..."
+                  placeholder={isEn ? "Search contacts..." : "Kişilerde ara..."}
                   placeholderTextColor={theme.textMuted}
                   value={searchQuery}
                   onChangeText={handleSearch}
@@ -223,7 +224,7 @@ function WhitelistScreen({ navigation }: any) {
           {isContactsLoading ? (
             <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
               <ActivityIndicator size="large" color={theme.primary} />
-              <Text style={{color: theme.textMuted, marginTop: 10}}>Rehber yükleniyor...</Text>
+              <Text style={{color: theme.textMuted, marginTop: 10}}>{isEn ? "Loading contacts..." : "Rehber yükleniyor..."}</Text>
             </View>
           ) : (
             <FlatList
@@ -247,27 +248,28 @@ function WhitelistScreen({ navigation }: any) {
 function ScheduleScreen({ navigation }: any) {
   const theme = useAppTheme();
   const { settings, toggleSetting, updateSetting } = useSettings();
+  const isEn = settings.language === 'en';
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingBottom: 80 }}>
-      <TopHeader title="Zaman Programı" navigation={navigation} />
+      <TopHeader title={isEn ? "Schedule" : "Zaman Programı"} navigation={navigation} />
       <View style={styles.section}>
         <SettingRow
           icon={Clock}
           iconColor={theme.primary}
-          title="Aktif Et"
+          title={isEn ? "Enable" : "Aktif Et"}
           value={settings.filterScheduleEnabled}
           onToggle={() => toggleSetting('filterScheduleEnabled')}
         />
-        <SectionDesc text="Zaman programı aktifken, SMS koruması SADECE belirlediğiniz saatler arasında çalışır. (Örn: Sadece gece uyurken rahatsız edilmek istemiyorsanız)" />
+        <SectionDesc text={isEn ? "When schedule is active, SMS protection ONLY works between the hours you specify. (e.g., if you only want protection while sleeping)" : "Zaman programı aktifken, SMS koruması SADECE belirlediğiniz saatler arasında çalışır. (Örn: Sadece gece uyurken rahatsız edilmek istemiyorsanız)"} />
 
         {settings.filterScheduleEnabled && (
           <View style={{ marginTop: spacing.xl }}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Koruma Saatleri</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>{isEn ? "Protection Hours" : "Koruma Saatleri"}</Text>
 
             <View style={{ flexDirection: 'row', gap: 12, marginTop: spacing.sm }}>
               <View style={{ flex: 1, backgroundColor: theme.card, borderRadius: radii.lg, padding: spacing.md, borderWidth: 1, borderColor: theme.border, alignItems: 'center' }}>
-                <Text style={{ color: theme.textMuted, fontSize: 13, marginBottom: 8, fontWeight: '600' }}>BAŞLANGIÇ</Text>
+                <Text style={{ color: theme.textMuted, fontSize: 13, marginBottom: 8, fontWeight: '600' }}>{isEn ? "START" : "BAŞLANGIÇ"}</Text>
                 <TextInput
                   style={{ fontSize: 24, fontWeight: '800', color: theme.text, textAlign: 'center', width: '100%' }}
                   value={settings.scheduleStart}
@@ -278,7 +280,7 @@ function ScheduleScreen({ navigation }: any) {
               </View>
 
               <View style={{ flex: 1, backgroundColor: theme.card, borderRadius: radii.lg, padding: spacing.md, borderWidth: 1, borderColor: theme.border, alignItems: 'center' }}>
-                <Text style={{ color: theme.textMuted, fontSize: 13, marginBottom: 8, fontWeight: '600' }}>BİTİŞ</Text>
+                <Text style={{ color: theme.textMuted, fontSize: 13, marginBottom: 8, fontWeight: '600' }}>{isEn ? "END" : "BİTİŞ"}</Text>
                 <TextInput
                   style={{ fontSize: 24, fontWeight: '800', color: theme.text, textAlign: 'center', width: '100%' }}
                   value={settings.scheduleEnd}
@@ -288,7 +290,7 @@ function ScheduleScreen({ navigation }: any) {
                 />
               </View>
             </View>
-            <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: 12, textAlign: 'center' }}>Saatleri 24-saat formatında girin (Örn: 22:00)</Text>
+            <Text style={{ color: theme.textMuted, fontSize: 13, marginTop: 12, textAlign: 'center' }}>{isEn ? "Enter hours in 24-hour format (e.g. 22:00)" : "Saatleri 24-saat formatında girin (Örn: 22:00)"}</Text>
           </View>
         )}
       </View>
@@ -299,6 +301,7 @@ function ScheduleScreen({ navigation }: any) {
 function MappingScreen({ navigation }: any) {
   const theme = useAppTheme();
   const { settings, updateMapping } = useSettings();
+  const isEn = settings.language === 'en';
 
   const MappingBlock = ({ id, title, desc, icon: Icon, color }: any) => (
     <View style={{ marginBottom: spacing.xl }}>
@@ -325,7 +328,7 @@ function MappingScreen({ navigation }: any) {
             >
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 15, fontWeight: isSelected ? '700' : '500', color: isSelected ? theme.primary : theme.text }}>
-                  {cat === 'junk' ? 'İstenmeyen (Junk)' : cat === 'transaction' ? 'İşlemler (Transactions)' : cat === 'promotion' ? 'Tanıtımlar (Promotions)' : 'Gelen Kutusu (İzin Ver)'}
+                  {cat === 'junk' ? (isEn ? 'Junk' : 'İstenmeyen (Junk)') : cat === 'transaction' ? (isEn ? 'Transactions' : 'İşlemler (Transactions)') : cat === 'promotion' ? (isEn ? 'Promotions' : 'Tanıtımlar (Promotions)') : (isEn ? 'Inbox (Allow)' : 'Gelen Kutusu (İzin Ver)')}
                 </Text>
               </View>
               {isSelected && <CheckCircle2 size={20} color={theme.primary} />}
@@ -338,13 +341,13 @@ function MappingScreen({ navigation }: any) {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingBottom: 80 }}>
-      <TopHeader title="Kategori Eşleme" navigation={navigation} />
+      <TopHeader title={isEn ? "Category Mapping" : "Kategori Eşleme"} navigation={navigation} />
       <View style={styles.section}>
-        <SectionDesc text="SMS Filtresi uygulamasının tespit ettiği mesajların, Apple Mesajlar uygulamasındaki hangi klasörlere gönderileceğini belirleyin." />
+        <SectionDesc text={isEn ? "Determine which folders the messages detected by the SMS Filter app will be sent to in the Apple Messages app." : "SMS Filtresi uygulamasının tespit ettiği mesajların, Apple Mesajlar uygulamasındaki hangi klasörlere gönderileceğini belirleyin."} />
         <View style={{height: 24}} />
-        <MappingBlock id="spam" title="Spam ve Dolandırıcılık" desc="Tehlikeli linkler, yasa dışı bahis ve dolandırıcılık mesajları." icon={ShieldAlert} color={theme.danger} />
-        <MappingBlock id="promotion" title="Tanıtım ve Reklam" desc="Markaların indirim, kampanya ve bülten mesajları (Örn: B001)." icon={Zap} color="#F59E0B" />
-        <MappingBlock id="transaction" title="İşlem ve Bilgi" desc="Banka şifreleri, kargo takip kodları ve doğrulama mesajları." icon={Database} color="#3B82F6" />
+        <MappingBlock id="spam" title={isEn ? "Spam & Fraud" : "Spam ve Dolandırıcılık"} desc={isEn ? "Dangerous links, illegal betting and fraud messages." : "Tehlikeli linkler, yasa dışı bahis ve dolandırıcılık mesajları."} icon={ShieldAlert} color={theme.danger} />
+        <MappingBlock id="promotion" title={isEn ? "Promotion & Ads" : "Tanıtım ve Reklam"} desc={isEn ? "Discount, campaign and newsletter messages of brands (e.g. B001)." : "Markaların indirim, kampanya ve bülten mesajları (Örn: B001)."} icon={Zap} color="#F59E0B" />
+        <MappingBlock id="transaction" title={isEn ? "Transaction & Info" : "İşlem ve Bilgi"} desc={isEn ? "Bank passwords, cargo tracking codes and verification messages." : "Banka şifreleri, kargo takip kodları ve doğrulama mesajları."} icon={Database} color="#3B82F6" />
       </View>
     </ScrollView>
   );
@@ -353,6 +356,7 @@ function MappingScreen({ navigation }: any) {
 function FraudScreen({ navigation }: any) {
   const theme = useAppTheme();
   const { settings, toggleSetting, updateSetting } = useSettings();
+  const isEn = settings.language === 'en';
   const { showToast } = useToast();
   const [keyword, setKeyword] = useState('');
 
@@ -374,20 +378,20 @@ function FraudScreen({ navigation }: any) {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingBottom: 80 }}>
-      <TopHeader title="Dolandırıcılık Filtresi" navigation={navigation} />
+      <TopHeader title={isEn ? "Fraud Filter" : "Dolandırıcılık Filtresi"} navigation={navigation} />
       <View style={styles.section}>
-        <SettingRow icon={ShieldAlert} iconColor={theme.primary} title="Aktif Et" value={settings.fraudFilter} onToggle={() => toggleSetting('fraudFilter')} />
-        <SectionDesc text="Bu özellik Spam ve Tehdit Veritabanı'nın bir parçasıdır." />
+        <SettingRow icon={ShieldAlert} iconColor={theme.primary} title={isEn ? "Enable" : "Aktif Et"} value={settings.fraudFilter} onToggle={() => toggleSetting('fraudFilter')} />
+        <SectionDesc text={isEn ? "This feature is part of the Spam and Threat Database." : "Bu özellik Spam ve Tehdit Veritabanı'nın bir parçasıdır."} />
 
         <View style={{height: spacing.xl}}/>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Hassas Kelime Avcısı</Text>
-        <SectionDesc text="Aşağıdaki kelimelerden herhangi birini içeren mesajlar tehlikeli kabul edilir ve anında filtrelenir." />
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>{isEn ? "Sensitive Keyword Hunter" : "Hassas Kelime Avcısı"}</Text>
+        <SectionDesc text={isEn ? "Messages containing any of the following words are considered dangerous and are instantly filtered." : "Aşağıdaki kelimelerden herhangi birini içeren mesajlar tehlikeli kabul edilir ve anında filtrelenir."} />
 
         <View style={[styles.premiumInputContainer, { backgroundColor: theme.card, borderColor: theme.border, marginTop: spacing.md }]}>
           <Key size={20} color={theme.textMuted} style={{ marginLeft: 12 }} />
           <TextInput
             style={[styles.premiumInput, { color: theme.text }]}
-            placeholder="Yeni kelime (Örn: Şifre, Banka)"
+            placeholder={isEn ? "New keyword (e.g., Password, Bank)" : "Yeni kelime (Örn: Şifre, Banka)"}
             placeholderTextColor={theme.textMuted}
             value={keyword}
             onChangeText={setKeyword}
@@ -403,7 +407,7 @@ function FraudScreen({ navigation }: any) {
 
         <View style={{flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.xl, gap: spacing.sm}}>
           {(settings.customFraudKeywords || []).length === 0 ? (
-             <Text style={{ color: theme.textMuted, fontSize: 14 }}>Özel dolandırıcılık kelimesi eklenmemiş.</Text>
+             <Text style={{ color: theme.textMuted, fontSize: 14 }}>{isEn ? "No custom fraud keywords added." : "Özel dolandırıcılık kelimesi eklenmemiş."}</Text>
           ) : (
             <View style={{ flexDirection: 'column', width: '100%', gap: spacing.sm }}>
               {(settings.customFraudKeywords || []).map((kw: string) => (
@@ -428,9 +432,10 @@ function FraudScreen({ navigation }: any) {
 function DatabaseScreen({ navigation }: any) {
   const theme = useAppTheme();
   const { settings, toggleSetting } = useSettings();
+  const isEn = settings.language === 'en';
   const { showToast } = useToast();
   const [isSyncing, setIsSyncing] = useState(false);
-  const [lastSync, setLastSync] = useState('Yükleniyor...');
+  const [lastSync, setLastSync] = useState(isEn ? 'Loading...' : 'Yükleniyor...');
 
   useEffect(() => {
     ThreatCloudService.getLastSyncDate().then(setLastSync);
@@ -453,10 +458,10 @@ function DatabaseScreen({ navigation }: any) {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingBottom: 80 }}>
-      <TopHeader title="Veritabanı Filtresi" navigation={navigation} />
+      <TopHeader title={isEn ? "Database Filter" : "Veritabanı Filtresi"} navigation={navigation} />
       <View style={styles.section}>
-        <SettingRow icon={Database} iconColor={theme.primary} title="Aktif Et" value={settings.databaseFilter} onToggle={() => toggleSetting('databaseFilter')} />
-        <SectionDesc text="Bulut tabanlı tehdit veritabanı korumasını aktif eder. Sistem arka planda en güncel tehditleri otomatik olarak indirir." />
+        <SettingRow icon={Database} iconColor={theme.primary} title={isEn ? "Enable" : "Aktif Et"} value={settings.databaseFilter} onToggle={() => toggleSetting('databaseFilter')} />
+        <SectionDesc text={isEn ? "Activates cloud-based threat database protection. The system automatically downloads the most up-to-date threats in the background." : "Bulut tabanlı tehdit veritabanı korumasını aktif eder. Sistem arka planda en güncel tehditleri otomatik olarak indirir."} />
         <View style={{height: spacing.xl}}/>
         <View style={[styles.dbCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <View style={styles.dbHeader}>
@@ -464,9 +469,9 @@ function DatabaseScreen({ navigation }: any) {
               <Server color={theme.primary} size={28} />
             </View>
             <View style={styles.dbInfo}>
-              <Text style={[styles.dbTitle, { color: theme.text }]}>Bulut Eşitlemesi</Text>
+              <Text style={[styles.dbTitle, { color: theme.text }]}>{isEn ? "Cloud Sync" : "Bulut Eşitlemesi"}</Text>
               <Text style={[styles.dbSubtitle, { color: theme.textMuted }]}>
-                Son Güncelleme: {lastSync}
+                {isEn ? "Last Sync:" : "Son Güncelleme:"} {lastSync}
               </Text>
             </View>
           </View>
@@ -482,13 +487,13 @@ function DatabaseScreen({ navigation }: any) {
               <Globe color="#fff" size={20} />
             )}
             <Text style={[styles.dbSyncBtnText, { color: isSyncing ? theme.textMuted : '#fff' }]}>
-              {isSyncing ? 'Eşitleniyor...' : 'Şimdi Eşitle'}
+              {isSyncing ? (isEn ? "Syncing..." : "Eşitleniyor...") : (isEn ? "Sync Now" : "Şimdi Eşitle")}
             </Text>
           </TouchableOpacity>
         </View>
         <View style={{height: spacing.xl}}/>
-        <SettingRow icon={Activity} iconColor={theme.primary} title="Otomatik Arka Plan Güncellemesi" value={settings.autoSyncEnabled !== false} onToggle={() => toggleSetting('autoSyncEnabled')} />
-        <SectionDesc text="Uygulama kapalıyken bile günde 2 kez buluttan en yeni tehdit verilerini arka planda cihazınıza indirir. İnternet ve şarj tüketimi yok denecek kadar azdır." />
+        <SettingRow icon={Activity} iconColor={theme.primary} title={isEn ? "Auto Background Sync" : "Otomatik Arka Plan Güncellemesi"} value={settings.autoSyncEnabled !== false} onToggle={() => toggleSetting('autoSyncEnabled')} />
+        <SectionDesc text={isEn ? "Downloads the newest threat data from the cloud in the background twice a day even when the app is closed. Internet and battery consumption are almost negligible." : "Uygulama kapalıyken bile günde 2 kez buluttan en yeni tehdit verilerini arka planda cihazınıza indirir. İnternet ve şarj tüketimi yok denecek kadar azdır."} />
       </View>
     </ScrollView>
   );
@@ -497,22 +502,23 @@ function DatabaseScreen({ navigation }: any) {
 function ProactiveScreen({ navigation }: any) {
   const theme = useAppTheme();
   const { settings, toggleSetting, updateSetting } = useSettings();
+  const isEn = settings.language === 'en';
 
   const aiLevels = [
-    { val: 0.9, label: 'Düşük', desc: 'Sadece kesinlikle emin olduğunda engeller.', color: '#10B981' },
-    { val: 0.8, label: 'Orta', desc: 'Dengeli koruma sağlar (Önerilen).', color: theme.primary },
-    { val: 0.6, label: 'Yüksek', desc: 'Şüpheli bulduğu her mesajı engeller.', color: theme.danger }
+    { val: 0.9, label: isEn ? "Low" : "Düşük", desc: isEn ? "Blocks only when absolutely sure." : "Sadece kesinlikle emin olduğunda engeller.", color: '#10B981' },
+    { val: 0.8, label: isEn ? "Medium" : "Orta", desc: isEn ? "Provides balanced protection (Recommended)." : "Dengeli koruma sağlar (Önerilen).", color: theme.primary },
+    { val: 0.6, label: isEn ? "High" : "Yüksek", desc: isEn ? "Blocks every message it finds suspicious." : "Şüpheli bulduğu her mesajı engeller.", color: theme.danger }
   ];
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingBottom: 80 }}>
-      <TopHeader title="Proaktif Filtre" navigation={navigation} />
+      <TopHeader title={isEn ? "Proactive Filter" : "Proaktif Filtre"} navigation={navigation} />
       <View style={styles.section}>
-        <SettingRow icon={Activity} iconColor={theme.primary} title="Akıllı Filtre Aktif" value={settings.proactiveFilter} onToggle={() => toggleSetting('proactiveFilter')} trackTrue={theme.primary} />
-        <SectionDesc text="Makine öğrenmesi tabanlı Olasılık Algoritması ile henüz bilinmeyen, yeni nesil spam mesajları analiz eder ve anında filtrelenir." />
+        <SettingRow icon={Activity} iconColor={theme.primary} title={isEn ? "Smart Filter Active" : "Akıllı Filtre Aktif"} value={settings.proactiveFilter} onToggle={() => toggleSetting('proactiveFilter')} trackTrue={theme.primary} />
+        <SectionDesc text={isEn ? "Analyzes and instantly filters unknown, next-generation spam messages with a machine learning-based Probability Algorithm." : "Makine öğrenmesi tabanlı Olasılık Algoritması ile henüz bilinmeyen, yeni nesil spam mesajları analiz eder ve anında filtrelenir."} />
         <View style={{height: spacing.xl}}/>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Filtre Hassasiyeti</Text>
-        <SectionDesc text="Filtrenin şüpheli mesajları engellerken ne kadar katı davranacağını seçin." />
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>{isEn ? "Filter Sensitivity" : "Filtre Hassasiyeti"}</Text>
+        <SectionDesc text={isEn ? "Choose how strict the filter will be when blocking suspicious messages." : "Filtrenin şüpheli mesajları engellerken ne kadar katı davranacağını seçin."} />
         <View style={{marginTop: spacing.md, gap: spacing.sm}}>
           {aiLevels.map(lvl => {
             const isSelected = settings.aiSensitivity === lvl.val;
@@ -542,16 +548,17 @@ function ProactiveScreen({ navigation }: any) {
 function InvalidNumberScreen({ navigation }: any) {
   const theme = useAppTheme();
   const { settings, toggleSetting } = useSettings();
+  const isEn = settings.language === 'en';
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: theme.background }]} contentContainerStyle={{ paddingBottom: 80 }}>
-      <TopHeader title="Geçersiz Numara Filtresi" navigation={navigation} />
+      <TopHeader title={isEn ? "Invalid Number Filter" : "Geçersiz Numara Filtresi"} navigation={navigation} />
       <View style={styles.section}>
-        <SettingRow icon={Info} iconColor={theme.primary} title="Aktif Et" value={settings.invalidNumberFilter} onToggle={() => toggleSetting('invalidNumberFilter')} />
-        <SectionDesc text="Gönderici numarasının doğruluğu ve formatı kontrol edilir." />
+        <SettingRow icon={Info} iconColor={theme.primary} title={isEn ? "Enable" : "Aktif Et"} value={settings.invalidNumberFilter} onToggle={() => toggleSetting('invalidNumberFilter')} />
+        <SectionDesc text={isEn ? "Sender number's accuracy and format are checked." : "Gönderici numarasının doğruluğu ve formatı kontrol edilir."} />
         <View style={{height: spacing.xl}}/>
-        <SettingRow icon={AlertTriangle} iconColor={theme.danger} title="Yurtdışı Numaralarını Engelle" value={settings.blockForeignNumbers} onToggle={() => toggleSetting('blockForeignNumbers')} danger />
-        <SectionDesc text="Etkinleştirildiğinde, +90 (Türkiye) dışındaki tüm ülke kodlarından gelen sms'ler otomatik filtrelenir." />
+        <SettingRow icon={AlertTriangle} iconColor={theme.danger} title={isEn ? "Block Foreign Numbers" : "Yurtdışı Numaralarını Engelle"} value={settings.blockForeignNumbers} onToggle={() => toggleSetting('blockForeignNumbers')} danger />
+        <SectionDesc text={isEn ? "When enabled, SMS from all country codes other than +90 (Turkey) are automatically filtered." : "Etkinleştirildiğinde, +90 (Türkiye) dışındaki tüm ülke kodlarından gelen sms'ler otomatik filtrelenir."} />
       </View>
     </ScrollView>
   );
@@ -560,6 +567,7 @@ function InvalidNumberScreen({ navigation }: any) {
 function SettingsMainScreen({ navigation }: any) {
   const theme = useAppTheme();
   const { settings, toggleSetting, updateSetting } = useSettings();
+  const isEn = settings.language === 'en';
   const insets = useSafeAreaInsets();
   const t = getT(settings.language || 'tr');
   const scrollRef = React.useRef<ScrollView>(null);
@@ -630,27 +638,27 @@ function SettingsMainScreen({ navigation }: any) {
         <SettingRow
           icon={Key}
           iconColor={theme.primary}
-          title="Biyometrik Kilit (Uygulama İçi)"
+          title={isEn ? "Biometric Lock (In-App)" : "Biyometrik Kilit (Uygulama İçi)"}
           value={settings.biometricLock}
           onToggle={() => toggleSetting('biometricLock')}
         />
-        <SectionDesc text="Ayarlar ve kurallar menüsüne girişte FaceID / Parmak İzi onayı ister." />
+        <SectionDesc text={isEn ? "Requires FaceID / Fingerprint approval to enter the settings and rules menu." : "Ayarlar ve kurallar menüsüne girişte FaceID / Parmak İzi onayı ister."} />
       </View>
 
       {Platform.OS === 'android' && (
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>
-            Android SMS Koruması
+            {isEn ? "Android SMS Protection" : "Android SMS Koruması"}
           </Text>
           <SettingRow
             icon={ShieldCheck}
             iconColor={smsPermissionGranted ? '#10B981' : theme.danger}
-            title="Gelen SMS İzni"
+            title={isEn ? "Incoming SMS Permission" : "Gelen SMS İzni"}
             value={smsPermissionGranted}
             isNav
             onPress={handleSmsPermission}
           />
-          <SectionDesc text="Yeni gelen mesajları cihaz üzerinde spam belirtileri için kontrol edebilmek amacıyla gereklidir." />
+          <SectionDesc text={isEn ? "Required to check incoming messages for spam symptoms on the device." : "Yeni gelen mesajları cihaz üzerinde spam belirtileri için kontrol edebilmek amacıyla gereklidir."} />
         </View>
       )}
 
@@ -665,7 +673,7 @@ function SettingsMainScreen({ navigation }: any) {
         <View style={[styles.settingGroupCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <SettingRow icon={ShieldCheck} iconColor="#10B981" title={t.whitelist} isNav isGrouped onPress={() => navigation.navigate('Whitelist')} />
           <View style={[styles.separator, { backgroundColor: theme.border }]} />
-          <SettingRow icon={ListFilter} iconColor={theme.primary} title="Uygulama Kuralları" isNav isGrouped onPress={() => navigation.navigate('Rules')} />
+          <SettingRow icon={ListFilter} iconColor={theme.primary} title={isEn ? "App Rules" : "Uygulama Kuralları"} isNav isGrouped onPress={() => navigation.navigate('Rules')} />
         </View>
         <SectionDesc text={t.whitelistDesc} />
       </View>
@@ -684,26 +692,41 @@ function SettingsMainScreen({ navigation }: any) {
         <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>{t.otherFilters}</Text>
         <View style={[styles.settingGroupCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
           <SettingRow icon={Clock} iconColor="#8B5CF6" title={t.schedule} isNav onPress={() => navigation.navigate('Schedule')} isGrouped />
-          <View style={[styles.separator, { backgroundColor: theme.border }]} />
-          <SettingRow icon={ListFilter} iconColor="#EC4899" title={t.mapping} isNav onPress={() => navigation.navigate('Mapping')} isGrouped />
+          {Platform.OS === 'ios' && (
+            <>
+              <View style={[styles.separator, { backgroundColor: theme.border }]} />
+              <SettingRow icon={ListFilter} iconColor="#EC4899" title={t.mapping} isNav onPress={() => navigation.navigate('Mapping')} isGrouped />
+            </>
+          )}
           <View style={[styles.separator, { backgroundColor: theme.border }]} />
           <SettingRow icon={ShieldAlert} iconColor="#EF4444" title={t.fraud} isNav onPress={() => navigation.navigate('Fraud')} isGrouped />
           <View style={[styles.separator, { backgroundColor: theme.border }]} />
           <SettingRow icon={Database} iconColor="#3B82F6" title={t.database} isNav onPress={() => navigation.navigate('Database')} isGrouped />
-          <View style={[styles.separator, { backgroundColor: theme.border }]} />
-          <SettingRow icon={Activity} iconColor="#10B981" title={t.proactive} isNav onPress={() => navigation.navigate('Proactive')} isGrouped />
         </View>
+        <SectionDesc text={isEn ? "Configure when filtering runs and which local threat rules are used." : "Filtrelemenin ne zaman çalışacağını ve hangi yerel tehdit kurallarının kullanılacağını ayarlayın."} />
       </View>
 
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>Hakkında</Text>
+        <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>{isEn ? "About" : "Hakkında"}</Text>
         <SettingRow
           icon={Info}
           iconColor={theme.primary}
-          title="Gizlilik Politikası"
+          title={isEn ? "Privacy Policy" : "Gizlilik Politikası"}
           isNav
           onPress={openPrivacyPolicy}
         />
+      </View>
+
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>{isEn ? "Developer" : "Geliştirici"}</Text>
+        <SettingRow
+          icon={FlaskConical}
+          iconColor="#8B5CF6"
+          title={isEn ? "Test Simulator" : "Test Simülatörü"}
+          isNav
+          onPress={() => navigation.navigate('Simulator')}
+        />
+        <SectionDesc text={isEn ? "Test how the app behaves without receiving a real SMS." : "Gerçek bir SMS almadan uygulamanın nasıl davrandığını test edin."} />
       </View>
 
       {Platform.OS === 'android' && (
@@ -714,8 +737,8 @@ function SettingsMainScreen({ navigation }: any) {
             onToggle={() => {
               if (!settings.underAttackMode) {
                 Alert.alert(t.underAttack, t.underAttackDesc, [
-                  { text: 'İptal', style: 'cancel' },
-                  { text: 'Aktifleştir', style: 'destructive', onPress: () => toggleSetting('underAttackMode') }
+                  { text: isEn ? 'Cancel' : 'İptal', style: 'cancel' },
+                  { text: isEn ? 'Activate' : 'Aktifleştir', style: 'destructive', onPress: () => toggleSetting('underAttackMode') }
                 ]);
               } else {
                 toggleSetting('underAttackMode');
@@ -847,6 +870,7 @@ export default function SettingsScreen() {
     const newSettings = { ...settings, [key]: !val };
     setSettings(newSettings as any);
     await FilterManager.saveSettings(newSettings as any);
+    DeviceEventEmitter.emit('onSettingsChanged', newSettings);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     if (key === 'autoSyncEnabled') {
@@ -863,6 +887,7 @@ export default function SettingsScreen() {
     const newSettings = { ...settings, [key]: value };
     setSettings(newSettings as any);
     await FilterManager.saveSettings(newSettings as any);
+    DeviceEventEmitter.emit('onSettingsChanged', newSettings);
     if (key === 'theme') {
       DeviceEventEmitter.emit('onThemeChanged', value);
     }
@@ -873,6 +898,7 @@ export default function SettingsScreen() {
     const newSettings = { ...settings, categoryMapping: { ...settings.categoryMapping, [key]: value } };
     setSettings(newSettings as any);
     await FilterManager.saveSettings(newSettings as any);
+    DeviceEventEmitter.emit('onSettingsChanged', newSettings);
     Haptics.selectionAsync();
   };
 

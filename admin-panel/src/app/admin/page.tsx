@@ -188,7 +188,7 @@ export default function AdminDashboard() {
           </div>
           <div>
             <h1 className="text-2xl font-bold tracking-tight">V5 Analitik Paneli</h1>
-            <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Sistem Durumu: MongoDB Atlas & Akıllı Analiz Aktif</p>
+            <p className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Sistem Durumu: MongoDB Atlas & Topluluk Kuralları Aktif</p>
           </div>
         </div>
         <button onClick={() => setIsDark(!isDark)} className={`p-2 rounded-lg ${isDark ? 'bg-gray-800 text-yellow-400' : 'bg-gray-100 text-slate-700'}`}>

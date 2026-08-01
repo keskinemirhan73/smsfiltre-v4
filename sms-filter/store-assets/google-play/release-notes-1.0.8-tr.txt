@@ -1,0 +1,4 @@
+• Akıllı Analiz artık tamamen cihaz üzerinde çalışır.
+• Bildirim izni yalnızca ilgili özelliği kullandığınızda istenir.
+• Güvenli depolama uyumluluğu ve tehdit veritabanı doğrulaması iyileştirildi.
+• Yanıltıcı profil ve senkronizasyon durumları düzeltildi.

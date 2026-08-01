@@ -86,7 +86,7 @@ export default function LandingPage() {
               </div>
               <h3 className="text-2xl font-bold mb-4 text-white">Topluluk Destekli</h3>
               <p className="text-[#a9bfd3] leading-relaxed">
-                Kullanıcılarımızın spam olarak işaretlediği trend kelimeler anında sistemimize düşer, herkes korunur.
+                Kullanıcıların gönüllü olarak bildirdiği spam işaretleri incelenip onaylandıktan sonra topluluk kurallarına eklenir.
               </p>
             </div>
 
@@ -97,9 +97,9 @@ export default function LandingPage() {
               </div>
               <h3 className="text-2xl font-bold mb-4 text-white">Cihaz İçi Ana Filtreleme</h3>
               <p className="text-[#a9bfd3] leading-relaxed">
-                Otomatik SMS filtreleme kuralları cihazınızda çalışır. Mesaj
-                metni yalnızca isteğe bağlı Akıllı Analiz veya spam bildirimi
-                başlattığınızda sunucuya gönderilir.
+                Otomatik SMS filtreleme ve Akıllı Analiz cihazınızda çalışır.
+                Yalnızca Spam Bildir işlemini özellikle başlattığınızda
+                maskelenmiş rapor içeriği sunucuya gönderilir.
               </p>
             </div>
 

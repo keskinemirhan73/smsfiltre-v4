@@ -18,7 +18,7 @@
         "Uygulama işlevselliği",
         "Dolandırıcılığı önleme, güvenlik ve uyumluluk"
       ],
-      "details": "Yalnızca kullanıcı Akıllı Analiz veya Spam Bildir işlemini başlattığında seçilen metin gönderilir; otomatik SMS algılama cihaz üzerinde kalır."
+      "details": "Yalnızca kullanıcı Spam Bildir işlemini başlattığında maskelenmiş rapor metni gönderilir; otomatik SMS algılama ve Akıllı Analiz cihaz üzerinde kalır."
     },
     {
       "category": "Kullanıcı tarafından oluşturulan içerik",
@@ -59,7 +59,7 @@
   ],
   "notCollected": [
     "Rehber: yalnızca beyaz liste seçimi için cihaz üzerinde işlenir.",
-    "Otomatik gelen SMS analizi: mesaj metni cihazdan otomatik çıkmaz.",
+    "Otomatik gelen SMS analizi ve Akıllı Analiz: mesaj metni cihazdan çıkmaz.",
     "Konum, ödeme, sağlık, reklam kimliği ve reklam verileri."
   ],
   "needsFinalLegalVerification": true

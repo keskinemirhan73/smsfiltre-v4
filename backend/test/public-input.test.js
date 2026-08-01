@@ -24,6 +24,11 @@ test('production backend has no paid Gemini runtime dependency', () => {
   );
 });
 
+test('legacy analysis endpoint does not persist submitted message text', () => {
+  assert.doesNotMatch(backendSource, /AIAnalysisCache/);
+  assert.doesNotMatch(backendSource, /messageText:\s*cleanText/);
+});
+
 test('analysis input is trimmed and limited to a reasonable message size', () => {
   assert.deepEqual(validateAnalyzeInput({ text: '  Şüpheli bağlantı  ' }), {
     ok: true,

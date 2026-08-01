@@ -5,10 +5,15 @@ import { useAppTheme, spacing, radii } from '../theme';
 import { FilterManager } from '../modules/FilterManager';
 import { useToast } from '../components/Toast';
 import * as Haptics from 'expo-haptics';
+import { useSettings } from '../context/SettingsContext';
+import { getT } from '../i18n';
+import { CommunityRule, parseCommunityRules } from '../services/communityRulesPolicy';
 
 export default function CommunityRulesScreen() {
   const theme = useAppTheme();
-  const [rules, setRules] = useState<any[]>([]);
+  const { settings } = useSettings();
+  const t = getT(settings.language);
+  const [rules, setRules] = useState<CommunityRule[]>([]);
   const [localRules, setLocalRules] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { showToast } = useToast();
@@ -28,10 +33,10 @@ export default function CommunityRulesScreen() {
   const fetchRules = async () => {
     try {
       const res = await fetch(API_URL);
-      const data = await res.json();
-      setRules(data || []);
+      if (!res.ok) throw new Error(`Community rules HTTP ${res.status}`);
+      setRules(parseCommunityRules(await res.json()));
     } catch (e) {
-      showToast('Kurallar alınamadı.', { type: 'error' });
+      showToast(t.rulesFetchError, { type: 'error' });
     }
     setIsLoading(false);
   };
@@ -42,32 +47,26 @@ export default function CommunityRulesScreen() {
     const current = settings.customFraudKeywords || [];
     
     if (!current.includes(keyword)) {
-      current.push(keyword);
-      await FilterManager.saveSettings({ ...settings, customFraudKeywords: current });
-      setLocalRules(current);
-      showToast(`"${keyword}" koruma listesine eklendi!`, { type: 'success' });
+      const updatedRules = [...current, keyword];
+      await FilterManager.saveSettings({ ...settings, customFraudKeywords: updatedRules });
+      setLocalRules(updatedRules);
+      showToast(t.ruleAddedToLocal.replace('{keyword}', keyword), { type: 'success' });
     }
   };
 
   const addAllRules = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const settings = await FilterManager.loadSettings();
-    let current = [...(settings.customFraudKeywords || [])];
-    let added = 0;
-    
-    rules.forEach(r => {
-      if (!current.includes(r.keyword)) {
-        current.push(r.keyword);
-        added++;
-      }
-    });
+    const existingRules = settings.customFraudKeywords || [];
+    const current = [...new Set([...existingRules, ...rules.map(rule => rule.keyword)])];
+    const added = current.length - existingRules.length;
     
     if (added > 0) {
       await FilterManager.saveSettings({ ...settings, customFraudKeywords: current });
       setLocalRules(current);
-      showToast(`${added} yeni kural cihazınıza indirildi!`, { type: 'success' });
+      showToast(t.rulesDownloaded.replace('{added}', added.toString()), { type: 'success' });
     } else {
-      showToast(`Tüm kurallar zaten cihazınızda güncel.`, { type: 'info' });
+      showToast(t.rulesAlreadyUpdated, { type: 'info' });
     }
   };
 
@@ -79,9 +78,9 @@ export default function CommunityRulesScreen() {
           <View style={[styles.iconWrapper, { backgroundColor: 'rgba(59,130,246,0.1)' }]}>
             <CloudDownload size={32} color={theme.primary} />
           </View>
-          <Text style={[styles.heroTitle, { color: theme.text }]}>Topluluk Kuralları</Text>
+          <Text style={[styles.heroTitle, { color: theme.text }]}>{t.communityRules}</Text>
           <Text style={[styles.heroDesc, { color: theme.textMuted }]}>
-            Diğer kullanıcıların bildirdiği ve moderatörler tarafından onaylanan spam kelimelerini tek tıkla cihazınıza indirebilirsiniz. İnternetiniz olmasa bile koruma sağlar.
+            {t.communityRulesDesc}
           </Text>
           
           <TouchableOpacity 
@@ -89,16 +88,16 @@ export default function CommunityRulesScreen() {
             onPress={addAllRules}
           >
             <Download size={20} color="#fff" style={{ marginRight: 8 }} />
-            <Text style={styles.downloadAllTxt}>Tümünü İndir</Text>
+            <Text style={styles.downloadAllTxt}>{t.downloadAll}</Text>
           </TouchableOpacity>
         </View>
 
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>Onaylı Kurallar ({rules.length})</Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t.approvedRules} ({rules.length})</Text>
 
         {isLoading ? (
           <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 40 }} />
         ) : rules.length === 0 ? (
-          <Text style={{ color: theme.textMuted, textAlign: 'center', marginTop: 20 }}>Henüz onaylanmış kural yok.</Text>
+          <Text style={{ color: theme.textMuted, textAlign: 'center', marginTop: 20 }}>{t.noApprovedRules}</Text>
         ) : (
           <View style={styles.ruleList}>
             {rules.map((rule, idx) => {
@@ -108,21 +107,21 @@ export default function CommunityRulesScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.ruleKeyword, { color: theme.text }]}>{rule.keyword}</Text>
                     <Text style={[styles.ruleType, { color: theme.textMuted }]}>
-                      {rule.type === 'number' ? 'Numara Engeli' : 'Kelime Engeli'}
+                      {rule.type === 'number' ? t.numberBlock : t.wordBlock}
                     </Text>
                   </View>
                   
                   {isAdded ? (
                     <View style={[styles.addedBadge, { backgroundColor: 'rgba(16,185,129,0.1)' }]}>
                       <CheckCircle size={16} color={theme.secondary} />
-                      <Text style={[styles.addedTxt, { color: theme.secondary }]}>Eklendi</Text>
+                      <Text style={[styles.addedTxt, { color: theme.secondary }]}>{t.added}</Text>
                     </View>
                   ) : (
                     <TouchableOpacity 
                       style={[styles.addBtn, { backgroundColor: theme.primary }]}
                       onPress={() => addRuleToLocal(rule.keyword)}
                     >
-                      <Text style={styles.addBtnTxt}>Ekle</Text>
+                      <Text style={styles.addBtnTxt}>{t.add}</Text>
                     </TouchableOpacity>
                   )}
                 </View>

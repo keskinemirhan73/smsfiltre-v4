@@ -1,6 +1,7 @@
 import * as BackgroundFetch from 'expo-background-fetch';
 import * as TaskManager from 'expo-task-manager';
 import { ThreatCloudService } from './ThreatCloudService';
+import { backgroundSyncOutcome } from './backgroundSyncPolicy';
 
 const BACKGROUND_FETCH_TASK = 'background-threat-sync';
 
@@ -8,10 +9,10 @@ const BACKGROUND_FETCH_TASK = 'background-threat-sync';
 TaskManager.defineTask(BACKGROUND_FETCH_TASK, async () => {
   try {
     console.log('[BackgroundFetch] Bulut veritabanı senkronizasyonu başlatılıyor...');
-    await ThreatCloudService.syncDatabase();
-    console.log('[BackgroundFetch] Senkronizasyon başarılı!');
-    
-    // Return successful result
+    const syncOutcome = backgroundSyncOutcome(await ThreatCloudService.syncDatabase());
+    if (syncOutcome === 'failed') {
+      return BackgroundFetch.BackgroundFetchResult.Failed;
+    }
     return BackgroundFetch.BackgroundFetchResult.NewData;
   } catch (error) {
     console.error('[BackgroundFetch] Senkronizasyon hatası:', error);

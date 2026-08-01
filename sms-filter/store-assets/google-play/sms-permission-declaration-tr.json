@@ -1,7 +1,7 @@
 {
   "declaredPermission": "android.permission.RECEIVE_SMS",
   "coreUseCase": "Caller ID, spam detection, and/or spam blocking",
-  "coreFunctionality": "FiltreAI'nin temel işlevi, yeni gelen SMS'leri spam ve dolandırıcılık belirtileri açısından cihaz üzerinde analiz etmektir. Uygulama yalnızca RECEIVE_SMS iznini kullanır; eski mesajları okumaz. Gelen SMS içerikleri otomatik olarak sunucuya gönderilmez. Şüpheli bir mesaj algılandığında kullanıcıya güvenlik bildirimi gösterilir. Akıllı Analiz ve Spam Bildir özellikleri yalnızca kullanıcı tarafından özellikle başlatıldığında ilgili metni sunucuya gönderir.",
+  "coreFunctionality": "FiltreAI'nin temel işlevi, yeni gelen SMS'leri spam ve dolandırıcılık belirtileri açısından cihaz üzerinde analiz etmektir. Uygulama yalnızca RECEIVE_SMS iznini kullanır; eski mesajları okumaz. Gelen SMS içerikleri otomatik olarak sunucuya gönderilmez. Şüpheli bir mesaj algılandığında kullanıcıya güvenlik bildirimi gösterilir. Akıllı Analiz cihaz üzerinde çalışır. Spam Bildir özelliği yalnızca kullanıcı tarafından özellikle başlatıldığında maskelenmiş rapor metnini sunucuya gönderir.",
   "reviewAccess": "Hesap veya giriş gerekmez. Temiz kurulumda uygulama açıldığında açıklama gösterilir. İzin reddedilirse Ayarlar > Android SMS Koruması > Gelen SMS İzni satırından akış yeniden başlatılabilir. Gerçek işlevi test etmek için izin verildikten sonra test cihazına bir SMS gönderin.",
   "videoRequired": true
 }

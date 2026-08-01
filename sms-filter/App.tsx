@@ -1,24 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Shield, List, Settings, FlaskConical, Sparkles, Trophy } from 'lucide-react-native';
+import { Shield, Settings, Sparkles, Trophy } from 'lucide-react-native';
 import { useColorScheme, DeviceEventEmitter } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import * as SplashScreen from 'expo-splash-screen';
+
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 import DashboardScreen from './src/screens/DashboardScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import TestSimulatorScreen from './src/screens/TestSimulatorScreen';
 import AIAnalysisScreen from './src/screens/AIAnalysisScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import OnboardingScreen from './src/screens/OnboardingScreen';
 import { darkColors, lightColors, ThemeContext } from './src/theme';
 import { FilterManager } from './src/modules/FilterManager';
 import { ToastProvider } from './src/components/Toast';
-import { registerForPushNotificationsAsync } from './src/services/PushNotificationService';
-import { ThreatCloudService } from './src/services/ThreatCloudService';
-import { registerBackgroundSync, unregisterBackgroundSync } from './src/services/BackgroundSyncService';
-import { ensureSmsDetectionPermission } from './src/services/SmsPermissionService';
+import { registerBackgroundSync } from './src/services/BackgroundSyncService';
+import { SettingsProvider } from './src/context/SettingsContext';
+import { getInitialRoute, InitialRoute } from './src/app/startupPolicy';
+import { hasCompletedOnboarding } from './src/app/onboardingStorage';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -30,26 +35,79 @@ Notifications.setNotificationHandler({
 });
 
 const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
+
+function MainTabs() {
+  const themeColors = useContext(ThemeContext);
+  return (
+    <Tab.Navigator
+      sceneContainerStyle={{ backgroundColor: themeColors.background }}
+      screenOptions={{
+        headerStyle: {
+          backgroundColor: themeColors.surface,
+          shadowColor: 'transparent',
+          elevation: 0,
+        },
+        headerTintColor: themeColors.text,
+        tabBarStyle: {
+          backgroundColor: themeColors.surface,
+          borderTopColor: themeColors.border,
+        },
+        tabBarActiveTintColor: themeColors.primary,
+        tabBarInactiveTintColor: themeColors.textMuted,
+      }}
+    >
+      <Tab.Screen
+        name="Dashboard"
+        component={DashboardScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => <Shield color={color} size={size} />,
+        }}
+      />
+      <Tab.Screen
+        name="Akıllı Analiz"
+        component={AIAnalysisScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => <Sparkles color={color} size={size} />,
+        }}
+      />
+      <Tab.Screen
+        name="Katkılarım"
+        component={ProfileScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => <Trophy color={color} size={size} />,
+        }}
+      />
+      <Tab.Screen
+        name="Ayarlar"
+        component={SettingsScreen}
+        options={{
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => <Settings color={color} size={size} />,
+        }}
+      />
+    </Tab.Navigator>
+  );
+}
 
 export default function App() {
   const systemScheme = useColorScheme();
   const [appTheme, setAppTheme] = useState('system');
+  const [initialRoute, setInitialRoute] = useState<InitialRoute | null>(null);
 
   useEffect(() => {
     FilterManager.loadSettings().then(s => setAppTheme(s.theme || 'system'));
 
-    const initializePermissions = async () => {
-      await ensureSmsDetectionPermission();
-
-      // Register for push notifications and send token to backend
-      const token = await registerForPushNotificationsAsync();
-      if (token) {
-        await ThreatCloudService.registerPushToken(token);
-      }
+    const initializeApp = async () => {
+      const onboardingComplete = await hasCompletedOnboarding();
+      setInitialRoute(getInitialRoute(onboardingComplete));
     };
-    initializePermissions().catch(error => {
-      console.warn('İzinler hazırlanamadı:', error);
-    });
+
+    initializeApp()
+      .catch(error => {
+        console.warn('Başlangıç durumu okunamadı:', error);
+        setInitialRoute('Onboarding');
+      });
 
     // Check if background sync is enabled in settings
     FilterManager.loadSettings().then(settings => {
@@ -64,81 +122,42 @@ export default function App() {
     return () => sub.remove();
   }, []);
 
+  if (!initialRoute) {
+    return null;
+  }
+
   const isDark = appTheme === 'dark' || (appTheme === 'system' && systemScheme === 'dark');
   const themeColors = isDark ? darkColors : lightColors;
 
   return (
     <SafeAreaProvider>
       <ThemeContext.Provider value={themeColors}>
-        <ToastProvider>
-          <StatusBar style={isDark ? 'light' : 'dark'} />
-          <NavigationContainer theme={{
-        dark: isDark,
-        colors: {
-          primary: themeColors.primary,
-          background: themeColors.background,
-          card: themeColors.surface,
-          text: themeColors.text,
-          border: themeColors.border,
-          notification: themeColors.danger,
-        }
-      }}>
-        <Tab.Navigator
-          sceneContainerStyle={{ backgroundColor: themeColors.background }}
-          screenOptions={{
-            headerStyle: {
-              backgroundColor: themeColors.surface,
-              shadowColor: 'transparent',
-              elevation: 0,
-            },
-            headerTintColor: themeColors.text,
-            tabBarStyle: {
-              backgroundColor: themeColors.surface,
-              borderTopColor: themeColors.border,
-            },
-            tabBarActiveTintColor: themeColors.primary,
-            tabBarInactiveTintColor: themeColors.textMuted,
-          }}
-        >
-          <Tab.Screen
-            name="Dashboard"
-            component={DashboardScreen}
-            options={{
-              tabBarIcon: ({ color, size }) => <Shield color={color} size={size} />,
-            }}
-          />
-          <Tab.Screen
-            name="Simülatör"
-            component={TestSimulatorScreen}
-            options={{
-              tabBarIcon: ({ color, size }) => <FlaskConical color={color} size={size} />,
-            }}
-          />
-          <Tab.Screen
-            name="Akıllı Analiz"
-            component={AIAnalysisScreen}
-            options={{
-              tabBarIcon: ({ color, size }) => <Sparkles color={color} size={size} />,
-            }}
-          />
-          <Tab.Screen
-            name="Liderlik"
-            component={ProfileScreen}
-            options={{
-              tabBarIcon: ({ color, size }) => <Trophy color={color} size={size} />,
-            }}
-          />
-          <Tab.Screen
-            name="Ayarlar"
-            component={SettingsScreen}
-            options={{
-              headerShown: false, // Settings stack will handle its own headers
-              tabBarIcon: ({ color, size }) => <Settings color={color} size={size} />,
-            }}
-          />
-        </Tab.Navigator>
-          </NavigationContainer>
-        </ToastProvider>
+        <SettingsProvider>
+          <ToastProvider>
+            <StatusBar style={isDark ? 'light' : 'dark'} />
+            <NavigationContainer
+              onReady={() => {
+                SplashScreen.hideAsync().catch(() => {});
+              }}
+              theme={{
+              dark: isDark,
+              colors: {
+                primary: themeColors.primary,
+                background: themeColors.background,
+                card: themeColors.surface,
+                text: themeColors.text,
+                border: themeColors.border,
+                notification: themeColors.danger,
+              }
+            }}>
+              <Stack.Navigator initialRouteName={initialRoute} screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+                <Stack.Screen name="MainTabs" component={MainTabs} />
+                <Stack.Screen name="Simulator" component={TestSimulatorScreen} />
+              </Stack.Navigator>
+            </NavigationContainer>
+          </ToastProvider>
+        </SettingsProvider>
       </ThemeContext.Provider>
     </SafeAreaProvider>
   );

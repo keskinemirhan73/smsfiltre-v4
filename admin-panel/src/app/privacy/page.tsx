@@ -32,7 +32,7 @@ export default function PrivacyPolicy() {
               FiltreAI olarak kişisel verilerinize ve gizliliğinize büyük önem veriyoruz. Sizi nasıl koruduğumuzu öğrenin.
             </p>
             <p className="mt-2 text-sm text-[#22d3ee] font-bold">
-              Son Güncelleme: 29 Temmuz 2026
+              Son Güncelleme: 1 Ağustos 2026
             </p>
           </div>
         </div>
@@ -53,11 +53,12 @@ export default function PrivacyPolicy() {
           <div className="p-6 rounded-2xl border border-white/10 shadow-lg"
                style={{ background: 'rgba(15, 36, 56, 0.84)' }}>
             <Lock className="w-8 h-8 text-[#7cff5b] mb-4" />
-            <h2 className="text-xl font-bold text-white mb-2">İsteğe Bağlı Bulut Özellikleri</h2>
+            <h2 className="text-xl font-bold text-white mb-2">Cihaz İçi Akıllı Analiz</h2>
             <p className="text-[#a9bfd3] leading-relaxed">
-              Akıllı Analiz veya Spam Bildir özelliğini siz başlattığınızda ilgili
-              mesaj metni ya da anahtar kelime HTTPS üzerinden işlenmek üzere
-              sunucumuza gönderilir. Bu özellikler otomatik değildir.
+              1.0.8 ve sonraki sürümlerde Akıllı Analiz, seçtiğiniz mesajı cihaz
+              üzerinde inceler ve analiz metnini sunucuya göndermez. Yalnızca
+              Spam Bildir işlemini özellikle başlatırsanız maskelenmiş rapor
+              içeriği sunucumuza gönderilir.
             </p>
           </div>
         </div>
@@ -73,11 +74,11 @@ export default function PrivacyPolicy() {
             <ul className="space-y-3 text-[#a9bfd3] ml-4 list-none">
               <li className="flex items-start gap-2">
                 <CheckCircle size={18} className="text-[#7cff5b] mt-1 shrink-0" />
-                <span><strong>Akıllı analiz metni:</strong> Analiz düğmesine basarak gönderdiğiniz mesaj metni FiltreAI sunucusuna iletilir ve kural tabanlı analiz motoruyla incelenir. Metin başka bir yapay zekâ sağlayıcısına aktarılmaz. Mesaj metni ve analiz sonucu tekrar eden sorguları hızlandırmak amacıyla sunucudaki analiz önbelleğinde saklanır.</span>
+                <span><strong>Akıllı Analiz:</strong> 1.0.8 ve sonraki sürümlerde seçtiğiniz mesaj cihaz üzerinde kural tabanlı olarak analiz edilir. Analiz metni ve sonucu FiltreAI sunucusuna veya başka bir yapay zekâ sağlayıcısına gönderilmez. 1.0.7 ve önceki test sürümleri, kullanıcı tarafından seçilen analiz metnini sonuç üretmek için FiltreAI sunucusuna gönderebilir. Bu eski sürümlerden gelen metinlerin yeni bir sunucu kaydı oluşturulmaz; daha önce oluşturulmuş kayıtlar en geç 7 gün içinde otomatik olarak silinir.</span>
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle size={18} className="text-[#7cff5b] mt-1 shrink-0" />
-                <span><strong>Gönüllü spam bildirimleri:</strong> Bildirdiğiniz anahtar kelime veya metin, cihaz platformu, push token ve isteğin IP adresi kötüye kullanımı önlemek, raporu saymak ve topluluk kurallarını geliştirmek için saklanabilir.</span>
+                <span><strong>Gönüllü spam bildirimleri:</strong> Yalnızca Spam Bildir işlemini başlattığınızda bildirdiğiniz maskelenmiş anahtar kelime veya metin; varsa push token ve isteğin IP adresiyle birlikte kötüye kullanımı önlemek, raporu saymak ve topluluk kurallarını geliştirmek için saklanabilir.</span>
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle size={18} className="text-[#7cff5b] mt-1 shrink-0" />
@@ -89,7 +90,7 @@ export default function PrivacyPolicy() {
               </li>
               <li className="flex items-start gap-2">
                 <CheckCircle size={18} className="text-[#7cff5b] mt-1 shrink-0" />
-                <span><strong>Toplanmayan veriler:</strong> Finansal bilgileriniz ve otomatik filtrelenen diğer mesajlar bulut özelliklerini siz başlatmadıkça sunucuya gönderilmez.</span>
+                <span><strong>Toplanmayan veriler:</strong> 1.0.8 ve sonraki sürümlerde Akıllı Analiz metni; tüm sürümlerde otomatik filtrelenen mesajlar, rehber ve finansal bilgiler sunucuya gönderilmez.</span>
               </li>
             </ul>
           </div>
@@ -104,7 +105,6 @@ export default function PrivacyPolicy() {
             </p>
             <ul className="space-y-2 text-[#a9bfd3] list-disc list-inside ml-2">
               <li>Spam filtreleme algoritmamızı iyileştirmek</li>
-              <li>İsteğiniz üzerine mesaj metnini kural tabanlı analiz motoruyla incelemek</li>
               <li>Yeni dolandırıcılık yöntemleri hakkında push bildirimi göndermek</li>
               <li>Rapor kötüye kullanımını IP adresi üzerinden sınırlamak</li>
               <li>Uygulamanın düzgün çalışmasını sağlamak ve hataları gidermek</li>
@@ -124,12 +124,12 @@ export default function PrivacyPolicy() {
               reklam takibi için kullanılmaz.
             </p>
             <p className="text-[#a9bfd3] leading-relaxed">
-              Akıllı analiz metni ve sonucu, analiz önbelleğine eklendikten yaklaşık
-              7 gün sonra otomatik olarak silinir. Push token&apos;ları, IP
-              adresleri ve rapor kayıtları hizmetin çalışması için gerekli
-              olduğu sürece veya silinme talebiniz işlenene kadar saklanabilir;
-              bu diğer kayıtlar için şu anda sabit bir otomatik silme süresi
-              uygulanmamaktadır.
+              1.0.8 ve sonraki sürümlerde Akıllı Analiz metni cihazda kalır.
+              1.0.7 ve önceki test sürümlerinden daha önce oluşturulmuş analiz
+              kayıtları en geç 7 gün içinde otomatik olarak silinir. Push
+              token&apos;ları, IP adresleri ve gönüllü spam raporları hizmetin çalışması için gerekli
+              olduğu sürece veya silinme talebiniz işlenene kadar saklanabilir.
+              Bu kayıtlar için şu anda sabit bir otomatik silme süresi uygulanmamaktadır.
             </p>
           </div>
 
@@ -140,8 +140,8 @@ export default function PrivacyPolicy() {
               4. Tercihleriniz, Silinme ve İletişim
             </h3>
             <p className="text-[#a9bfd3] leading-relaxed mb-4">
-              Bildirim iznini cihaz ayarlarından kapatabilir, Akıllı Analiz ve Spam
-              Bildir özelliklerini kullanmayabilir ve SMS filtreleme uzantısını
+              Bildirim iznini cihaz ayarlarından kapatabilir, Spam Bildir özelliğini
+              kullanmayabilir ve SMS filtreleme uzantısını
               devre dışı bırakabilirsiniz. Saklanan verilerinizin silinmesini
               istemek veya gizlilik politikası hakkında soru sormak için
               aşağıdaki adresten bize ulaşabilirsiniz.

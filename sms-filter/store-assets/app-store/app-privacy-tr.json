@@ -7,7 +7,7 @@
       "linkedToUser": true,
       "usedForTracking": false,
       "purpose": "App Functionality",
-      "details": "Kullanıcı tarafından başlatılan Akıllı Analiz veya spam bildirimi."
+      "details": "Yalnızca kullanıcı tarafından başlatılan spam bildirimi; Akıllı Analiz cihaz üzerinde kalır."
     },
     {
       "type": "User Content > Other User Content",
@@ -36,7 +36,7 @@
   ],
   "notCollected": [
     "Contacts: beyaz liste seçimi cihaz üzerinde kalır.",
-    "Otomatik mesaj filtreleme içeriği: Mesaj Filtreleme uzantısı cihaz üzerinde çalışır.",
+    "Otomatik mesaj filtreleme ve Akıllı Analiz içeriği cihaz üzerinde kalır.",
     "Location, purchases, financial, health, advertising and diagnostics data."
   ],
   "needsFinalLegalVerification": true

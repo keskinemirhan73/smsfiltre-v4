@@ -2,7 +2,7 @@
   "expo": {
     "name": "FiltreAI",
     "slug": "sms-filter",
-    "version": "1.0.1",
+    "version": "1.0.8",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -17,12 +17,17 @@
     },
     "android": {
       "package": "com.filtreai.app",
+      "versionCode": 10,
       "blockedPermissions": [
         "android.permission.READ_SMS",
         "android.permission.WRITE_CONTACTS",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.SYSTEM_ALERT_WINDOW"
+      ],
+      "permissions": [
+        "android.permission.RECEIVE_SMS",
+        "android.permission.VIBRATE"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#1E1E2E",
@@ -36,7 +41,9 @@
     },
     "plugins": [
       "@bacons/apple-targets",
-      "./plugins/withAndroidSmsFilter.js"
+      "./plugins/withAndroidSmsFilter.js",
+      "expo-secure-store",
+      "expo-notifications"
     ],
     "extra": {
       "eas": {

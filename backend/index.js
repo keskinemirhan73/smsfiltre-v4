@@ -25,6 +25,10 @@ app.use(express.json({ limit: '16kb' }));
 // Trust proxy for rate limiter (if behind Heroku, Render, Vercel etc)
 app.set('trust proxy', 1);
 
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', service: 'filtreai-api' });
+});
+
 // Rate Limiting
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -153,9 +157,8 @@ app.post('/api/report', async (req, res) => {
   }
 });
 
-const AIAnalysisCache = require('./src/models/AIAnalysisCache');
-
 // PUBLIC API: Analyze text with the deterministic FiltreAI rules engine.
+// Kept for older clients; submitted message text is processed in memory only.
 app.post('/api/analyze', async (req, res) => {
   const validation = validateAnalyzeInput(req.body);
   if (!validation.ok) {
@@ -164,33 +167,6 @@ app.post('/api/analyze', async (req, res) => {
 
   const cleanText = validation.text;
   const analysis = analyzeMessage(cleanText);
-
-  if (mongoose.connection.readyState === 1) {
-    try {
-      const cached = await AIAnalysisCache.findOne({ messageText: cleanText });
-      if (cached) {
-        cached.queryCount += 1;
-        await cached.save();
-        return res.json({
-          success: true,
-          cached: true,
-          analysisEngine: 'rules-v1',
-          riskLevel: cached.riskLevel,
-          threatType: cached.threatType,
-          recommendation: cached.recommendation,
-        });
-      }
-
-      await AIAnalysisCache.create({
-        messageText: cleanText,
-        riskLevel: analysis.riskLevel,
-        threatType: analysis.threatType,
-        recommendation: analysis.recommendation,
-      });
-    } catch (error) {
-      console.warn('[ANALİZ ÖNBELLEK HATASI]', error.message);
-    }
-  }
 
   return res.json({
     success: true,

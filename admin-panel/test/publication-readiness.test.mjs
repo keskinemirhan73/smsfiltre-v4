@@ -22,6 +22,18 @@ const mobileSettingsScreen = readFileSync(
   new URL('../../sms-filter/src/screens/SettingsScreen.tsx', import.meta.url),
   'utf8',
 );
+const mobileAppSource = readFileSync(
+  new URL('../../sms-filter/App.tsx', import.meta.url),
+  'utf8',
+);
+const onboardingScreen = readFileSync(
+  new URL('../../sms-filter/src/screens/OnboardingScreen.tsx', import.meta.url),
+  'utf8',
+);
+const threatCloudService = readFileSync(
+  new URL('../../sms-filter/src/services/ThreatCloudService.ts', import.meta.url),
+  'utf8',
+);
 const mobileGitignore = readFileSync(
   new URL('../../sms-filter/.gitignore', import.meta.url),
   'utf8',
@@ -209,20 +221,41 @@ const termsPage = readFileSync(
   'utf8',
 );
 
+const googlePlayReleaseNotes = readFileSync(
+  new URL(
+    '../../sms-filter/store-assets/google-play/release-notes-1.0.8-tr.txt',
+    import.meta.url,
+  ),
+  'utf8',
+);
+
 test('privacy disclosures cover every off-device data flow', () => {
   for (const disclosure of [
-    /mesaj metni/i,
-    /kural tabanl/i,
+    /spam bildirim/i,
     /push.*token/i,
     /IP adres/i,
     /saklama/i,
     /silinme/i,
-    /7 gün/i,
     /rehber[\s\S]{0,300}beyaz liste/i,
   ]) {
     assert.match(privacyPage, disclosure);
     assert.match(mobilePrivacyPolicy, disclosure);
   }
+
+  for (const content of [privacyPage, mobilePrivacyPolicy]) {
+    assert.match(content, /Akıllı Analiz[\s\S]{0,250}cihaz/i);
+    assert.match(content, /1\.0\.7[\s\S]{0,500}sunucu/i);
+    assert.match(content, /1\.0\.8[\s\S]{0,500}cihaz/i);
+    assert.doesNotMatch(content, /analiz önbelle/i);
+  }
+});
+
+test('next release metadata identifies the fixed local-analysis build', () => {
+  assert.equal(mobileAppConfig.expo.version, '1.0.8');
+  assert.match(googlePlayReleaseNotes, /cihaz üzerinde/i);
+  assert.match(googlePlayReleaseNotes, /bildirim izni/i);
+  assert.match(googlePlayReleaseNotes, /güvenli depolama/i);
+  assert.ok(googlePlayReleaseNotes.trim().length <= 500);
 });
 
 test('store-facing content does not promise the removed paid Gemini service', () => {
@@ -245,6 +278,19 @@ test('store-facing content does not promise the removed paid Gemini service', ()
   assert.doesNotMatch(
     `${googlePlayListing.fullDescription}\n${appStoreListing.promotionalText}\n${appStoreListing.description}`,
     /yapay zek[âa]/i,
+  );
+  assert.doesNotMatch(analysisScreen, /Yapay zekanın|Think the AI/i);
+});
+
+test('mobile UI avoids fake leaderboard, fake seed threats, and platform-wrong onboarding', () => {
+  assert.doesNotMatch(mobileAppSource, /name=["']Liderlik["']/);
+  assert.doesNotMatch(threatCloudService, /\+905551234567/);
+  assert.doesNotMatch(threatCloudService, /%100 güvenli|limitsiz sunucu/i);
+  assert.match(onboardingScreen, /Platform\.OS === ['"]android['"]/);
+  assert.match(onboardingScreen, /Continue|Devam Et/);
+  assert.doesNotMatch(
+    mobileTranslations,
+    /Bulut Veritabanı Güncel|Cloud Database Up-to-Date|Son Engellenenler|Recently Blocked|Haftalık Engelleme/i,
   );
 });
 
@@ -398,11 +444,24 @@ test('store privacy and restricted-permission submission drafts are complete', (
     'android.permission.RECEIVE_SMS',
   );
   assert.match(googlePlaySmsDeclaration.coreUseCase, /spam detection/i);
+  assert.match(
+    googlePlaySmsDeclaration.coreFunctionality,
+    /Akıllı Analiz[\s\S]{0,200}cihaz/i,
+  );
+  assert.doesNotMatch(
+    googlePlaySmsDeclaration.coreFunctionality,
+    /Akıllı Analiz ve Spam Bildir/i,
+  );
   assert.equal(googlePlayDataSafety.collectsData, true);
   assert.equal(googlePlayDataSafety.sharesData, false);
   assert.equal(googlePlayDataSafety.encryptedInTransit, true);
   assert.equal(appStorePrivacy.tracking, false);
   assert.ok(appStorePrivacy.dataTypes.length >= 4);
+  assert.match(googlePlayListing.fullDescription, /Akıllı Analiz[\s\S]{0,200}cihaz/i);
+  assert.doesNotMatch(
+    googlePlayListing.fullDescription,
+    /Akıllı Analiz[^.]{0,200}sunucuya (?:iletilir|gönderilir)/i,
+  );
 
   for (const requiredVideoStep of [
     /uygulamanın verisini temizleyin/i,
@@ -453,6 +512,34 @@ test('iOS never marks every unknown message as junk', () => {
   );
 });
 
+test('native filters honor the user-facing whitelist and schedule settings', () => {
+  for (const requiredSetting of [
+    /whitelist/,
+    /filterScheduleEnabled/,
+    /scheduleStart/,
+    /scheduleEnd/,
+    /blockForeignNumbers/,
+    /blockArabic/,
+  ]) {
+    assert.match(iosMessageFilterExtension, requiredSetting);
+    assert.match(androidSmsReceiver, requiredSetting);
+  }
+
+  assert.match(iosMessageFilterExtension, /categoryMapping/);
+  assert.doesNotMatch(
+    mobileSettingsScreen,
+    /Daily Summary Only|Sadece Günlük Özet/,
+  );
+  assert.doesNotMatch(
+    mobileSettingsScreen,
+    /navigation\.navigate\(['"]Proactive['"]\)/,
+  );
+  assert.match(
+    mobileSettingsScreen,
+    /Platform\.OS === ['"]ios['"][\s\S]{0,500}navigation\.navigate\(['"]Mapping['"]\)/,
+  );
+});
+
 test('Android requests only the minimum SMS permission', () => {
   assert.match(androidSmsPlugin, /android\.permission\.RECEIVE_SMS/);
   assert.doesNotMatch(androidSmsPlugin, /android\.permission\.READ_SMS/);
@@ -471,6 +558,10 @@ test('Android requests only the minimum SMS permission', () => {
 test('Android detects suspicious SMS without claiming to abort delivery', () => {
   assert.doesNotMatch(androidSmsReceiver, /abortBroadcast/);
   assert.match(androidSmsReceiver, /showSuspiciousSmsNotification/);
+  assert.equal(
+    (androidSmsReceiver.match(/if \(keyword\.isBlank\(\)\) continue/g) ?? []).length,
+    2,
+  );
   assert.doesNotMatch(dashboardScreen, /engelleniyor|engellendi/i);
   assert.doesNotMatch(mobileTranslations, /engellenir|engellenmes/i);
 });
@@ -482,7 +573,7 @@ test('automatic SMS detection is not described as background cloud AI', () => {
   );
   assert.match(
     dashboardScreen,
-    /cihaz üzerinde analiz ediyor/i,
+    /cihazınızda analiz edilir/i,
   );
 });
 
