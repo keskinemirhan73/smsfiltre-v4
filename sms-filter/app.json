@@ -17,7 +17,6 @@
     },
     "android": {
       "package": "com.filtreai.app",
-      "versionCode": 10,
       "blockedPermissions": [
         "android.permission.READ_SMS",
         "android.permission.WRITE_CONTACTS",

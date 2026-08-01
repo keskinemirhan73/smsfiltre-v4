@@ -347,6 +347,7 @@ test('mobile settings exposes the public privacy policy', () => {
 test('EAS owns and auto-increments store build numbers', () => {
   assert.equal(easConfig.cli.appVersionSource, 'remote');
   assert.equal(easConfig.build.production.autoIncrement, true);
+  assert.equal(mobileAppConfig.expo.android.versionCode, undefined);
   assert.equal(mobileAppConfig.expo.cli, undefined);
 });
 
