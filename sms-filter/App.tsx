@@ -4,7 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Shield, Settings, Sparkles, Trophy } from 'lucide-react-native';
+import { Shield, Settings, Sparkles, Trophy, Flag } from 'lucide-react-native';
 import { useColorScheme, DeviceEventEmitter, Linking } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
@@ -12,6 +12,7 @@ import * as SplashScreen from 'expo-splash-screen';
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 import DashboardScreen from './src/screens/DashboardScreen';
+import ReportsScreen from './src/screens/ReportsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import TestSimulatorScreen from './src/screens/TestSimulatorScreen';
 import AIAnalysisScreen from './src/screens/AIAnalysisScreen';
@@ -66,6 +67,14 @@ function MainTabs() {
         component={DashboardScreen}
         options={{
           tabBarIcon: ({ color, size }) => <Shield color={color} size={size} />,
+        }}
+      />
+      <Tab.Screen
+        name="Raporlar"
+        component={ReportsScreen}
+        options={{
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => <Flag color={color} size={size} />,
         }}
       />
       <Tab.Screen
