@@ -9,9 +9,29 @@ export interface ThreatDatabase extends ThreatDatabaseShape {}
 
 const DEFAULT_DB: ThreatDatabase = {
   blacklistedNumbers: [],
-  spamKeywords: ['bet', 'casino', 'bahis', 'kumar', 'bonus', 'çevrimsiz', 'mt2', 'metin2', 'ep hediye', 'sms iptal', 'b011', 'b013', 'b015'],
-  scamUrls: ['bit.ly', 'cutt.ly', 'kisa.link', 't.me'],
-  regexPatterns: ['b[.\\s]*a[.\\s]*h[.\\s]*i[.\\s]*s', 'b[.\\s]*o[.\\s]*n[.\\s]*u[.\\s]*s', 'c[.\\s]*a[.\\s]*s[.\\s]*i[.\\s]*n[.\\s]*o'],
+  spamKeywords: [
+    'bahis', 'casino', 'slot', 'rulet', 'jackpot', 'iddaa', 'freespin', 'freebet',
+    'deneme bonusu', 'hoşgeldin bonusu', 'hosgeldin bonusu', 'çevrim şartsız', 'cevrim sartsiz',
+    'kayıp bonusu', 'yatırım bonusu', 'sweet bonanza', 'vdcasino', 'sahabet', 'matbet',
+    'ptt kargo', 'adresinizi güncelleyin', 'adresinizi guncelleyin', 'adresiniz doğrulanamadı',
+    'adresiniz dogrulanamadi', 'kargonuz teslim', 'iade edildi', 'gümrükte takıldı', 'gumrukte takildi',
+    'ceza dosyası', 'ceza dosyasi', 'icra takibi', 'dosyanız savcılığa', 'hesabınız bloke',
+    'sma hastası', 'sma hastasi', 'sadakanızla', 'sadakanizla', 'valilik denetimli', 'sms iptal',
+    'vikingmt2', 'nesne marketi', '50.000em', '50000em', 'ret ultr', 'ret yaz', 'mt2', 'pvp server',
+    'b011', 'b013', 'b015', 'b018', 'b021', 'b043', 'b356', 'b372', 'b001', 'b002'
+  ],
+  scamUrls: [
+    'is.gd', 'cutt.ly', 'bit.ly', 'tinyurl.com', 't.co', 't.ly', 'rb.gy',
+    'shorturl', 'kisa.link', 't.me', 'ngrok-free.app', 'pages.dev'
+  ],
+  regexPatterns: [
+    'b[.\\s]*a[.\\s]*h[.\\s]*i[.\\s]*s',
+    'b[.\\s]*o[.\\s]*n[.\\s]*u[.\\s]*s',
+    'c[.\\s]*a[.\\s]*s[.\\s]*i[.\\s]*n[.\\s]*o',
+    'f[.\\s]*r[.\\s]*e[.\\s]*e[.\\s]*b[.\\s]*e[.\\s]*t',
+    'TR\\d{24}',
+    'http.*\\.(xyz|cc|top|club|site|gd|me|fun|icu|info)'
+  ],
 };
 
 export class ThreatCloudService {
@@ -20,24 +40,29 @@ export class ThreatCloudService {
    * İleriye dönük en ucuz, en hızlı ve SDK gerektirmeyen (sıfır bloat) mimari budur.
    */
   static async syncDatabase(): Promise<boolean> {
-    try {
-      // Kurallar herkese açık, sürümlenmiş bir JSON dosyasından indirilir.
-      const CLOUD_JSON_URL = 'https://raw.githubusercontent.com/keskinemirhan73/sms-filtre-db/refs/heads/main/database.json';
-      
-      const response = await fetch(CLOUD_JSON_URL, {
-        headers: { 'Cache-Control': 'no-cache' },
-      });
-      if (!response.ok) throw new Error(`Threat database HTTP ${response.status}`);
-      const cloudData = parseThreatDatabase(await response.json());
+    const cloudUrls = [
+      'https://filtreai.vercel.app/api/database',
+      'https://cdn.jsdelivr.net/gh/keskinemirhan73/sms-filtre-db@main/database.json',
+      'https://raw.githubusercontent.com/keskinemirhan73/sms-filtre-db/main/database.json',
+    ];
 
-      // İndirilen/Yedek veriyi şifreli hafızaya (AsyncStorage) kaydet
-      await AsyncStorage.setItem(DB_KEY, JSON.stringify(cloudData));
-      await AsyncStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
-      return true;
-    } catch (error) {
-      console.warn('Cloud Sync Error (handled):', error);
-      return false;
+    for (const url of cloudUrls) {
+      try {
+        const response = await fetch(url, {
+          headers: { 'Cache-Control': 'no-cache' },
+        });
+        if (response.ok) {
+          const cloudData = parseThreatDatabase(await response.json());
+          await AsyncStorage.setItem(DB_KEY, JSON.stringify(cloudData));
+          await AsyncStorage.setItem(LAST_SYNC_KEY, new Date().toISOString());
+          return true;
+        }
+      } catch (e) {
+        console.warn(`Threat DB fetch failed for ${url}:`, e);
+      }
     }
+
+    return false;
   }
 
   /**

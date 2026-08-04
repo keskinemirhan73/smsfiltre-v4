@@ -12,10 +12,12 @@ interface SmsDetailModalProps {
   item: HistoryItem | null;
   onClose: () => void;
   onCreateRule: (sender: string) => void;
+  onMarkAsNotJunk?: (sender: string) => void;
+  onReportAsJunk?: (sender: string, preview: string) => void;
   onReport: (keyword: string, category: string, notes: string) => void;
 }
 
-export function SmsDetailModal({ visible, item, onClose, onCreateRule, onReport }: SmsDetailModalProps) {
+export function SmsDetailModal({ visible, item, onClose, onCreateRule, onMarkAsNotJunk, onReportAsJunk, onReport }: SmsDetailModalProps) {
   const theme = useAppTheme();
   const [urls, setUrls] = useState<string[]>([]);
   const [checkingUrl, setCheckingUrl] = useState<string | null>(null);
@@ -150,6 +152,32 @@ export function SmsDetailModal({ visible, item, onClose, onCreateRule, onReport 
 
             {/* Actions Section */}
             <View style={styles.actionsContainer}>
+              {onMarkAsNotJunk && (
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: '#10B98120', borderColor: '#10B981', borderWidth: 1 }]}
+                  onPress={() => {
+                    onClose();
+                    onMarkAsNotJunk(item.sender);
+                  }}
+                >
+                  <ShieldCheck color="#10B981" size={20} />
+                  <Text style={[styles.actionBtnText, { color: '#10B981', fontWeight: '700' }]}>İstenmeyen Değil (Güvenli Yap)</Text>
+                </TouchableOpacity>
+              )}
+
+              {onReportAsJunk && (
+                <TouchableOpacity
+                  style={[styles.actionBtn, { backgroundColor: '#EF444420', borderColor: '#EF4444', borderWidth: 1 }]}
+                  onPress={() => {
+                    onClose();
+                    onReportAsJunk(item.sender, item.preview);
+                  }}
+                >
+                  <ShieldAlert color="#EF4444" size={20} />
+                  <Text style={[styles.actionBtnText, { color: '#EF4444', fontWeight: '700' }]}>İstenmeyen Olarak Bildir & Engelle</Text>
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: theme.background, borderColor: theme.border, borderWidth: 1 }]}
                 onPress={() => {
@@ -158,7 +186,7 @@ export function SmsDetailModal({ visible, item, onClose, onCreateRule, onReport 
                 }}
               >
                 <ShieldBan color={theme.text} size={20} />
-                <Text style={[styles.actionBtnText, { color: theme.text }]}>Gönderici İçin Kural Oluştur</Text>
+                <Text style={[styles.actionBtnText, { color: theme.text }]}>Gönderici İçin Özel Kural Oluştur</Text>
               </TouchableOpacity>
             </View>
 

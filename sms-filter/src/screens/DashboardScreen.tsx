@@ -1,12 +1,12 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity, Modal, TextInput, ActivityIndicator, Animated, Platform, KeyboardAvoidingView, Easing, Linking } from 'react-native';
-import { ShieldAlert, Zap, History, ShieldCheck, TrendingUp, Receipt, Megaphone, ShieldBan, X, ArrowRight, Activity, Globe, Bell } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity, Modal, TextInput, ActivityIndicator, Animated, Platform, KeyboardAvoidingView, Easing, Linking, Alert } from 'react-native';
+import { ShieldAlert, Zap, History, ShieldCheck, TrendingUp, Receipt, Megaphone, ShieldBan, X, ArrowRight, Activity, Globe, Bell, ChevronRight } from 'lucide-react-native';
 import { LineChart, PieChart } from 'react-native-chart-kit';
 import { useFocusEffect, useScrollToTop } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import { useAppTheme, spacing, radii } from '../theme';
-import { FilterManager, AppSettings, Stats, HistoryItem } from '../modules/FilterManager';
+import { FilterManager, AppSettings, Stats, HistoryItem, FilterRule } from '../modules/FilterManager';
 import { ThreatCloudService } from '../services/ThreatCloudService';
 import { useToast } from '../components/Toast';
 import { useSettings } from '../context/SettingsContext';
@@ -14,9 +14,14 @@ import { getT } from '../i18n';
 import { hasSmsDetectionPermission, requestSmsDetectionPermission } from '../services/SmsPermissionService';
 import { SecurityUtils } from '../utils/SecurityUtils';
 import { SmsDetailModal } from '../components/SmsDetailModal';
+import { SecureStorage } from '../utils/SecureStorage';
 import { getExistingExpoPushTokenAsync, registerForPushNotificationsAsync, requestNotificationPermissionAsync } from '../services/PushNotificationService';
 import { createPublicJsonRequest } from '../services/publicApiRequest';
-import { buildThreatDistribution, buildWeeklySuspiciousSeries } from '../services/dashboardMetrics';
+import {
+  buildThreatDistribution,
+  buildWeeklySuspiciousSeries,
+  reconcileDashboardStats,
+} from '../services/dashboardMetrics';
 
 const { width } = Dimensions.get('window');
 
@@ -33,6 +38,18 @@ export default function DashboardScreen() {
   const [recentActivity, setRecentActivity] = useState<HistoryItem[]>([]);
   const [cloudThreatCount, setCloudThreatCount] = useState<number>(0);
   const [hasSmsPermission, setHasSmsPermission] = useState<boolean>(true);
+  const [isSetupBannerDismissed, setIsSetupBannerDismissed] = useState<boolean>(false);
+
+  useEffect(() => {
+    SecureStorage.getItem('@junkman_setup_dismissed').then(val => {
+      if (val === 'true') setIsSetupBannerDismissed(true);
+    });
+  }, []);
+
+  const handleDismissSetupBanner = async () => {
+    setIsSetupBannerDismissed(true);
+    await SecureStorage.setItem('@junkman_setup_dismissed', 'true');
+  };
 
   const [isSetupModalVisible, setIsSetupModalVisible] = useState(false);
   const [isReportModalVisible, setIsReportModalVisible] = useState(false);
@@ -177,22 +194,38 @@ export default function DashboardScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      FilterManager.loadStats().then(setStats);
-      FilterManager.loadHistory().then(setRecentActivity);
-      ThreatCloudService.getDatabase().then(db => {
-        setCloudThreatCount(db.spamKeywords.length + db.scamUrls.length + (db.regexPatterns?.length || 0));
-      });
+      let active = true;
+      const refreshDashboard = async () => {
+        await FilterManager.importNativeSmsEvents();
+        const [nextStats, nextHistory, db] = await Promise.all([
+          FilterManager.loadStats(),
+          FilterManager.loadHistory(),
+          ThreatCloudService.getDatabase(),
+        ]);
+        if (!active) return;
+        setStats(nextStats);
+        setRecentActivity(nextHistory);
+        setCloudThreatCount(
+          db.spamKeywords.length + db.scamUrls.length + (db.regexPatterns?.length || 0),
+        );
+      };
+      refreshDashboard().catch(() => {});
       if (Platform.OS === 'android') {
         hasSmsDetectionPermission().then(setHasSmsPermission);
       }
+      return () => {
+        active = false;
+      };
     }, [])
   );
 
+  const displayStats = reconcileDashboardStats(stats, recentActivity);
+  const latestActivity = recentActivity[0];
   const statCards = [
-    { label: t.suspicious, value: stats.blockedCount, icon: ShieldBan, color: theme.danger, bg: 'rgba(239,68,68,0.08)' },
-    { label: t.totalAnalyzed, value: stats.analyzedCount, icon: Activity, color: theme.primary, bg: 'rgba(59,130,246,0.08)' },
-    { label: t.transaction, value: stats.transactionCount, icon: Receipt, color: theme.secondary, bg: 'rgba(10,185,129,0.08)' },
-    { label: t.promotion, value: stats.promotionCount, icon: Megaphone, color: '#F59E0B', bg: 'rgba(245,158,11,0.08)' },
+    { label: t.suspicious, value: displayStats.blockedCount, icon: ShieldBan, color: theme.danger, bg: 'rgba(239,68,68,0.08)' },
+    { label: t.totalAnalyzed, value: displayStats.analyzedCount, icon: Activity, color: theme.primary, bg: 'rgba(59,130,246,0.08)' },
+    { label: t.transaction, value: displayStats.transactionCount, icon: Receipt, color: theme.secondary, bg: 'rgba(10,185,129,0.08)' },
+    { label: t.promotion, value: displayStats.promotionCount, icon: Megaphone, color: '#F59E0B', bg: 'rgba(245,158,11,0.08)' },
   ];
 
   const getStatusConfig = (status: string) => {
@@ -205,7 +238,7 @@ export default function DashboardScreen() {
   };
 
   const weeklyData = buildWeeklySuspiciousSeries(recentActivity);
-  const threatDistribution = buildThreatDistribution(stats);
+  const threatDistribution = buildThreatDistribution(displayStats);
 
   const chartConfig = {
     backgroundGradientFrom: theme.card,
@@ -264,32 +297,73 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {(Platform.OS === 'ios' || (Platform.OS === 'android' && !hasSmsPermission)) && (
-          <TouchableOpacity
-            style={[styles.setupCard, { backgroundColor: 'rgba(139,92,246,0.1)', borderColor: 'rgba(139,92,246,0.3)' }]}
-            activeOpacity={0.8}
-            onPress={async () => {
-              if (Platform.OS === 'ios') {
-                setIsSetupModalVisible(true);
-              } else {
-                const granted = await requestSmsDetectionPermission();
-                setHasSmsPermission(granted);
-              }
-            }}
+        {!isSetupBannerDismissed && (Platform.OS === 'ios' || (Platform.OS === 'android' && !hasSmsPermission)) && (
+          <View
+            style={[styles.setupCard, { backgroundColor: 'rgba(139,92,246,0.1)', borderColor: 'rgba(139,92,246,0.3)', position: 'relative' }]}
           >
-            <View style={styles.setupHeader}>
-              <View style={[styles.setupIconWrapper, { backgroundColor: '#8B5CF6' }]}>
-                <ShieldCheck size={20} color="#fff" />
+            <TouchableOpacity
+              style={{ position: 'absolute', top: 12, right: 12, zIndex: 10, padding: 4 }}
+              onPress={handleDismissSetupBanner}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <X size={18} color={theme.textMuted} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={async () => {
+                if (Platform.OS === 'ios') {
+                  setIsSetupModalVisible(true);
+                } else {
+                  const granted = await requestSmsDetectionPermission();
+                  setHasSmsPermission(granted);
+                  if (granted) handleDismissSetupBanner();
+                }
+              }}
+            >
+              <View style={styles.setupHeader}>
+                <View style={[styles.setupIconWrapper, { backgroundColor: '#8B5CF6' }]}>
+                  <ShieldCheck size={20} color="#fff" />
+                </View>
+                <Text style={[styles.setupTitle, { color: '#8B5CF6' }]}>{t.activateFilter}</Text>
               </View>
-              <Text style={[styles.setupTitle, { color: '#8B5CF6' }]}>{t.activateFilter}</Text>
+              <Text style={[styles.setupDesc, { color: theme.text, marginBottom: spacing.md, paddingRight: 20 }]}>
+                {t.activateFilterDesc}
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#8B5CF6', paddingVertical: 10, paddingHorizontal: 16, borderRadius: radii.md, alignSelf: 'flex-start' }}>
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14, marginRight: 6 }}>{t.setupNow}</Text>
+                <ArrowRight size={16} color="#fff" />
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {Platform.OS === 'android' && latestActivity && (
+          <TouchableOpacity
+            style={[styles.androidDetectionNotice, { backgroundColor: theme.card, borderColor: theme.border }]}
+            onPress={() => {
+              setSelectedSms(latestActivity);
+              setIsSmsDetailVisible(true);
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.historyIcon, { backgroundColor: 'rgba(239,68,68,0.1)' }]}>
+              <ShieldAlert size={20} color={theme.danger} />
             </View>
-            <Text style={[styles.setupDesc, { color: theme.text, marginBottom: spacing.md }]}>
-              {t.activateFilterDesc}
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#8B5CF6', paddingVertical: 10, paddingHorizontal: 16, borderRadius: radii.md, alignSelf: 'flex-start' }}>
-              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14, marginRight: 6 }}>{t.setupNow}</Text>
-              <ArrowRight size={16} color="#fff" />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.androidDetectionTitle, { color: theme.text }]}>
+                {settings.language === 'en' ? 'Latest SMS analysis' : 'Son SMS analizi'}
+              </Text>
+              <Text style={[styles.androidDetectionText, { color: theme.textMuted }]} numberOfLines={2}>
+                {latestActivity.preview}
+              </Text>
+              <Text style={[styles.androidDetectionLimit, { color: theme.danger }]}>
+                {settings.language === 'en'
+                  ? 'Android: detected on-device; delivery to the default Messages app is not stopped.'
+                  : 'Android: cihazda tespit edildi; varsayılan Mesajlar uygulamasına teslimat durdurulmaz.'}
+              </Text>
             </View>
+            <ChevronRight size={20} color={theme.textMuted} />
           </TouchableOpacity>
         )}
 
@@ -458,6 +532,40 @@ export default function DashboardScreen() {
         item={selectedSms}
         onClose={() => setIsSmsDetailVisible(false)}
         onCreateRule={handleCreateRule}
+        onMarkAsNotJunk={async (sender) => {
+          if (!sender) return;
+          const rules = await FilterManager.loadRules();
+          const newRule: FilterRule = {
+            id: Date.now().toString(),
+            keyword: sender,
+            type: 'word',
+            category: 'allowed',
+            matchTarget: 'sender'
+          };
+          await FilterManager.saveRules([...rules, newRule]);
+          
+          const settings = await FilterManager.loadSettings();
+          if (!settings.whitelist.includes(sender)) {
+            settings.whitelist.push(sender);
+            await FilterManager.saveSettings(settings);
+          }
+          
+          Alert.alert("İstenmeyen Değil (Güvenli Liste)", `"${sender}" artık güvenli gönderici olarak kaydedildi.`);
+        }}
+        onReportAsJunk={async (sender, preview) => {
+          if (!sender) return;
+          const rules = await FilterManager.loadRules();
+          const newRule: FilterRule = {
+            id: Date.now().toString(),
+            keyword: sender,
+            type: 'word',
+            category: 'junk',
+            matchTarget: 'sender'
+          };
+          await FilterManager.saveRules([...rules, newRule]);
+          await handleDetailedReport(preview, 'İstenmeyen', 'Kullanıcı istenmeyen olarak bildirdi.');
+          Alert.alert("İstenmeyen Olarak Bildirildi", `"${sender}" engellenenler listesine eklendi ve rapor kaydedildi.`);
+        }}
         onReport={(preview, category, notes) => {
           handleDetailedReport(preview, category, notes);
         }}
@@ -509,7 +617,21 @@ export default function DashboardScreen() {
           <View style={[styles.setupFooter, { backgroundColor: theme.background, borderColor: theme.border }]}>
             <TouchableOpacity
               style={[styles.openSettingsBtn, { backgroundColor: '#8B5CF6' }]}
-              onPress={() => Platform.OS === 'ios' ? Linking.openURL('App-Prefs:root=MESSAGES') : Linking.openSettings()}
+              onPress={async () => {
+                if (Platform.OS === 'ios') {
+                  try {
+                    await Linking.openURL('App-Prefs:MESSAGES');
+                  } catch {
+                    try {
+                      await Linking.openURL('app-settings:');
+                    } catch {
+                      Linking.openSettings();
+                    }
+                  }
+                } else {
+                  Linking.openSettings();
+                }
+              }}
             >
               <Text style={styles.openSettingsBtnText}>{t.openSettingsBtn}</Text>
               <ArrowRight size={20} color="#fff" />
@@ -575,6 +697,19 @@ const styles = StyleSheet.create({
   historySender: { fontSize: 16, fontWeight: '700', marginBottom: 2 },
   historyPreview: { fontSize: 13 },
   historyActionBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radii.md },
+  androidDetectionNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    padding: spacing.md,
+    borderRadius: radii.xl,
+    borderWidth: 1,
+  },
+  androidDetectionTitle: { fontSize: 16, fontWeight: '800', marginBottom: 2 },
+  androidDetectionText: { fontSize: 13, lineHeight: 18 },
+  androidDetectionLimit: { fontSize: 12, lineHeight: 17, fontWeight: '700', marginTop: 6 },
   statusLabel: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
 
   floatingBtnContainer: {
