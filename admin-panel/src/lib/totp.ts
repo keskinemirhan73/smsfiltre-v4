@@ -25,7 +25,7 @@ function base32Decode(base32: string): Buffer {
  */
 export function generateTOTP(secretBase32: string, timeWindowStep = 0): string {
   const timeStep = 30; // 30 seconds interval
-  const counter = Math.floor(Date.now() / 1000 / timeStep) + timeStep;
+  const counter = Math.floor(Date.now() / 1000 / timeStep) + timeWindowStep;
   const key = base32Decode(secretBase32);
 
   const buffer = Buffer.alloc(8);
