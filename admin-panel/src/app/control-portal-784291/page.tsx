@@ -51,8 +51,7 @@ export default function SecretAdminPortal() {
 
   const fetchDashboardData = async (pass: string, code?: string) => {
     try {
-      const authVal = code ? `${pass}:${code}` : pass;
-      const headers = { 'Authorization': `Bearer ${authVal}` };
+      const headers = { 'Authorization': `Bearer ${pass}` };
       
       const pendingRes = await fetch(`${API_BASE}/api/pending`, { headers });
       if (pendingRes.status === 401) {
@@ -89,7 +88,7 @@ export default function SecretAdminPortal() {
     try {
       await fetch(`${API_BASE}/api/${action}/${id}`, { 
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${password}:${totpCode}` }
+        headers: { 'Authorization': `Bearer ${password}` }
       });
       await fetchDashboardData(password, totpCode);
     } catch (e) {
