@@ -55,7 +55,7 @@ app.use('/api/report', expensiveOperationLimiter);
 
 // Environment variables
 const MONGODB_URI = process.env.MONGODB_URI;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
 const PORT = process.env.PORT || 5000;
 const THRESHOLD = 5; 
 
