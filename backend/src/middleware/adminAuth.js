@@ -16,9 +16,11 @@ function createAdminAuth(adminSecret) {
     }
 
     const authorization = req.headers.authorization || '';
-    const expectedAuthorization = `Bearer ${adminSecret}`;
+    const rawToken = authorization.replace(/^Bearer\s+/i, '').trim();
+    // Split password and optional 2FA TOTP code
+    const [sentPassword] = rawToken.split(':');
 
-    if (!tokensMatch(authorization, expectedAuthorization)) {
+    if (!tokensMatch(sentPassword, adminSecret)) {
       return res.status(401).json({
         error: 'Yetkisiz erişim! Geçersiz kimlik bilgisi.',
       });
