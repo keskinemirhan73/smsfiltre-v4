@@ -240,3 +240,48 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
         completion(response)
     }
 }
+
+extension MessageFilterExtension: ILMessageFilterReportHandling {
+    func handle(
+        _ reportRequest: ILMessageFilterReportRequest,
+        context: ILMessageFilterExtensionContext,
+        completion: @escaping () -> Void
+    ) {
+        let sender = String((reportRequest.sender ?? "").prefix(256))
+        let body = String((reportRequest.messageBody ?? "").prefix(4096))
+
+        // 1. Record event as reported junk in shared container
+        recordEvent(sender: sender, action: .junk)
+
+        // 2. Add sender/keyword to custom fraud rules in shared config
+        if let defaults = UserDefaults(suiteName: "group.com.filtreai.app") {
+            let jsonString = defaults.string(forKey: "smsfilter_config_json") ?? ""
+            var json: [String: Any] = [:]
+            if let data = jsonString.data(using: .utf8),
+               let parsed = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                json = parsed
+            }
+
+            var rules = json["rules"] as? [[String: Any]] ?? []
+            let targetKeyword = sender.isEmpty ? body : sender
+            if !targetKeyword.isEmpty {
+                let newRule: [String: Any] = [
+                    "id": String(Int64(Date().timeIntervalSince1970 * 1000)),
+                    "keyword": targetKeyword,
+                    "type": "word",
+                    "category": "junk",
+                    "matchTarget": "both"
+                ]
+                rules.insert(newRule, at: 0)
+                json["rules"] = rules
+
+                if let outputData = try? JSONSerialization.data(withJSONObject: json),
+                   let outputStr = String(data: outputData, encoding: .utf8) {
+                    defaults.set(outputStr, forKey: "smsfilter_config_json")
+                }
+            }
+        }
+
+        completion()
+    }
+}
