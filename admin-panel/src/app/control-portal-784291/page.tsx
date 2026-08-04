@@ -80,7 +80,21 @@ export default function SecretAdminPortal() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    await fetchDashboardData(password, totpCode);
+    setLoginError(false);
+    try {
+      const verifyRes = await fetch('/api/admin/verify-2fa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, totpCode })
+      });
+      if (!verifyRes.ok) {
+        setLoginError(true);
+        return;
+      }
+      await fetchDashboardData(password, totpCode);
+    } catch {
+      setLoginError(true);
+    }
   };
 
   const handleAction = async (id: string, action: 'approve' | 'reject') => {
