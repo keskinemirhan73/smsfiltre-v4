@@ -76,8 +76,8 @@ export const translations = {
     downloadAll: 'Tümünü İndir',
     approvedRules: 'Onaylı Kurallar',
     noApprovedRules: 'Henüz onaylanmış kural yok.',
-    numberBlock: 'Numara Engeli',
-    wordBlock: 'Kelime Engeli',
+    numberBlock: 'Numara Kuralı',
+    wordBlock: 'Kelime Kuralı',
     added: 'Eklendi',
     add: 'Ekle',
 
@@ -181,8 +181,8 @@ export const translations = {
     downloadAll: 'Download All',
     approvedRules: 'Approved Rules',
     noApprovedRules: 'No approved rules yet.',
-    numberBlock: 'Number Block',
-    wordBlock: 'Keyword Block',
+    numberBlock: 'Number Rule',
+    wordBlock: 'Keyword Rule',
     added: 'Added',
     add: 'Add',
 
@@ -212,4 +212,4 @@ export const translations = {
 };
 
 export type Language = 'tr' | 'en';
-export const getT = (lang: Language = 'tr') => translations[lang] || translations.tr;
+export const getT = (lang: Language = 'en') => translations[lang] || translations.en;

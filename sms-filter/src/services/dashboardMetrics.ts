@@ -25,6 +25,34 @@ export interface ThreatDistribution {
   total: number;
 }
 
+export function reconcileDashboardStats(
+  stats: DashboardStats,
+  history: readonly ActivityRecord[],
+): DashboardStats {
+  const historyCounts = history.reduce(
+    (counts, item) => ({
+      blockedCount: counts.blockedCount + (item.status === 'blocked' ? 1 : 0),
+      transactionCount: counts.transactionCount + (item.status === 'transaction' ? 1 : 0),
+      promotionCount: counts.promotionCount + (item.status === 'promotion' ? 1 : 0),
+    }),
+    { blockedCount: 0, transactionCount: 0, promotionCount: 0 },
+  );
+  const blockedCount = Math.max(stats.blockedCount, historyCounts.blockedCount);
+  const transactionCount = Math.max(stats.transactionCount, historyCounts.transactionCount);
+  const promotionCount = Math.max(stats.promotionCount, historyCounts.promotionCount);
+
+  return {
+    blockedCount,
+    transactionCount,
+    promotionCount,
+    analyzedCount: Math.max(
+      stats.analyzedCount,
+      history.length,
+      blockedCount + transactionCount + promotionCount,
+    ),
+  };
+}
+
 export function buildWeeklySuspiciousSeries(
   history: readonly ActivityRecord[],
   now = new Date(),

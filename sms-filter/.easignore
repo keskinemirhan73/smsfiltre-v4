@@ -14,7 +14,6 @@ credentials/
 .env.*
 .tmp-android-export*/
 assets/Screenshot_*.jpg
-assets/premium_splash.png
 generate_splash.py
 get_credentials.js
 strip_meta_inf.py

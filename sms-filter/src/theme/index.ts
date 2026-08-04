@@ -1,28 +1,30 @@
 
 export const darkColors = {
   background: '#0F172A',
-  card: 'rgba(30, 41, 59, 0.7)',
+  card: '#1E293B',
   surface: '#1E293B',
-  primary: '#3B82F6',
-  primaryGlow: 'rgba(59, 130, 246, 0.3)',
+  primary: '#6366F1',
+  primaryGlow: 'rgba(99, 102, 241, 0.25)',
   secondary: '#10B981',
   danger: '#EF4444',
+  warning: '#F59E0B',
   text: '#F8FAFC',
   textMuted: '#94A3B8',
-  border: 'rgba(148, 163, 184, 0.1)',
+  border: 'rgba(255, 255, 255, 0.08)',
 };
 
 export const lightColors = {
-  background: '#F1F5F9',
-  card: 'rgba(255, 255, 255, 0.7)',
+  background: '#F8FAFC',
+  card: '#FFFFFF',
   surface: '#FFFFFF',
-  primary: '#2563EB',
-  primaryGlow: 'rgba(37, 99, 235, 0.2)',
+  primary: '#4F46E5',
+  primaryGlow: 'rgba(79, 70, 229, 0.15)',
   secondary: '#059669',
   danger: '#DC2626',
+  warning: '#D97706',
   text: '#0F172A',
   textMuted: '#64748B',
-  border: 'rgba(148, 163, 184, 0.3)',
+  border: 'rgba(148, 163, 184, 0.2)',
 };
 
 // Default static reference for older un-migrated components

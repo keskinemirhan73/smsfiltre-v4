@@ -8,7 +8,11 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
+      "appleTeamId": "334UHSY5U9",
       "bundleIdentifier": "com.filtreai.app",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "entitlements": {
         "com.apple.security.application-groups": [
           "group.com.filtreai.app"
@@ -40,9 +44,23 @@
     },
     "plugins": [
       "@bacons/apple-targets",
-      "./plugins/withAndroidSmsFilter.js",
+      [
+        "./plugins/withAndroidSmsFilter.js",
+        {
+          "enableDefaultSms": false
+        }
+      ],
       "expo-secure-store",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/premium_splash.png",
+          "imageWidth": 320,
+          "resizeMode": "contain",
+          "backgroundColor": "#0F172A"
+        }
+      ]
     ],
     "extra": {
       "eas": {

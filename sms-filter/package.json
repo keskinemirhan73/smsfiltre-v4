@@ -46,9 +46,17 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "check:ios": "node scripts/check-ios-readiness.mjs",
     "test": "node --import tsx --test src/**/*.test.ts",
     "test:coverage": "node --import tsx --test --experimental-test-coverage src/**/*.test.ts",
     "postinstall": "patch-package"
+  },
+  "overrides": {
+    "@expo/plist@0.0.18": {
+      "@xmldom/xmldom": "0.8.13"
+    },
+    "postcss": "8.5.25",
+    "uuid": "11.1.1"
   },
   "private": true
 }

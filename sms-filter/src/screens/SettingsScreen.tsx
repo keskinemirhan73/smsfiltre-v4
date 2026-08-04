@@ -385,7 +385,7 @@ function FraudScreen({ navigation }: any) {
 
         <View style={{height: spacing.xl}}/>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>{isEn ? "Sensitive Keyword Hunter" : "Hassas Kelime Avcısı"}</Text>
-        <SectionDesc text={isEn ? "Messages containing any of the following words are considered dangerous and are instantly filtered." : "Aşağıdaki kelimelerden herhangi birini içeren mesajlar tehlikeli kabul edilir ve anında filtrelenir."} />
+        <SectionDesc text={isEn ? "Messages containing any of the following words are analyzed and marked as suspicious." : "Aşağıdaki kelimelerden herhangi birini içeren mesajlar analiz edilir ve şüpheli olarak işaretlenir."} />
 
         <View style={[styles.premiumInputContainer, { backgroundColor: theme.card, borderColor: theme.border, marginTop: spacing.md }]}>
           <Key size={20} color={theme.textMuted} style={{ marginLeft: 12 }} />
@@ -505,9 +505,9 @@ function ProactiveScreen({ navigation }: any) {
   const isEn = settings.language === 'en';
 
   const aiLevels = [
-    { val: 0.9, label: isEn ? "Low" : "Düşük", desc: isEn ? "Blocks only when absolutely sure." : "Sadece kesinlikle emin olduğunda engeller.", color: '#10B981' },
+    { val: 0.9, label: isEn ? "Low" : "Düşük", desc: isEn ? "Flags only high-confidence threats." : "Yalnızca yüksek güvenli tehditleri işaretler.", color: '#10B981' },
     { val: 0.8, label: isEn ? "Medium" : "Orta", desc: isEn ? "Provides balanced protection (Recommended)." : "Dengeli koruma sağlar (Önerilen).", color: theme.primary },
-    { val: 0.6, label: isEn ? "High" : "Yüksek", desc: isEn ? "Blocks every message it finds suspicious." : "Şüpheli bulduğu her mesajı engeller.", color: theme.danger }
+    { val: 0.6, label: isEn ? "High" : "Yüksek", desc: isEn ? "Flags more messages that appear suspicious." : "Şüpheli görünen daha fazla mesajı işaretler.", color: theme.danger }
   ];
 
   return (
@@ -515,10 +515,10 @@ function ProactiveScreen({ navigation }: any) {
       <TopHeader title={isEn ? "Proactive Filter" : "Proaktif Filtre"} navigation={navigation} />
       <View style={styles.section}>
         <SettingRow icon={Activity} iconColor={theme.primary} title={isEn ? "Smart Filter Active" : "Akıllı Filtre Aktif"} value={settings.proactiveFilter} onToggle={() => toggleSetting('proactiveFilter')} trackTrue={theme.primary} />
-        <SectionDesc text={isEn ? "Analyzes and instantly filters unknown, next-generation spam messages with a machine learning-based Probability Algorithm." : "Makine öğrenmesi tabanlı Olasılık Algoritması ile henüz bilinmeyen, yeni nesil spam mesajları analiz eder ve anında filtrelenir."} />
+        <SectionDesc text={isEn ? "Analyzes unknown spam patterns on-device and marks suspicious messages." : "Bilinmeyen spam kalıplarını cihaz üzerinde analiz eder ve şüpheli mesajları işaretler."} />
         <View style={{height: spacing.xl}}/>
         <Text style={[styles.sectionTitle, { color: theme.text }]}>{isEn ? "Filter Sensitivity" : "Filtre Hassasiyeti"}</Text>
-        <SectionDesc text={isEn ? "Choose how strict the filter will be when blocking suspicious messages." : "Filtrenin şüpheli mesajları engellerken ne kadar katı davranacağını seçin."} />
+        <SectionDesc text={isEn ? "Choose how strict detection should be when identifying suspicious messages." : "Şüpheli mesajları tespit ederken ne kadar katı davranılacağını seçin."} />
         <View style={{marginTop: spacing.md, gap: spacing.sm}}>
           {aiLevels.map(lvl => {
             const isSelected = settings.aiSensitivity === lvl.val;
@@ -557,7 +557,7 @@ function InvalidNumberScreen({ navigation }: any) {
         <SettingRow icon={Info} iconColor={theme.primary} title={isEn ? "Enable" : "Aktif Et"} value={settings.invalidNumberFilter} onToggle={() => toggleSetting('invalidNumberFilter')} />
         <SectionDesc text={isEn ? "Sender number's accuracy and format are checked." : "Gönderici numarasının doğruluğu ve formatı kontrol edilir."} />
         <View style={{height: spacing.xl}}/>
-        <SettingRow icon={AlertTriangle} iconColor={theme.danger} title={isEn ? "Block Foreign Numbers" : "Yurtdışı Numaralarını Engelle"} value={settings.blockForeignNumbers} onToggle={() => toggleSetting('blockForeignNumbers')} danger />
+        <SettingRow icon={AlertTriangle} iconColor={theme.danger} title={isEn ? "Flag Foreign Numbers" : "Yurtdışı Numaralarını İşaretle"} value={settings.blockForeignNumbers} onToggle={() => toggleSetting('blockForeignNumbers')} danger />
         <SectionDesc text={isEn ? "When enabled, SMS from all country codes other than +90 (Turkey) are automatically filtered." : "Etkinleştirildiğinde, +90 (Türkiye) dışındaki tüm ülke kodlarından gelen sms'ler otomatik filtrelenir."} />
       </View>
     </ScrollView>
@@ -609,25 +609,29 @@ function SettingsMainScreen({ navigation }: any) {
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: theme.textMuted }]}>{t.appearance}</Text>
         <View style={[styles.settingGroupCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-          <View style={styles.settingGroupItem}>
-            <View style={styles.settingIcon}><Languages size={22} color={theme.primary} /></View>
-            <View style={styles.settingContent}><Text style={[styles.settingTitle, { color: theme.text }]}>{t.language}</Text></View>
-            <View style={{flexDirection: 'row', backgroundColor: theme.background, borderRadius: radii.md, padding: 4}}>
-              <TouchableOpacity onPress={() => updateSetting('language', 'tr')} style={[styles.toggleBtn, settings.language === 'tr' && { backgroundColor: theme.primary }]}>
+          <View style={styles.appearanceSelectorRow}>
+            <View style={styles.appearanceSelectorHeader}>
+              <View style={styles.settingIcon}><Languages size={22} color={theme.primary} /></View>
+              <Text style={[styles.settingTitle, { color: theme.text }]}>{t.language}</Text>
+            </View>
+            <View style={[styles.appearanceSelectorOptions, { backgroundColor: theme.background }]}>
+              <TouchableOpacity onPress={() => updateSetting('language', 'tr')} style={[styles.appearanceOption, settings.language === 'tr' && { backgroundColor: theme.primary }]}>
                 <Text style={{color: settings.language === 'tr' ? '#fff' : theme.textMuted, fontWeight: 'bold'}}>TR</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => updateSetting('language', 'en')} style={[styles.toggleBtn, settings.language === 'en' && { backgroundColor: theme.primary }]}>
+              <TouchableOpacity onPress={() => updateSetting('language', 'en')} style={[styles.appearanceOption, settings.language === 'en' && { backgroundColor: theme.primary }]}>
                 <Text style={{color: settings.language === 'en' ? '#fff' : theme.textMuted, fontWeight: 'bold'}}>EN</Text>
               </TouchableOpacity>
             </View>
           </View>
           <View style={[styles.separator, { backgroundColor: theme.border }]} />
-          <View style={styles.settingGroupItem}>
-            <View style={styles.settingIcon}><Palette size={22} color={theme.primary} /></View>
-            <View style={styles.settingContent}><Text style={[styles.settingTitle, { color: theme.text }]}>{t.theme}</Text></View>
-            <View style={{flexDirection: 'row', backgroundColor: theme.background, borderRadius: radii.md, padding: 4}}>
+          <View style={styles.appearanceSelectorRow}>
+            <View style={styles.appearanceSelectorHeader}>
+              <View style={styles.settingIcon}><Palette size={22} color={theme.primary} /></View>
+              <Text style={[styles.settingTitle, { color: theme.text }]}>{t.theme}</Text>
+            </View>
+            <View style={[styles.appearanceSelectorOptions, { backgroundColor: theme.background }]}>
               {(['system', 'light', 'dark'] as const).map((thm) => (
-                <TouchableOpacity key={thm} onPress={() => updateSetting('theme', thm)} style={[styles.toggleBtn, settings.theme === thm && { backgroundColor: theme.primary }]}>
+                <TouchableOpacity key={thm} onPress={() => updateSetting('theme', thm)} style={[styles.appearanceOption, settings.theme === thm && { backgroundColor: theme.primary }]}>
                   <Text style={{color: settings.theme === thm ? '#fff' : theme.textMuted, fontWeight: 'bold', textTransform: 'capitalize'}}>{t[thm] || thm}</Text>
                 </TouchableOpacity>
               ))}
@@ -989,6 +993,17 @@ const styles = StyleSheet.create({
   navValue: { fontSize: 15 },
 
   toggleBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: radii.sm },
+  appearanceSelectorRow: { padding: spacing.md, gap: spacing.sm },
+  appearanceSelectorHeader: { flexDirection: 'row', alignItems: 'center' },
+  appearanceSelectorOptions: { flexDirection: 'row', borderRadius: radii.md, padding: 4 },
+  appearanceOption: {
+    flex: 1,
+    minHeight: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radii.sm,
+    paddingHorizontal: 6,
+  },
 
   premiumInputContainer: {
     flexDirection: 'row', alignItems: 'center', height: 56,

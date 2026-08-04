@@ -60,7 +60,7 @@ export default function TestSimulatorScreen() {
   const getResultConfig = () => {
     switch (result) {
       case 'junk': return {
-        icon: ShieldAlert, color: theme.danger, title: 'Engellendi (Spam)',
+        icon: ShieldAlert, color: theme.danger, title: 'Şüpheli (Spam)',
         desc: 'Bu mesaj FiltreAI kurallarına göre İstenmeyen (Junk) klasörüne yönlendirilirdi.',
         bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.3)',
       };

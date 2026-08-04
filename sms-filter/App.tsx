@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -17,6 +17,7 @@ import TestSimulatorScreen from './src/screens/TestSimulatorScreen';
 import AIAnalysisScreen from './src/screens/AIAnalysisScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
+import BrandSplashScreen from './src/screens/BrandSplashScreen';
 import { darkColors, lightColors, ThemeContext } from './src/theme';
 import { FilterManager } from './src/modules/FilterManager';
 import { ToastProvider } from './src/components/Toast';
@@ -24,6 +25,9 @@ import { registerBackgroundSync } from './src/services/BackgroundSyncService';
 import { SettingsProvider } from './src/context/SettingsContext';
 import { getInitialRoute, InitialRoute } from './src/app/startupPolicy';
 import { hasCompletedOnboarding } from './src/app/onboardingStorage';
+import { getRemainingSplashDuration } from './src/app/splashPolicy';
+
+import { registerForPushNotificationsAsync, syncPushTokenWithBackend, scheduleWeeklySafetyNotification } from './src/services/PushNotificationService';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -91,15 +95,19 @@ function MainTabs() {
 }
 
 export default function App() {
+  const appStartedAt = useRef(Date.now());
   const systemScheme = useColorScheme();
   const [appTheme, setAppTheme] = useState('system');
   const [initialRoute, setInitialRoute] = useState<InitialRoute | null>(null);
+  const [showBrandSplash, setShowBrandSplash] = useState(true);
 
   useEffect(() => {
     FilterManager.loadSettings().then(s => setAppTheme(s.theme || 'system'));
 
     const initializeApp = async () => {
       const onboardingComplete = await hasCompletedOnboarding();
+      await FilterManager.initializeNativeFiltering();
+      await FilterManager.importNativeSmsEvents();
       setInitialRoute(getInitialRoute(onboardingComplete));
     };
 
@@ -116,14 +124,34 @@ export default function App() {
       }
     });
 
+    registerForPushNotificationsAsync().then(token => {
+      if (token) syncPushTokenWithBackend(token);
+    });
+    scheduleWeeklySafetyNotification();
+
     const sub = DeviceEventEmitter.addListener('onThemeChanged', (newTheme) => {
       setAppTheme(newTheme);
     });
     return () => sub.remove();
   }, []);
 
-  if (!initialRoute) {
-    return null;
+  useEffect(() => {
+    if (!initialRoute) return;
+
+    const remainingDuration = getRemainingSplashDuration(
+      appStartedAt.current,
+      Date.now(),
+    );
+    const timer = setTimeout(() => setShowBrandSplash(false), remainingDuration);
+    return () => clearTimeout(timer);
+  }, [initialRoute]);
+
+  if (!initialRoute || showBrandSplash) {
+    return (
+      <BrandSplashScreen
+        onReady={() => SplashScreen.hideAsync().catch(() => {})}
+      />
+    );
   }
 
   const isDark = appTheme === 'dark' || (appTheme === 'system' && systemScheme === 'dark');
@@ -136,9 +164,6 @@ export default function App() {
           <ToastProvider>
             <StatusBar style={isDark ? 'light' : 'dark'} />
             <NavigationContainer
-              onReady={() => {
-                SplashScreen.hideAsync().catch(() => {});
-              }}
               theme={{
               dark: isDark,
               colors: {

@@ -46,6 +46,57 @@ private func isWithinSchedule(_ settings: [String: Any]) -> Bool {
         : (current >= start || current <= end)
 }
 
+private func recordEvent(sender: String, action: ILMessageFilterAction) {
+    guard let defaults = UserDefaults(suiteName: "group.com.filtreai.app") else { return }
+    let jsonStr = defaults.string(forKey: "smsfilter_event_queue_json") ?? "[]"
+    var queue: [[String: Any]] = []
+    if let data = jsonStr.data(using: .utf8),
+       let parsed = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+        queue = parsed
+    }
+
+    if queue.count > 50 {
+        queue = Array(queue.suffix(49))
+    }
+
+    let maskSender: (String) -> String = { s in
+        let trimmed = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        let suffix = String(trimmed.suffix(4))
+        return suffix.isEmpty ? "Bilinmeyen" : "***\(suffix)"
+    }
+
+    let statusStr: String
+    let previewStr: String
+    switch action {
+    case .junk:
+        statusStr = "suspicious"
+        previewStr = "Şüpheli SMS iOS filtre tarafından yakalandı."
+    case .transaction:
+        statusStr = "transaction"
+        previewStr = "İşlem SMS'i iOS filtre tarafından sınıflandırıldı."
+    case .promotion:
+        statusStr = "promotion"
+        previewStr = "Tanıtım SMS'i iOS filtre tarafından sınıflandırıldı."
+    default:
+        statusStr = "allowed"
+        previewStr = "SMS iOS filtre tarafından analiz edildi."
+    }
+
+    let event: [String: Any] = [
+        "id": UUID().uuidString,
+        "sender": maskSender(sender),
+        "preview": previewStr,
+        "status": statusStr,
+        "timestamp": Int64(Date().timeIntervalSince1970 * 1000)
+    ]
+    queue.append(event)
+
+    if let outputData = try? JSONSerialization.data(withJSONObject: queue),
+       let outputStr = String(data: outputData, encoding: .utf8) {
+        defaults.set(outputStr, forKey: "smsfilter_event_queue_json")
+    }
+}
+
 extension MessageFilterExtension: ILMessageFilterQueryHandling {
     func handle(
         _ queryRequest: ILMessageFilterQueryRequest,
@@ -53,8 +104,8 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
         completion: @escaping (ILMessageFilterQueryResponse) -> Void
     ) {
         let response = ILMessageFilterQueryResponse()
-        let sender = queryRequest.sender ?? ""
-        let body = queryRequest.messageBody ?? ""
+        let sender = String((queryRequest.sender ?? "").prefix(256))
+        let body = String((queryRequest.messageBody ?? "").prefix(4096))
         let lowerBody = body.lowercased()
         let lowerSender = sender.lowercased()
 
@@ -77,11 +128,11 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
             let value = entry.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !value.isEmpty else { return false }
             return sender.compare(value, options: .caseInsensitive) == .orderedSame
-                || sender.range(of: value, options: .caseInsensitive) != nil
         }
 
         guard !isWhitelisted, isWithinSchedule(settings) else {
             response.action = .allow
+            recordEvent(sender: sender, action: response.action)
             completion(response)
             return
         }
@@ -89,9 +140,12 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
         let mapping = settings["categoryMapping"] as? [String: Any] ?? [:]
         let invalidNumberFilter = settings["invalidNumberFilter"] as? Bool ?? false
         let blockForeignNumbers = settings["blockForeignNumbers"] as? Bool ?? false
-        if invalidNumberFilter && blockForeignNumbers
-            && sender.hasPrefix("+") && !sender.hasPrefix("+90") {
+        let isForeignSender = sender.hasPrefix("+") && !sender.hasPrefix("+90")
+        let hasLinkInBody = body.range(of: "(https?://|[a-z0-9-]+\\.(gd|ly|com|cc|top|xyz|me|co|site|info|fun|icu))", options: [.regularExpression, .caseInsensitive]) != nil
+
+        if isForeignSender && (hasLinkInBody || (invalidNumberFilter && blockForeignNumbers)) {
             response.action = categoryAction("junk", mapping: mapping)
+            recordEvent(sender: sender, action: response.action)
             completion(response)
             return
         }
@@ -102,6 +156,7 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
                 || sender.range(of: "[\\u0600-\\u06FF]", options: .regularExpression) != nil
         ) {
             response.action = categoryAction("junk", mapping: mapping)
+            recordEvent(sender: sender, action: response.action)
             completion(response)
             return
         }
@@ -110,9 +165,12 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
         if settings["fraudFilter"] as? Bool ?? true,
            customFraudKeywords.contains(where: { keyword in
                let normalized = keyword.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-               return !normalized.isEmpty && lowerBody.contains(normalized)
+               return !normalized.isEmpty
+                   && normalized.count <= 160
+                   && lowerBody.contains(normalized)
            }) {
             response.action = categoryAction("junk", mapping: mapping)
+            recordEvent(sender: sender, action: response.action)
             completion(response)
             return
         }
@@ -122,6 +180,7 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
         for rule in rules {
             guard let keyword = rule["keyword"] as? String,
                   !keyword.isEmpty,
+                  keyword.count <= 160,
                   let type = rule["type"] as? String,
                   let category = rule["category"] as? String,
                   let matchTarget = rule["matchTarget"] as? String else { continue }
@@ -145,6 +204,7 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
                 } else {
                     response.action = categoryAction(category, mapping: mapping)
                 }
+                recordEvent(sender: sender, action: response.action)
                 completion(response)
                 return
             }
@@ -157,6 +217,7 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
             for threat in threatDatabase {
                 guard let keyword = threat["keyword"] as? String,
                       !keyword.isEmpty,
+                      keyword.count <= 160,
                       let type = threat["type"] as? String else { continue }
 
                 let isMatch = type == "regex"
@@ -167,6 +228,7 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
 
                 if isMatch {
                     response.action = categoryAction("junk", mapping: mapping)
+                    recordEvent(sender: sender, action: response.action)
                     completion(response)
                     return
                 }
@@ -174,6 +236,7 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
         }
 
         response.action = .allow
+        recordEvent(sender: sender, action: response.action)
         completion(response)
     }
 }

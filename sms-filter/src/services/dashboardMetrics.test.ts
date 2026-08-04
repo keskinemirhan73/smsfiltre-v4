@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   buildThreatDistribution,
   buildWeeklySuspiciousSeries,
+  reconcileDashboardStats,
 } from './dashboardMetrics';
 
 test('haftalık seri veri yokken sahte olay üretmez', () => {
@@ -48,4 +49,18 @@ test('tehdit dağılımı gerçek sayaçları kullanır ve izinli sayısını ne
     }).allowed,
     0,
   );
+});
+
+test('gecmis kaydi varken eksik kalmis sayaclari gorunum icin onarir', () => {
+  const repaired = reconcileDashboardStats(
+    { blockedCount: 0, analyzedCount: 0, transactionCount: 0, promotionCount: 0 },
+    [{ status: 'blocked', timestamp: Date.now() }],
+  );
+
+  assert.deepEqual(repaired, {
+    blockedCount: 1,
+    analyzedCount: 1,
+    transactionCount: 0,
+    promotionCount: 0,
+  });
 });

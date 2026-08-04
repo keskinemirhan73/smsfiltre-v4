@@ -35,7 +35,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     blockForeignNumbers: false,
     blockArabic: false,
     theme: 'system',
-    language: 'tr',
+    language: 'en',
     customFraudKeywords: [],
     whitelist: [],
     autoSyncEnabled: true,

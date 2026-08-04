@@ -2,6 +2,7 @@ import * as BackgroundFetch from 'expo-background-fetch';
 import * as TaskManager from 'expo-task-manager';
 import { ThreatCloudService } from './ThreatCloudService';
 import { backgroundSyncOutcome } from './backgroundSyncPolicy';
+import { FilterManager } from '../modules/FilterManager';
 
 const BACKGROUND_FETCH_TASK = 'background-threat-sync';
 
@@ -13,6 +14,7 @@ TaskManager.defineTask(BACKGROUND_FETCH_TASK, async () => {
     if (syncOutcome === 'failed') {
       return BackgroundFetch.BackgroundFetchResult.Failed;
     }
+    await FilterManager.initializeNativeFiltering();
     return BackgroundFetch.BackgroundFetchResult.NewData;
   } catch (error) {
     console.error('[BackgroundFetch] Senkronizasyon hatası:', error);

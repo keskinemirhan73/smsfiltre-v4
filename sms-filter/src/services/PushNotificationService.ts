@@ -68,3 +68,46 @@ export async function getExistingExpoPushTokenAsync(): Promise<string | undefine
     return undefined;
   }
 }
+
+export async function syncPushTokenWithBackend(token: string): Promise<boolean> {
+  if (!token) return false;
+  try {
+    const res = await fetch('https://filtreai.vercel.app/api/push/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token,
+        platform: Platform.OS,
+        deviceName: Device.deviceName || Device.modelName || 'Device',
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function scheduleWeeklySafetyNotification(): Promise<void> {
+  try {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    const hasSafetyReminder = scheduled.some(
+      n => n.content.data?.type === 'safety_reminder',
+    );
+    if (!hasSafetyReminder) {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'FiltreAI Korumanız Aktif 🛡️',
+          body: 'SMS filtre veritabanınız ve cihaz içi kurallarınız güncel. Güvendesiniz!',
+          data: { type: 'safety_reminder' },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: 7 * 24 * 60 * 60,
+          repeats: true,
+        },
+      });
+    }
+  } catch (err) {
+    console.warn('Haftalık bildirim planlanamadı:', err);
+  }
+}

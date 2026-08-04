@@ -10,8 +10,10 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Telephony
 import android.util.Log
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
+import java.util.UUID
 
 class SmsFilterReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -42,6 +44,7 @@ class SmsFilterReceiver : BroadcastReceiver() {
                 var customFraudKeywords = emptyList<String>()
                 var shouldBlock = false
                 var isWhitelisted = false
+                var classification = "allowed"
                 
                 try {
                     val jsonObj = JSONObject(jsonStr)
@@ -89,8 +92,9 @@ class SmsFilterReceiver : BroadcastReceiver() {
                     }
 
                     // 2. Foreign number and alphabet rules
-                    if (!shouldBlock && invalidNumberFilter && blockForeignNumbers &&
-                        sender.startsWith("+") && !sender.startsWith("+90")) {
+                    val isForeignSender = sender.startsWith("+") && !sender.startsWith("+90")
+                    val hasLinkInBody = Regex("(https?://|[a-z0-9-]+\\.(gd|ly|com|cc|top|xyz|me|co|site|info|fun|icu))", RegexOption.IGNORE_CASE).containsMatchIn(body)
+                    if (!shouldBlock && isForeignSender && (hasLinkInBody || (invalidNumberFilter && blockForeignNumbers))) {
                         shouldBlock = true
                     }
 
@@ -132,17 +136,23 @@ class SmsFilterReceiver : BroadcastReceiver() {
                             if (isMatch) {
                                 if (category == "junk") {
                                     shouldBlock = true
+                                    classification = "suspicious"
                                 } else if (category == "allowed") {
                                     shouldBlock = false
+                                    isWhitelisted = true
+                                    classification = "allowed"
+                                } else if (category == "transaction") {
+                                    classification = "transaction"
+                                } else if (category == "promotion") {
+                                    classification = "promotion"
                                 }
-                                // transaction and promotion: don't block, just classify
                                 break
                             }
                         }
                     }
                     
                     // 4. Threat Database
-                    if (!shouldBlock && smartFilter && (databaseFilter || fraudFilter) && jsonObj.has("threatDb")) {
+                    if (!shouldBlock && !isWhitelisted && smartFilter && (databaseFilter || fraudFilter) && jsonObj.has("threatDb")) {
                         val threatDb = jsonObj.getJSONArray("threatDb")
                         for (i in 0 until threatDb.length()) {
                             val threat = threatDb.getJSONObject(i)
@@ -158,6 +168,7 @@ class SmsFilterReceiver : BroadcastReceiver() {
                             
                             if (isMatch) {
                                 shouldBlock = true
+                                classification = "suspicious"
                                 break
                             }
                         }
@@ -167,13 +178,57 @@ class SmsFilterReceiver : BroadcastReceiver() {
                     Log.e("SmsFilter", "Error parsing rules", e)
                 }
 
+                if (shouldBlock) classification = "suspicious"
+                val eventId = recordSmsEvent(context, sender, classification)
                 if (shouldBlock) {
-                    Log.d("SmsFilter", "Suspicious SMS detected from: $sender")
-                    showSuspiciousSmsNotification(context, sender, body)
+                    Log.d("SmsFilter", "Suspicious SMS detected on device")
+                    showSuspiciousSmsNotification(context, eventId)
                 } else {
-                    Log.d("SmsFilter", "Allowed SMS from: $sender")
+                    Log.d("SmsFilter", "SMS analyzed on device")
                 }
         }
+    }
+
+    private fun recordSmsEvent(
+        context: Context,
+        sender: String,
+        classification: String
+    ): String {
+        val eventId = UUID.randomUUID().toString()
+        try {
+            val prefs = context.getSharedPreferences("smsfilter_prefs", Context.MODE_PRIVATE)
+            val storedQueue = prefs.getString("smsfilter_event_queue_json", "[]") ?: "[]"
+            val previousQueue = try { JSONArray(storedQueue) } catch (_: Exception) { JSONArray() }
+            val nextQueue = JSONArray()
+            val firstIndex = maxOf(0, previousQueue.length() - 49)
+            for (index in firstIndex until previousQueue.length()) {
+                nextQueue.put(previousQueue.get(index))
+            }
+
+            val preview = when (classification) {
+                "suspicious" -> "Şüpheli SMS cihaz üzerinde tespit edildi."
+                "transaction" -> "İşlem SMS'i cihaz üzerinde sınıflandırıldı."
+                "promotion" -> "Tanıtım SMS'i cihaz üzerinde sınıflandırıldı."
+                else -> "SMS cihaz üzerinde analiz edildi."
+            }
+            nextQueue.put(JSONObject()
+                .put("id", eventId)
+                .put("sender", maskSender(sender))
+                .put("preview", preview)
+                .put("status", classification)
+                .put("timestamp", System.currentTimeMillis()))
+            prefs.edit()
+                .putString("smsfilter_event_queue_json", nextQueue.toString())
+                .apply()
+        } catch (error: Exception) {
+            Log.e("SmsFilter", "Could not record SMS analysis event", error)
+        }
+        return eventId
+    }
+
+    private fun maskSender(sender: String): String {
+        val suffix = sender.trim().takeLast(4)
+        return if (suffix.isEmpty()) "Bilinmeyen" else "***$suffix"
     }
 
     private fun isWithinSchedule(enabled: Boolean, start: String, end: String): Boolean {
@@ -202,8 +257,7 @@ class SmsFilterReceiver : BroadcastReceiver() {
 
     private fun showSuspiciousSmsNotification(
         context: Context,
-        sender: String,
-        body: String
+        eventId: String
     ) {
         try {
             val channelId = "filtreai_sms_alerts"
@@ -246,7 +300,7 @@ class SmsFilterReceiver : BroadcastReceiver() {
                 .setVisibility(Notification.VISIBILITY_PRIVATE)
 
             pendingIntent?.let(builder::setContentIntent)
-            manager.notify("$sender:$body".hashCode(), builder.build())
+            manager.notify(eventId.hashCode(), builder.build())
         } catch (error: Exception) {
             Log.e("SmsFilter", "Could not show suspicious SMS notification", error)
         }
