@@ -197,6 +197,7 @@ export default function DashboardScreen() {
       let active = true;
       const refreshDashboard = async () => {
         await FilterManager.importNativeSmsEvents();
+        await ThreatCloudService.syncDatabase().catch(() => {});
         const [nextStats, nextHistory, db] = await Promise.all([
           FilterManager.loadStats(),
           FilterManager.loadHistory(),

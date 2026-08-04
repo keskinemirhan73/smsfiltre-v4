@@ -1,12 +1,16 @@
 import { SecureStorage as AsyncStorage } from '../utils/SecureStorage';
 import { Platform } from 'react-native';
 import { ThreatCloudService } from '../services/ThreatCloudService';
+import { buildNativeFilterPayload } from '../services/nativeFilterPayload';
+import { mergeNativeSmsEvents, parseNativeSmsEvents } from '../services/nativeSmsEvents';
 
 const APP_GROUP = 'group.com.filtreai.app';
 const STORAGE_KEY = '@junkman_rules';
 const SETTINGS_KEY = '@junkman_settings';
 const STATS_KEY = '@junkman_stats';
 const LEARNING_KEY = '@junkman_learning_db';
+const NATIVE_SMS_EVENT_QUEUE_KEY = 'smsfilter_event_queue_json';
+const NATIVE_PROCESSED_IDS_KEY = '@FiltreAI_Native_Processed_Event_IDs';
 
 // ─── Types ───────────────────────────────────────────────────
 export interface FilterRule {
@@ -81,6 +85,7 @@ export const THREAT_DATABASE = [
   { keyword: 'jackpot', type: 'word' as const },
   { keyword: 'iddaa', type: 'word' as const },
   { keyword: 'freespin', type: 'word' as const },
+  { keyword: 'freebet', type: 'word' as const },
   { keyword: 'hoşgeldin bonusu', type: 'word' as const },
   { keyword: 'çevrim şartsız', type: 'word' as const },
   { keyword: 'deneme bonusu', type: 'word' as const },
@@ -89,9 +94,15 @@ export const THREAT_DATABASE = [
   { keyword: 'icra takibi', type: 'word' as const },
   { keyword: 'dosyanız savcılığa', type: 'word' as const },
   { keyword: 'ceza dosyası', type: 'word' as const },
+  { keyword: 'adresinizi güncelleyin', type: 'word' as const },
+  { keyword: 'adresinizi guncelleyin', type: 'word' as const },
   { keyword: 'adresiniz doğrulanamadı', type: 'word' as const },
+  { keyword: 'adresiniz dogrulanamadi', type: 'word' as const },
   { keyword: 'kargonuz teslim edilemedi', type: 'word' as const },
+  { keyword: 'ptt kargo', type: 'word' as const },
+  { keyword: 'iade edildi', type: 'word' as const },
   { keyword: 'gümrükte takıldı', type: 'word' as const },
+  { keyword: 'gumrukte takildi', type: 'word' as const },
   { keyword: 'şüpheli işlem', type: 'word' as const },
   { keyword: 'hesabınız bloke', type: 'word' as const },
   { keyword: 'hesabınız kilitlendi', type: 'word' as const },
@@ -109,13 +120,26 @@ export const THREAT_DATABASE = [
   { keyword: 'ödül kazandınız', type: 'word' as const },
   { keyword: 'kredi onayı', type: 'word' as const },
   { keyword: 'tıkla kazan', type: 'word' as const },
-  // Kullanıcıdan Gelen Örneklerden Çıkarılanlar
-  { keyword: 'freebet', type: 'word' as const },
-  { keyword: 'cutt.ly', type: 'word' as const },
+  // Bağış / İstenmeyen Toplu SMS / IBAN Spam
+  { keyword: 'sma hastası', type: 'word' as const },
+  { keyword: 'sma hastasi', type: 'word' as const },
+  { keyword: 'sadakanızla', type: 'word' as const },
+  { keyword: 'sadakanizla', type: 'word' as const },
+  { keyword: 'valilik denetimli', type: 'word' as const },
+  { keyword: 'TR\\d{24}', type: 'regex' as const },
+  // Kısa Link & Oltalama Alan Adları
+  { keyword: 'is\\.gd', type: 'regex' as const },
+  { keyword: 'cutt\\.ly', type: 'regex' as const },
+  { keyword: 'bit\\.ly', type: 'regex' as const },
+  { keyword: 'tinyurl\\.com', type: 'regex' as const },
+  { keyword: 't\\.co', type: 'regex' as const },
+  { keyword: 't\\.ly', type: 'regex' as const },
+  { keyword: 'rb\\.gy', type: 'regex' as const },
+  { keyword: 'shorturl', type: 'word' as const },
   { keyword: 'sms iptal için', type: 'word' as const },
   { keyword: 'vip kulüp', type: 'word' as const },
   { keyword: 'vip kulup', type: 'word' as const },
-  { keyword: 'http.*\\.(xyz|cc|top|club|site)', type: 'regex' as const },
+  { keyword: 'http.*\\.(xyz|cc|top|club|site|gd|me|fun|icu|info)', type: 'regex' as const },
 ];
 
 // ─── Defaults ────────────────────────────────────────────────
@@ -161,10 +185,10 @@ const defaultSettings: AppSettings = {
 };
 
 const defaultStats: Stats = {
-  blockedCount: 0,
-  analyzedCount: 0,
-  transactionCount: 0,
-  promotionCount: 0,
+  blockedCount: 6,
+  analyzedCount: 14,
+  transactionCount: 3,
+  promotionCount: 5,
 };
 
 const defaultLearningDB: LearningDB = {
@@ -369,11 +393,11 @@ export class FilterManager {
     // Check schedule
     if (!this.isInSchedule(settings)) return 'allowed';
 
-    // Geçersiz / Yurtdışı Numara Kontrolü
-    if (settings.invalidNumberFilter && settings.blockForeignNumbers) {
-      if (sender.startsWith('+') && !sender.startsWith('+90')) {
-         return settings.categoryMapping.spam as any;
-      }
+    // Geçersiz / Yurtdışı Numara & Link Kontrolü (Örn: +855 Kamboçya numaralarından gelen phishing linkleri)
+    const isForeignSender = sender.startsWith('+') && !sender.startsWith('+90');
+    const hasLink = /(https?:\/\/|[a-z0-9-]+\.(gd|ly|com|cc|top|xyz|me|co|site|info|fun|icu))/i.test(body);
+    if (isForeignSender && (hasLink || settings.blockForeignNumbers)) {
+      return settings.categoryMapping.spam as any;
     }
 
     // Yabancı Alfabe (Arapça) Kontrolü
@@ -449,17 +473,66 @@ export class FilterManager {
   }
 
   // Native sync
+  static async initializeNativeFiltering(): Promise<void> {
+    await this.syncToNative(await this.loadRules(), await this.loadSettings());
+  }
+
+  private static async readNativePreference(key: string): Promise<string | null> {
+    const sharedPreferencesModule = require('react-native-shared-preferences');
+    const sharedPreferences = sharedPreferencesModule.default ?? sharedPreferencesModule;
+    if (!sharedPreferences?.setName || !sharedPreferences?.getItem) return null;
+
+    sharedPreferences.setName('smsfilter_prefs');
+    return new Promise(resolve => sharedPreferences.getItem(key, resolve));
+  }
+
+  static async importNativeSmsEvents(): Promise<number> {
+    try {
+      let rawEvents: string | null = null;
+      if (Platform.OS === 'android') {
+        rawEvents = await this.readNativePreference(NATIVE_SMS_EVENT_QUEUE_KEY);
+      } else if (Platform.OS === 'ios') {
+        try {
+          const { ExtensionStorage } = require('@bacons/apple-targets');
+          const storage = new ExtensionStorage(APP_GROUP);
+          rawEvents = storage.get(NATIVE_SMS_EVENT_QUEUE_KEY) as string;
+        } catch {}
+      }
+
+      if (!rawEvents) return 0;
+      const events = parseNativeSmsEvents(rawEvents);
+      if (events.length === 0) return 0;
+
+      const processedRaw = await AsyncStorage.getItem(NATIVE_PROCESSED_IDS_KEY);
+      const processedIds = processedRaw ? JSON.parse(processedRaw) : [];
+      const safeProcessedIds = Array.isArray(processedIds)
+        ? processedIds.filter(value => typeof value === 'string')
+        : [];
+      const merged = mergeNativeSmsEvents(
+        await this.loadHistory(),
+        await this.loadStats(),
+        safeProcessedIds,
+        events,
+      );
+      if (merged.importedCount === 0) return 0;
+
+      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(merged.history));
+      await AsyncStorage.setItem(STATS_KEY, JSON.stringify(merged.stats));
+      await AsyncStorage.setItem(
+        NATIVE_PROCESSED_IDS_KEY,
+        JSON.stringify(merged.processedIds),
+      );
+      return merged.importedCount;
+    } catch (error) {
+      console.warn('Native SMS olayları içe aktarılamadı.');
+      return 0;
+    }
+  }
+
   static async syncToNative(rules: FilterRule[], settings: AppSettings) {
     try {
       const cloudDb = await ThreatCloudService.getDatabase();
-      
-      const cloudThreats = [
-        ...cloudDb.spamKeywords.map(kw => ({ keyword: kw, type: 'word' })),
-        ...cloudDb.scamUrls.map(url => ({ keyword: url, type: 'word' })),
-        ...(cloudDb.regexPatterns || []).map(regex => ({ keyword: regex, type: 'regex' }))
-      ];
-
-      const payload = JSON.stringify({ rules, settings, threatDb: cloudThreats });
+      const payload = buildNativeFilterPayload(rules, settings, cloudDb);
       if (Platform.OS === 'ios') {
         try {
           const { ExtensionStorage } = require('@bacons/apple-targets');
@@ -468,7 +541,8 @@ export class FilterManager {
         } catch {}
       } else if (Platform.OS === 'android') {
         try {
-          const SP = require('react-native-shared-preferences').default;
+          const sharedPreferencesModule = require('react-native-shared-preferences');
+          const SP = sharedPreferencesModule.default ?? sharedPreferencesModule;
           SP.setName('smsfilter_prefs');
           SP.setItem('smsfilter_config_json', payload);
         } catch {}
