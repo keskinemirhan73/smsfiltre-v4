@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Linking, Alert, TextInput } from 'react-native';
-import { ShieldAlert, ShieldCheck, X, ShieldBan, Flag, Send, ChevronDown } from 'lucide-react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Linking, Alert, TextInput, Platform } from 'react-native';
+import { ShieldAlert, ShieldCheck, X, ShieldBan, Send, Check, ChevronDown, HelpCircle, ArrowRight } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useAppTheme, spacing, radii } from '../theme';
 import { HistoryItem } from '../modules/FilterManager';
@@ -17,18 +17,27 @@ interface SmsDetailModalProps {
   onReport: (keyword: string, category: string, notes: string) => void;
 }
 
+const CATEGORIES = [
+  { key: 'İstenmeyen', label: 'İstenmeyen', icon: ShieldBan, color: '#EF4444' },
+  { key: 'İzin Verilen', label: 'İzin Verilen', icon: ShieldCheck, color: '#10B981' },
+  { key: 'İşlem', label: 'İşlem', icon: Send, color: '#3B82F6' },
+  { key: 'Promosyon', label: 'Promosyon', icon: ShieldAlert, color: '#F59E0B' },
+];
+
 export function SmsDetailModal({ visible, item, onClose, onCreateRule, onMarkAsNotJunk, onReportAsJunk, onReport }: SmsDetailModalProps) {
   const theme = useAppTheme();
   const [urls, setUrls] = useState<string[]>([]);
   const [checkingUrl, setCheckingUrl] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string>('İstenmeyen');
   const [notes, setNotes] = useState<string>('');
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
 
   useEffect(() => {
     if (item && item.preview) {
       setUrls(SecurityUtils.extractUrls(item.preview));
-      setSelectedCategory('İstenmeyen'); // default
+      setSelectedCategory('İstenmeyen');
       setNotes('');
+      setShowCategoryDropdown(false);
     } else {
       setUrls([]);
     }
@@ -62,329 +71,351 @@ export function SmsDetailModal({ visible, item, onClose, onCreateRule, onMarkAsN
     }
   };
 
-  const getStatusColor = () => {
-    switch (item.status) {
-      case 'blocked': return theme.danger;
-      case 'transaction': return theme.primary;
-      case 'promotion': return '#F59E0B';
-      default: return theme.secondary;
-    }
-  };
-
   const getStatusText = () => {
     switch (item.status) {
-      case 'blocked': return '🛡️ FiltreAI Spam Kalkanı Tarafından Engellendi';
-      case 'transaction': return '💳 Güvenli İşlem / Doğrulama Kodu';
-      case 'promotion': return '📢 Tanıtım / Kampanya Mesajı';
-      default: return '✅ Güvenli Gönderici (İzin Verildi)';
+      case 'blocked': return '🛡️ Engellendi (Spam)';
+      case 'transaction': return '💳 Güvenli İşlem';
+      case 'promotion': return '📢 Tanıtım Mesajı';
+      default: return '❓ Sonuç Yok / Bilinmeyen';
     }
   };
 
-  const StatusIcon = item.status === 'blocked' ? ShieldBan : ShieldCheck;
-
   return (
-    <Modal visible={visible} animationType="slide" transparent={true} onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContainer, { backgroundColor: theme.surface }]}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={[styles.container, { backgroundColor: '#F2F2F7' }]}>
+        
+        {/* Header Bar */}
+        <View style={styles.headerBar}>
+          <TouchableOpacity onPress={onClose} style={styles.iconCircleBtn}>
+            <X color="#3C3C43" size={20} />
+          </TouchableOpacity>
+          
+          <Text style={styles.headerTitle}>FiltreAI</Text>
 
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: theme.text }]}>FiltreAI Detay</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <X color={theme.textMuted} size={24} />
-            </TouchableOpacity>
+          <TouchableOpacity onPress={onClose} style={[styles.iconCircleBtn, { backgroundColor: '#8E8E9320' }]}>
+            <Check color="#007AFF" size={20} />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          
+          {/* Gönderici Card */}
+          <Text style={styles.sectionLabel}>Gönderici</Text>
+          <View style={styles.infoCard}>
+            <Text style={styles.flagIcon}>🇹🇷</Text>
+            <Text style={styles.senderText}>{item.sender}</Text>
           </View>
 
-          <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
-            {/* Sender and Message Body */}
-            <View style={[styles.card, { backgroundColor: theme.background }]}>
-              <Text style={[styles.label, { color: theme.textMuted }]}>Gönderici</Text>
-              <Text style={[styles.value, { color: theme.text }]}>{item.sender}</Text>
+          {/* Mesaj Card */}
+          <Text style={styles.sectionLabel}>Mesaj</Text>
+          <View style={styles.infoCard}>
+            <Text style={styles.messageText}>{item.preview}</Text>
+          </View>
 
-              <View style={[styles.divider, { backgroundColor: theme.border }]} />
-
-              <Text style={[styles.label, { color: theme.textMuted }]}>Mesaj İçeriği</Text>
-              <Text style={[styles.messageBody, { color: theme.text }]}>{item.preview}</Text>
+          {/* Sizin Sınıflandırmanız Card */}
+          <Text style={styles.sectionLabel}>Sizin Sınıflandırmanız</Text>
+          <TouchableOpacity
+            style={styles.dropdownCard}
+            onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
+            activeOpacity={0.8}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <ShieldBan size={22} color="#EF4444" />
+              <Text style={styles.dropdownCardText}>{selectedCategory}</Text>
             </View>
+            <ChevronDown size={20} color="#8E8E93" />
+          </TouchableOpacity>
 
-            {/* App Decision */}
-            <View style={[styles.card, { backgroundColor: theme.background }]}>
-              <Text style={[styles.label, { color: theme.textMuted }]}>Uygulamanın Kararı</Text>
-              <View style={styles.decisionRow}>
-                <StatusIcon color={getStatusColor()} size={20} />
-                <Text style={[styles.decisionText, { color: getStatusColor() }]}>
-                  {getStatusText()}
-                </Text>
-              </View>
-              {item.category && (
-                <Text style={[styles.categoryInfo, { color: theme.textMuted }]}>
-                  Nedeni: {item.category}
-                </Text>
-              )}
-            </View>
-
-            {/* URL Section */}
-            {urls.length > 0 && (
-              <View style={[styles.card, { backgroundColor: theme.background }]}>
-                <Text style={[styles.label, { color: theme.textMuted }]}>Mesajdaki Bağlantılar (URL)</Text>
-                {urls.map((url, index) => (
-                  <View key={index} style={styles.urlRow}>
-                    <Text style={[styles.urlText, { color: theme.primary }]} numberOfLines={1}>
-                      {url}
-                    </Text>
-                    <TouchableOpacity
-                      style={[styles.urlActionBtn, { backgroundColor: theme.primary + '20' }]}
-                      onPress={() => handleCheckUrl(url)}
-                      disabled={checkingUrl === url}
-                    >
-                      {checkingUrl === url ? (
-                        <Text style={[styles.urlActionText, { color: theme.primary }]}>...</Text>
-                      ) : (
-                        <>
-                          <ShieldAlert color={theme.primary} size={16} />
-                          <Text style={[styles.urlActionText, { color: theme.primary }]}>Kontrol Et</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {/* Actions Section */}
-            <View style={styles.actionsContainer}>
-              {onMarkAsNotJunk && (
-                <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: '#10B98120', borderColor: '#10B981', borderWidth: 1 }]}
-                  onPress={() => {
-                    onClose();
-                    onMarkAsNotJunk(item.sender);
-                  }}
-                >
-                  <ShieldCheck color="#10B981" size={20} />
-                  <Text style={[styles.actionBtnText, { color: '#10B981', fontWeight: '700' }]}>İstenmeyen Değil (Güvenli Yap)</Text>
-                </TouchableOpacity>
-              )}
-
-              {onReportAsJunk && (
-                <TouchableOpacity
-                  style={[styles.actionBtn, { backgroundColor: '#EF444420', borderColor: '#EF4444', borderWidth: 1 }]}
-                  onPress={() => {
-                    onClose();
-                    onReportAsJunk(item.sender, item.preview);
-                  }}
-                >
-                  <ShieldAlert color="#EF4444" size={20} />
-                  <Text style={[styles.actionBtnText, { color: '#EF4444', fontWeight: '700' }]}>İstenmeyen Olarak Bildir & Engelle</Text>
-                </TouchableOpacity>
-              )}
-
-              <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: theme.background, borderColor: theme.border, borderWidth: 1 }]}
-                onPress={() => {
-                  onClose();
-                  onCreateRule(item.sender);
-                }}
-              >
-                <ShieldBan color={theme.text} size={20} />
-                <Text style={[styles.actionBtnText, { color: theme.text }]}>Gönderici İçin Özel Kural Oluştur</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Detailed Reporting Section (Sizin Sınıflandırmanız) */}
-            <View style={[styles.card, { backgroundColor: theme.background, marginTop: spacing.md }]}>
-              <Text style={[styles.label, { color: theme.textMuted }]}>Sizin Sınıflandırmanız</Text>
-
-              <View style={styles.categoryChips}>
-                {['İstenmeyen', 'İzin Verilen', 'İşlem', 'Promosyon'].map((cat) => (
+          {/* Category Dropdown Selector */}
+          {showCategoryDropdown && (
+            <View style={styles.dropdownMenu}>
+              {CATEGORIES.map((cat) => {
+                const CatIcon = cat.icon;
+                return (
                   <TouchableOpacity
-                    key={cat}
-                    style={[
-                      styles.categoryChip,
-                      {
-                        backgroundColor: selectedCategory === cat ? theme.primary + '20' : theme.surface,
-                        borderColor: selectedCategory === cat ? theme.primary : theme.border
-                      }
-                    ]}
-                    onPress={() => setSelectedCategory(cat)}
+                    key={cat.key}
+                    style={styles.dropdownMenuItem}
+                    onPress={() => {
+                      setSelectedCategory(cat.key);
+                      setShowCategoryDropdown(false);
+                    }}
                   >
-                    <Text style={[styles.categoryChipText, { color: selectedCategory === cat ? theme.primary : theme.text }]}>
-                      {cat}
+                    <CatIcon size={20} color={cat.color} />
+                    <Text style={[styles.dropdownMenuItemText, { color: cat.key === selectedCategory ? '#007AFF' : '#000000' }]}>
+                      {cat.label}
                     </Text>
                   </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={[styles.label, { color: theme.textMuted, marginTop: spacing.md }]}>Ek Notlar (İsteğe Bağlı)</Text>
-              <TextInput
-                style={[styles.notesInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.surface }]}
-                placeholder="Raporunuz için ek not yazabilirsiniz..."
-                placeholderTextColor={theme.textMuted}
-                value={notes}
-                onChangeText={setNotes}
-                multiline
-                numberOfLines={3}
-              />
-
-              <TouchableOpacity
-                style={[styles.submitReportBtn, { backgroundColor: theme.primary, marginTop: spacing.md }]}
-                onPress={() => {
-                  onClose();
-                  onReport(item.preview, selectedCategory, notes);
-                }}
-              >
-                <Send color="#fff" size={20} />
-                <Text style={[styles.actionBtnText, { color: '#fff' }]}>Rapor Gönder</Text>
-              </TouchableOpacity>
+                );
+              })}
             </View>
-          </ScrollView>
+          )}
 
-        </View>
+          {/* Uygulamanın Şu Anki Kararı */}
+          <Text style={styles.sectionLabel}>Uygulamanın Şu Anki Kararı</Text>
+          <View style={styles.infoCard}>
+            <HelpCircle size={22} color="#8E8E93" />
+            <Text style={styles.decisionText}>{getStatusText()}</Text>
+          </View>
+
+          {/* URL Section */}
+          {urls.length > 0 && (
+            <>
+              <Text style={styles.sectionLabel}>Mesajdaki Bağlantılar (URL)</Text>
+              {urls.map((url, index) => (
+                <View key={index} style={styles.urlCard}>
+                  <Text style={styles.urlText} numberOfLines={1}>{url}</Text>
+                  <TouchableOpacity
+                    style={styles.urlCheckBtn}
+                    onPress={() => handleCheckUrl(url)}
+                    disabled={checkingUrl === url}
+                  >
+                    <Text style={styles.urlCheckBtnText}>
+                      {checkingUrl === url ? '...' : 'Kontrol Et'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </>
+          )}
+
+          {/* Eylemler Section */}
+          <Text style={[styles.sectionLabel, { marginTop: 24 }]}>Eylemler</Text>
+
+          {/* Gönderici İçin Bir Kural Oluştur Card */}
+          <TouchableOpacity
+            style={styles.actionCard}
+            onPress={() => {
+              onClose();
+              onCreateRule(item.sender);
+            }}
+            activeOpacity={0.8}
+          >
+            <View style={styles.actionCardHeader}>
+              <ShieldBan size={22} color="#EF4444" />
+              <Text style={styles.actionCardTitle}>Gönderici İçin Bir Kural Oluştur</Text>
+            </View>
+            <Text style={styles.actionCardSubtext}>
+              Bu göndericiden ileride gelecek tüm mesajları filtrelemek için bir kural oluşturun. Mesajlar istenmeyen olarak, sessiz ve bildirimsiz şekilde gelecek.
+            </Text>
+          </TouchableOpacity>
+
+          {/* Ek Notlar Input */}
+          <View style={styles.notesCard}>
+            <TextInput
+              style={styles.notesInput}
+              placeholder="Ek notlar"
+              placeholderTextColor="#8E8E93"
+              value={notes}
+              onChangeText={setNotes}
+              multiline
+              numberOfLines={3}
+            />
+          </View>
+
+          {/* Rapor Gönder Button */}
+          <TouchableOpacity
+            style={styles.submitReportBtn}
+            onPress={() => {
+              onClose();
+              onReport(item.preview, selectedCategory, notes);
+            }}
+            activeOpacity={0.85}
+          >
+            <Send size={22} color="#007AFF" />
+            <Text style={styles.submitReportBtnText}>Rapor Gönder</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.reportDisclaimer}>
+            Raporlanan mesajlar manuel olarak incelenir ve Akıllı Filtre’nin gelecek sürümlerini eğitmek için kullanılabilir. Lütfen hassas bilgi içermediklerinden emin olun.
+          </Text>
+
+        </ScrollView>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  modalOverlay: {
+  container: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
   },
-  modalContainer: {
-    borderTopLeftRadius: radii.xl,
-    borderTopRightRadius: radii.xl,
-    maxHeight: '90%',
-    minHeight: '50%',
-    padding: spacing.lg,
-  },
-  header: {
+  headerBar: {
+    height: 56,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    backgroundColor: '#F2F2F7',
   },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  iconCircleBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#8E8E9330',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  closeBtn: {
-    padding: 4,
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#000000',
   },
   scrollContent: {
-    flexGrow: 0,
+    paddingHorizontal: 16,
+    paddingBottom: 40,
   },
-  card: {
-    borderRadius: radii.md,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  },
-  label: {
-    fontSize: 12,
+  sectionLabel: {
+    fontSize: 13,
     fontWeight: '600',
+    color: '#6C6C70',
+    marginTop: 18,
+    marginBottom: 8,
     textTransform: 'uppercase',
-    marginBottom: 4,
   },
-  value: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  divider: {
-    height: 1,
-    marginVertical: spacing.md,
-  },
-  messageBody: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  decisionRow: {
+  infoCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    gap: 12,
+  },
+  flagIcon: {
+    fontSize: 22,
+  },
+  senderText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  messageText: {
+    fontSize: 16,
+    lineHeight: 22,
+    color: '#1C1C1E',
+  },
+  dropdownCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  dropdownCardText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  dropdownMenu: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    marginTop: 8,
+    paddingVertical: 6,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  dropdownMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  dropdownMenuItemText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
   decisionText: {
     fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
+    fontWeight: '600',
+    color: '#1C1C1E',
   },
-  categoryInfo: {
-    fontSize: 13,
-    marginTop: 6,
-    fontStyle: 'italic',
-  },
-  urlRow: {
+  urlCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: spacing.sm,
-    backgroundColor: 'rgba(0,0,0,0.03)',
-    padding: spacing.sm,
-    borderRadius: radii.sm,
+    marginBottom: 8,
   },
   urlText: {
     flex: 1,
-    marginRight: 8,
-    fontSize: 14,
+    fontSize: 15,
+    color: '#007AFF',
+    marginRight: 10,
   },
-  urlActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  urlCheckBtn: {
+    backgroundColor: '#007AFF15',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: radii.full,
+    borderRadius: 8,
   },
-  urlActionText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginLeft: 4,
+  urlCheckBtnText: {
+    color: '#007AFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
-  actionsContainer: {
-    marginTop: spacing.md,
-    gap: spacing.sm,
-    marginBottom: spacing.xl,
+  actionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
+    gap: 8,
   },
-  actionBtn: {
+  actionCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.md,
-    borderRadius: radii.md,
-    gap: spacing.sm,
+    gap: 10,
   },
-  actionBtnText: {
-    fontSize: 16,
-    fontWeight: '600',
+  actionCardTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#000000',
   },
-  categoryChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 8,
+  actionCardSubtext: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#8E8E93',
   },
-  categoryChip: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: radii.full,
-    borderWidth: 1,
-  },
-  categoryChipText: {
-    fontSize: 14,
-    fontWeight: '600',
+  notesCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
+    marginTop: 14,
   },
   notesInput: {
-    borderWidth: 1,
-    borderRadius: radii.md,
-    padding: 12,
-    marginTop: 8,
-    minHeight: 80,
+    fontSize: 16,
+    color: '#000000',
+    minHeight: 60,
     textAlignVertical: 'top',
-    fontSize: 14,
   },
   submitReportBtn: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    height: 54,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.md,
-    borderRadius: radii.md,
-    gap: spacing.sm,
-  }
+    gap: 10,
+    marginTop: 14,
+  },
+  submitReportBtnText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#007AFF',
+  },
+  reportDisclaimer: {
+    fontSize: 12,
+    lineHeight: 16,
+    color: '#8E8E93',
+    marginTop: 10,
+    textAlign: 'left',
+    paddingHorizontal: 4,
+  },
 });
