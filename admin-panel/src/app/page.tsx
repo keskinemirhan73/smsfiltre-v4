@@ -21,9 +21,6 @@ export default function LandingPage() {
             <span className="text-2xl font-black tracking-tight text-white">FiltreAI</span>
           </div>
           <div className="flex items-center gap-6 text-sm font-bold">
-            <Link href="/admin" className="text-[#a9bfd3] hover:text-white transition-colors hidden sm:block">
-              Yönetici Girişi
-            </Link>
             <button className="bg-white text-[#071625] px-6 py-2.5 rounded-full hover:bg-gray-100 transition-colors shadow-lg">
               Uygulamayı İndir
             </button>
