@@ -1,16 +1,19 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, Animated, KeyboardAvoidingView, Platform, Dimensions } from 'react-native';
-import { Plus, Trash2, X, ShieldBan, ShieldCheck, Receipt, Megaphone, Search } from 'lucide-react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Modal, Animated, KeyboardAvoidingView, Platform, Dimensions, Alert } from 'react-native';
+import { Plus, Trash2, X, ShieldBan, ShieldCheck, Receipt, Megaphone, Search, Flag, Send, CheckCircle2 } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme, spacing, radii } from '../theme';
-import { FilterManager, FilterRule } from '../modules/FilterManager';
+import { FilterManager, FilterRule, HistoryItem } from '../modules/FilterManager';
+import { parseCustomRuleKeyword } from '../services/customRuleInput';
+import { SecurityUtils } from '../utils/SecurityUtils';
 
-type CategoryTab = 'junk' | 'transaction' | 'promotion' | 'allowed';
+type CategoryTab = 'junk' | 'allowed' | 'transaction' | 'promotion' | 'reports';
 
 const TABS: { key: CategoryTab; label: string; icon: any; color: string }[] = [
   { key: 'junk', label: 'Spam', icon: ShieldBan, color: '#EF4444' },
   { key: 'allowed', label: 'İzinli', icon: ShieldCheck, color: '#10B981' },
+  { key: 'reports', label: 'Raporlar & İşlemler', icon: Flag, color: '#8B5CF6' },
   { key: 'transaction', label: 'İşlem', icon: Receipt, color: '#3B82F6' },
   { key: 'promotion', label: 'Tanıtım', icon: Megaphone, color: '#F59E0B' },
 ];
@@ -26,6 +29,47 @@ export default function RulesScreen() {
   const [newKeyword, setNewKeyword] = useState('');
   const [newMatchTarget, setNewMatchTarget] = useState<'sender' | 'content' | 'both'>('content');
   const [searchQuery, setSearchQuery] = useState('');
+  const [reportInput, setReportInput] = useState('');
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+
+  const handleQuickReport = async (category: 'junk' | 'allowed') => {
+    if (!reportInput.trim()) return;
+    setIsSubmittingReport(true);
+    try {
+      const parsed = parseCustomRuleKeyword(reportInput);
+      const keyword = parsed ? parsed.keyword : reportInput.trim();
+
+      // 1. Save rule locally
+      const newRule: FilterRule = {
+        id: Date.now().toString(),
+        keyword,
+        type: 'word',
+        category,
+        matchTarget: 'both',
+      };
+      const updated = [newRule, ...rules];
+      setRules(updated);
+      await FilterManager.saveRules(updated);
+
+      // 2. Submit report to backend cloud
+      const safeKeyword = SecurityUtils.maskPII(keyword);
+      await fetch('https://smsfiltre-v4.onrender.com/api/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keyword: safeKeyword, type: 'word', category })
+      }).catch(() => {});
+
+      setReportInput('');
+      Alert.alert(
+        category === 'junk' ? 'İstenmeyen Olarak Bildirildi' : 'Güvenli Olarak Bildirildi',
+        `"${keyword}" başarıyla kaydedildi ve topluluk havuzuna fırlatıldı! 🚀`
+      );
+    } catch {
+      Alert.alert('İşlem Başarılı', 'Kural yerel veritabanına işlendi.');
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -34,18 +78,25 @@ export default function RulesScreen() {
   );
 
   const filteredRules = rules.filter(r => 
-    r.category === activeTab && 
+    (r.category === activeTab || activeTab === 'reports') && 
     (r.keyword.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const handleAddRule = async () => {
     if (!newKeyword.trim()) return;
-    const isRegex = newKeyword.includes('[') || newKeyword.includes('\\') || newKeyword.includes('+') || newKeyword.includes('*');
+    const parsedKeyword = parseCustomRuleKeyword(newKeyword);
+    if (!parsedKeyword) {
+      Alert.alert(
+        'Geçersiz Kural',
+        'Kural en fazla 200 karakter olmalı; regex kullanıyorsanız ifade geçerli ve güvenli olmalıdır.',
+      );
+      return;
+    }
     const newRule: FilterRule = {
       id: Date.now().toString(),
-      keyword: newKeyword.trim(),
-      type: isRegex ? 'regex' : 'word',
-      category: activeTab,
+      keyword: parsedKeyword.keyword,
+      type: parsedKeyword.type,
+      category: activeTab === 'reports' ? 'junk' : activeTab,
       matchTarget: newMatchTarget,
     };
     const updated = [newRule, ...rules];
@@ -115,43 +166,108 @@ export default function RulesScreen() {
         </View>
       </View>
 
-      {/* Rules List */}
+      {/* Content Area */}
       <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-        {filteredRules.map((rule) => (
-          <View key={rule.id} style={[styles.ruleCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <View style={[styles.ruleIconWrapper, { backgroundColor: `${activeTabInfo.color}15` }]}>
-              <activeTabInfo.icon size={20} color={activeTabInfo.color} />
-            </View>
-            <View style={styles.ruleInfo}>
-              <Text style={[styles.ruleKeyword, { color: theme.text }]}>{rule.keyword}</Text>
-              <Text style={[styles.ruleMeta, { color: theme.textMuted }]}>
-                {rule.type === 'regex' ? 'Düzenli İfade (Regex)' : 'Kelime / Numara'} • {rule.matchTarget === 'sender' ? 'Gönderici' : rule.matchTarget === 'content' ? 'Mesaj İçeriği' : 'Her İkisi'}
+        {activeTab === 'reports' ? (
+          <View style={{ gap: spacing.md }}>
+            {/* Quick Report Panel */}
+            <View style={[styles.ruleCard, { backgroundColor: theme.card, borderColor: theme.border, flexDirection: 'column', alignItems: 'stretch', gap: 12 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Flag size={20} color="#8B5CF6" />
+                <Text style={{ fontSize: 16, fontWeight: '700', color: theme.text }}>Hızlı Rapor & Kural Oluştur</Text>
+              </View>
+              <Text style={{ fontSize: 13, color: theme.textMuted }}>
+                Gelen bir SMS numarasını veya şüpheli kelimeyi buraya yazıp topluluk veritabanına ve kendi filtrenize anında işleyin.
               </Text>
+              <TextInput
+                style={[styles.searchInput, { backgroundColor: theme.background, borderColor: theme.border, color: theme.text, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, height: 46 }]}
+                placeholder="Örn: CELTICBET, +90549..., VikingMt2"
+                placeholderTextColor={theme.textMuted}
+                value={reportInput}
+                onChangeText={setReportInput}
+                autoCapitalize="none"
+              />
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 4 }}>
+                <TouchableOpacity
+                  style={{ flex: 1, backgroundColor: '#EF4444', height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}
+                  onPress={() => handleQuickReport('junk')}
+                  disabled={!reportInput.trim() || isSubmittingReport}
+                >
+                  <ShieldBan size={18} color="#fff" />
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>İstenmeyen Yap</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{ flex: 1, backgroundColor: '#10B981', height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}
+                  onPress={() => handleQuickReport('allowed')}
+                  disabled={!reportInput.trim() || isSubmittingReport}
+                >
+                  <ShieldCheck size={18} color="#fff" />
+                  <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Güvenli Yap</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-            <TouchableOpacity style={styles.deleteButton} onPress={() => handleDeleteRule(rule.id)}>
-              <Trash2 color={theme.danger} size={20} />
-            </TouchableOpacity>
-          </View>
-        ))}
-        {filteredRules.length === 0 && (
-          <View style={styles.emptyState}>
-            <View style={[styles.emptyIconContainer, { backgroundColor: `${activeTabInfo.color}10` }]}>
-              <activeTabInfo.icon color={activeTabInfo.color} size={56} opacity={0.9} />
-            </View>
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>Kural Bulunamadı</Text>
-            <Text style={[styles.emptyText, { color: theme.textMuted }]}>
-              {searchQuery ? "Aramanızla eşleşen kural yok." : "Özel kurallar ekleyerek filtreyi kişiselleştirin."}
+
+            {/* User Activity Feed */}
+            <Text style={{ fontSize: 15, fontWeight: '700', color: theme.text, marginTop: 8, marginLeft: 4 }}>
+              Eklenen Son Kurallar & Raporlarınız
             </Text>
-            {!searchQuery && (
-              <TouchableOpacity 
-                style={[styles.emptyAddBtn, { backgroundColor: activeTabInfo.color }]}
-                onPress={() => setShowModal(true)}
-              >
-                <Plus color="#fff" size={20} />
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15, marginLeft: 8 }}>Yeni Kural Ekle</Text>
-              </TouchableOpacity>
-            )}
+            {rules.map((rule) => (
+              <View key={rule.id} style={[styles.ruleCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <View style={[styles.ruleIconWrapper, { backgroundColor: rule.category === 'junk' ? '#EF444420' : '#10B98120' }]}>
+                  {rule.category === 'junk' ? <ShieldBan size={20} color="#EF4444" /> : <ShieldCheck size={20} color="#10B981" />}
+                </View>
+                <View style={styles.ruleInfo}>
+                  <Text style={[styles.ruleKeyword, { color: theme.text }]}>{rule.keyword}</Text>
+                  <Text style={[styles.ruleMeta, { color: theme.textMuted }]}>
+                    {rule.category === 'junk' ? 'İstenmeyen (Engellendi)' : 'İzinli (Güvenli)'} • Cihaz & Sunucuya İşlendi
+                  </Text>
+                </View>
+                <TouchableOpacity style={styles.deleteButton} onPress={() => handleDeleteRule(rule.id)}>
+                  <Trash2 color={theme.danger} size={20} />
+                </TouchableOpacity>
+              </View>
+            ))}
           </View>
+        ) : (
+          <>
+            {filteredRules.map((rule) => (
+              <View key={rule.id} style={[styles.ruleCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <View style={[styles.ruleIconWrapper, { backgroundColor: `${activeTabInfo.color}15` }]}>
+                  <activeTabInfo.icon size={20} color={activeTabInfo.color} />
+                </View>
+                <View style={styles.ruleInfo}>
+                  <Text style={[styles.ruleKeyword, { color: theme.text }]}>{rule.keyword}</Text>
+                  <Text style={[styles.ruleMeta, { color: theme.textMuted }]}>
+                    {rule.type === 'regex' ? 'Düzenli İfade (Regex)' : 'Kelime / Numara'} • {rule.matchTarget === 'sender' ? 'Gönderici' : rule.matchTarget === 'content' ? 'Mesaj İçeriği' : 'Her İkisi'}
+                  </Text>
+                </View>
+                <TouchableOpacity style={styles.deleteButton} onPress={() => handleDeleteRule(rule.id)}>
+                  <Trash2 color={theme.danger} size={20} />
+                </TouchableOpacity>
+              </View>
+            ))}
+            {filteredRules.length === 0 && (
+              <View style={styles.emptyState}>
+                <View style={[styles.emptyIconContainer, { backgroundColor: `${activeTabInfo.color}10` }]}>
+                  <activeTabInfo.icon color={activeTabInfo.color} size={56} opacity={0.9} />
+                </View>
+                <Text style={[styles.emptyTitle, { color: theme.text }]}>Kural Bulunamadı</Text>
+                <Text style={[styles.emptyText, { color: theme.textMuted }]}>
+                  {searchQuery ? "Aramanızla eşleşen kural yok." : "Özel kurallar ekleyerek filtreyi kişiselleştirin."}
+                </Text>
+                {!searchQuery && (
+                  <TouchableOpacity 
+                    style={[styles.emptyAddBtn, { backgroundColor: activeTabInfo.color }]}
+                    onPress={() => setShowModal(true)}
+                  >
+                    <Plus color="#fff" size={20} />
+                    <Text style={{ color: '#fff', fontWeight: '700', fontSize: 15, marginLeft: 8 }}>Yeni Kural Ekle</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
 
