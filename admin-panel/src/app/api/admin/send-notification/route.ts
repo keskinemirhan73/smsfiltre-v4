@@ -1,3 +1,4 @@
+import { NextResponse } from 'next/server';
 import { verifyTOTP } from '../../../../lib/totp';
 
 // Global / in-memory or store push tokens
