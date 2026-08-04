@@ -241,6 +241,7 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
     }
 }
 
+@available(iOS 14.0, *)
 extension MessageFilterExtension: ILMessageFilterReportHandling {
     func handle(
         _ reportRequest: ILMessageFilterReportRequest,
