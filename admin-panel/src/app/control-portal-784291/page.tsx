@@ -47,7 +47,7 @@ export default function SecretAdminPortal() {
   const [isSendingNotif, setIsSendingNotif] = useState(false);
   const [notifStatus, setNotifStatus] = useState<{type: 'success'|'error', msg: string} | null>(null);
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://smsfiltre-v4.onrender.com';
 
   const fetchDashboardData = async (pass: string, code?: string) => {
     try {
