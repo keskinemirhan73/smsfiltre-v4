@@ -1,6 +1,6 @@
 import React, { useContext, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { ShieldCheck, MessageSquareWarning, Shield } from 'lucide-react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, ScrollView, Linking } from 'react-native';
+import { Settings as SettingsIcon, MessageSquare, Scan, Shield, Bell, CheckCircle2, Phone } from 'lucide-react-native';
 import { ThemeContext } from '../theme';
 import { getT } from '../i18n';
 import SettingsContext from '../context/SettingsContext';
@@ -16,7 +16,23 @@ export default function OnboardingScreen({ navigation }: any) {
 
   const [loading, setLoading] = useState(false);
 
-  const handleGrantPermission = async () => {
+  const handleOpenSettings = async () => {
+    if (Platform.OS === 'ios') {
+      try {
+        await Linking.openURL('App-Prefs:MESSAGES');
+      } catch {
+        try {
+          await Linking.openURL('app-settings:');
+        } catch {
+          Linking.openSettings();
+        }
+      }
+    } else {
+      Linking.openSettings();
+    }
+  };
+
+  const handleNext = async () => {
     setLoading(true);
     try {
       if (isAndroid) {
@@ -32,75 +48,147 @@ export default function OnboardingScreen({ navigation }: any) {
     }
   };
 
-  const handleSkip = async () => {
-    try {
-      await markOnboardingComplete();
-    } catch (error) {
-      console.warn('Onboarding durumu kaydedilemedi:', error);
-    }
-    navigation.replace('MainTabs');
-  };
-
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.content}>
-        <View style={styles.iconContainer}>
-          <View style={[styles.iconCircle, { backgroundColor: theme.primary + '20' }]}>
-            <ShieldCheck size={80} color={theme.primary} />
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        
+        {/* Screen Header */}
+        <Text style={[styles.mainTitle, { color: theme.text }]}>
+          {isEn ? 'Enable FiltreAI...' : 'FiltreAI’yi Etkinleştirin...'}
+        </Text>
+
+        {/* Step List */}
+        <View style={styles.stepList}>
+          {/* Step 1 */}
+          <View style={styles.stepRow}>
+            <View style={[styles.iconContainer, { backgroundColor: '#475569' }]}>
+              <SettingsIcon size={22} color="#FFFFFF" />
+            </View>
+            <Text style={[styles.stepText, { color: theme.text }]}>
+              {isEn 
+                ? 'Tap the button at the bottom to open your device\'s Settings app.'
+                : 'Ekranın altındaki butona dokunarak cihazınızın Ayarlar uygulamasını açın.'}
+            </Text>
+          </View>
+
+          {/* Step 2 */}
+          <View style={styles.stepRow}>
+            <View style={[styles.iconContainer, { backgroundColor: '#10B981' }]}>
+              <MessageSquare size={22} color="#FFFFFF" />
+            </View>
+            <Text style={[styles.stepText, { color: theme.text }]}>
+              {isEn
+                ? 'In Settings, go to Apps -> Messages and scroll to Unknown Senders.'
+                : 'Ayarlar içinde Uygulamalar -> Mesajlar’a girin ve Bilinmeyen Gönderenler başlığına inin.'}
+            </Text>
+          </View>
+
+          {/* Step 3 */}
+          <View style={styles.stepRow}>
+            <View style={[styles.iconContainer, { backgroundColor: '#10B981' }]}>
+              <Scan size={22} color="#FFFFFF" />
+            </View>
+            <Text style={[styles.stepText, { color: theme.text }]}>
+              {isEn
+                ? 'Enable "Filter Unknown Senders".'
+                : 'Bilinmeyen Gönderenleri Tara’yı etkinleştirin.'}
+            </Text>
+          </View>
+
+          {/* Step 4 */}
+          <View style={styles.stepRow}>
+            <View style={[styles.iconContainer, { backgroundColor: '#2563EB' }]}>
+              <Shield size={22} color="#FFFFFF" />
+            </View>
+            <Text style={[styles.stepText, { color: theme.text }]}>
+              {isEn
+                ? 'Under Message Filtering, enable FiltreAI.'
+                : 'Mesaj Filtresi altında FiltreAI’yi etkinleştirin.'}
+            </Text>
+          </View>
+
+          {/* Step 5 */}
+          <View style={styles.stepRow}>
+            <View style={[styles.iconContainer, { backgroundColor: '#10B981' }]}>
+              <Bell size={22} color="#FFFFFF" />
+            </View>
+            <Text style={[styles.stepText, { color: theme.text }]}>
+              {isEn
+                ? 'Under Allow Notifications, turn on all notification categories.'
+                : 'Bildirimlere İzin Ver altında tüm bildirim kategorilerini açın.'}
+            </Text>
+          </View>
+
+          {/* Step 6 Recommendation */}
+          <View style={styles.stepRow}>
+            <View style={[styles.iconContainer, { backgroundColor: '#10B981' }]}>
+              <CheckCircle2 size={22} color="#FFFFFF" />
+            </View>
+            <Text style={[styles.stepText, { color: theme.text }]}>
+              <Text style={{ fontWeight: '700', fontStyle: 'italic' }}>
+                {isEn ? 'Recommended: ' : 'Önerilir: '}
+              </Text>
+              {isEn
+                ? 'Disable default "Filter Junk" as it may conflict with FiltreAI.'
+                : 'İstenmeyenleri Filtrele’yi devre dışı bırakın çünkü FiltreAI ile çakışabilir.'}
+            </Text>
           </View>
         </View>
 
-        <Text style={[styles.title, { color: theme.text }]}>
-          {isEn
-            ? (isAndroid ? 'Enable SMS Protection' : 'Set Up Message Filtering')
-            : (isAndroid ? 'SMS Korumasını Etkinleştir' : 'Mesaj Filtrelemeyi Ayarla')}
+        {/* Divider */}
+        <View style={[styles.divider, { backgroundColor: theme.border }]} />
+
+        {/* Optional Reporting Section */}
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>
+          {isEn ? 'Optional · Enable Reporting...' : 'Opsiyonel · Raporlamayı Etkinleştirin...'}
         </Text>
 
-        <Text style={[styles.description, { color: theme.textMuted }]}>
-          {isEn
-            ? 'FiltreAI analyzes incoming SMS messages on-device to detect spam and fraud. Protect your inbox from unwanted messages.'
-            : 'FiltreAI, gelen SMS’leri cihaz üzerinde analiz ederek spam ve dolandırıcılıkları yakalar. Gelen kutunuzu istenmeyen mesajlardan koruyun.'}
-        </Text>
-
-        <View style={styles.featuresContainer}>
-          <View style={styles.featureItem}>
-            <View style={[styles.featureIcon, { backgroundColor: theme.surface }]}>
-               <Shield size={24} color={theme.primary} />
+        <View style={styles.stepList}>
+          {/* Step 7 */}
+          <View style={styles.stepRow}>
+            <View style={[styles.iconContainer, { backgroundColor: '#10B981' }]}>
+              <Phone size={22} color="#FFFFFF" />
             </View>
-            <Text style={[styles.featureText, { color: theme.text }]}>
-              {isEn ? 'Private by Default (No Automatic Upload)' : 'Varsayılan Olarak Gizli (Otomatik Yükleme Yok)'}
+            <Text style={[styles.stepText, { color: theme.text }]}>
+              {isEn
+                ? 'In Settings, go to Apps -> Phone.'
+                : 'Ayarlar içinde Uygulamalar -> Telefon’a girin.'}
             </Text>
           </View>
-          <View style={styles.featureItem}>
-            <View style={[styles.featureIcon, { backgroundColor: theme.surface }]}>
-               <MessageSquareWarning size={24} color="#F59E0B" />
+
+          {/* Step 8 */}
+          <View style={styles.stepRow}>
+            <View style={[styles.iconContainer, { backgroundColor: '#2563EB' }]}>
+              <Shield size={22} color="#FFFFFF" />
             </View>
-            <Text style={[styles.featureText, { color: theme.text }]}>
-              {isEn ? 'Real-time Spam Detection' : 'Gerçek Zamanlı Spam Tespiti'}
+            <Text style={[styles.stepText, { color: theme.text }]}>
+              {isEn
+                ? 'Scroll down and under SMS/Call Reporting enable FiltreAI.'
+                : 'Aşağı inin ve SMS/Arama Raporu altında FiltreAI’yi etkinleştirin.'}
             </Text>
           </View>
         </View>
-      </View>
 
-      <View style={styles.footer}>
+      </ScrollView>
+
+      {/* Fixed Bottom Action Buttons */}
+      <View style={[styles.footer, { backgroundColor: theme.background, borderColor: theme.border }]}>
         <TouchableOpacity
-          style={[styles.button, { backgroundColor: theme.primary, opacity: loading ? 0.7 : 1 }]}
-          onPress={handleGrantPermission}
-          disabled={loading}
+          style={[styles.primaryButton, { backgroundColor: '#1D4ED8' }]}
+          onPress={handleOpenSettings}
         >
-          <Text style={styles.buttonText}>
-            {isEn
-              ? (isAndroid ? 'Allow SMS Permission' : 'Continue')
-              : (isAndroid ? 'İzin Ver ve Devam Et' : 'Devam Et')}
+          <Text style={styles.primaryButtonText}>
+            {isEn ? 'Open Settings' : 'Ayarlar\'ı Aç'}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.secondaryButton, { borderColor: theme.border }]}
-          onPress={handleSkip}
+          style={[styles.secondaryButton, { backgroundColor: '#1E3A8A' }]}
+          onPress={handleNext}
+          disabled={loading}
         >
-          <Text style={[styles.secondaryButtonText, { color: theme.textMuted }]}>
-            {isEn ? 'Not Now (Limited Features)' : 'Şimdi Değil (Sınırlı Özellikler)'}
+          <Text style={styles.secondaryButtonText}>
+            {isEn ? 'Continue' : 'Sonraki / Devam Et'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -111,88 +199,88 @@ export default function OnboardingScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'space-between',
   },
-  content: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 30,
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 160,
   },
-  iconContainer: {
-    marginBottom: 40,
-    alignItems: 'center',
-  },
-  iconCircle: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+  mainTitle: {
+    fontSize: 26,
+    fontWeight: '800',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 32,
+    letterSpacing: -0.5,
   },
-  description: {
-    fontSize: 16,
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 40,
+  stepList: {
+    gap: 22,
   },
-  featuresContainer: {
-    width: '100%',
-    gap: 16,
-  },
-  featureItem: {
+  stepRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
   },
-  featureIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  iconContainer: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  featureText: {
-    fontSize: 16,
-    fontWeight: '500',
+  stepText: {
     flex: 1,
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '500',
+  },
+  divider: {
+    height: 1,
+    marginVertical: 28,
+    width: '100%',
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 24,
+    letterSpacing: -0.3,
   },
   footer: {
-    padding: 30,
-    gap: 16,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 30,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 24,
+    paddingTop: 14,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    gap: 12,
+    borderTopWidth: 1,
   },
-  button: {
-    height: 56,
-    borderRadius: 16,
+  primaryButton: {
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    elevation: 2,
+    shadowColor: '#1D4ED8',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
-  buttonText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: 'bold',
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '700',
   },
   secondaryButton: {
-    height: 56,
-    borderRadius: 16,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
   },
   secondaryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-  }
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '700',
+  },
 });
