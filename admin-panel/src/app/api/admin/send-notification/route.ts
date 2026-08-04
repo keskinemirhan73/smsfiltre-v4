@@ -27,37 +27,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Başlık ve içerik zorunludur.' }, { status: 400 });
     }
 
-    const tokens = Array.from(registeredPushTokens);
-    if (tokens.length === 0) {
-      return NextResponse.json({
-        message: 'Bildirim gönderildi (Kayıtlı cihaz yok).',
-        sentCount: 0,
-      });
-    }
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://smsfiltre-v4.onrender.com';
 
-    // Send Expo push notifications to all registered tokens
-    const messages = tokens.map(expoVal => ({
-      to: expoVal,
-      sound: 'default',
-      title,
-      body,
-      data: { type: 'admin_broadcast' },
-    }));
-
-    const response = await fetch('https://exp.host/--/api/v2/push/send', {
+    // Forward to Render backend where MongoDB stores device tokens
+    const backendRes = await fetch(`${API_BASE}/api/admin/send-notification`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        'Authorization': `Bearer ${pass}`,
       },
-      body: JSON.stringify(messages),
+      body: JSON.stringify({ title, body }),
     });
 
-    const data = await response.json();
+    if (!backendRes.ok) {
+      const errData = await backendRes.json().catch(() => ({}));
+      return NextResponse.json({ error: errData.error || 'Backend sunucusu bildirimi gönderemedi.' }, { status: backendRes.status });
+    }
+
+    const result = await backendRes.json();
     return NextResponse.json({
-      message: `Bildirim ${tokens.length} cihaza başarıyla gönderildi! 🚀`,
-      sentCount: tokens.length,
-      expoResult: data,
+      message: result.message || `Bildirim ${result.successCount || 0} cihaza başarıyla gönderildi! 🚀`,
+      sentCount: result.successCount || 0,
+      expoResult: result,
     });
   } catch (error) {
     console.error('Push notification error:', error);
