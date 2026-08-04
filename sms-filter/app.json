@@ -2,6 +2,7 @@
   "expo": {
     "name": "FiltreAI",
     "slug": "sms-filter",
+    "scheme": "filtreai",
     "version": "1.0.8",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

@@ -5,7 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Shield, Settings, Sparkles, Trophy } from 'lucide-react-native';
-import { useColorScheme, DeviceEventEmitter } from 'react-native';
+import { useColorScheme, DeviceEventEmitter, Linking } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 
@@ -117,9 +117,18 @@ export default function App() {
         setInitialRoute('Onboarding');
       });
 
+    // Deep link listener
+    const handleUrl = (url: string | null) => {
+      if (url) {
+        FilterManager.importNativeSmsEvents().catch(() => {});
+      }
+    };
+    Linking.getInitialURL().then(handleUrl);
+    const linkSub = Linking.addEventListener('url', e => handleUrl(e.url));
+
     // Check if background sync is enabled in settings
     FilterManager.loadSettings().then(settings => {
-      if (settings.autoSyncEnabled !== false) { // Default true
+      if (settings.autoSyncEnabled !== false) {
         registerBackgroundSync();
       }
     });
@@ -132,7 +141,10 @@ export default function App() {
     const sub = DeviceEventEmitter.addListener('onThemeChanged', (newTheme) => {
       setAppTheme(newTheme);
     });
-    return () => sub.remove();
+    return () => {
+      sub.remove();
+      linkSub.remove();
+    };
   }, []);
 
   useEffect(() => {
