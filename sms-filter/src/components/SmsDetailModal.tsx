@@ -73,10 +73,10 @@ export function SmsDetailModal({ visible, item, onClose, onCreateRule, onMarkAsN
 
   const getStatusText = () => {
     switch (item.status) {
-      case 'blocked': return 'İstenmeyen (Spam/Dolandırıcılık)';
-      case 'transaction': return 'İşlem (Banka/Kod)';
-      case 'promotion': return 'Promosyon (Reklam/Kampanya)';
-      default: return 'İzin Verilen (Güvenli)';
+      case 'blocked': return '🛡️ FiltreAI Spam Kalkanı Tarafından Engellendi';
+      case 'transaction': return '💳 Güvenli İşlem / Doğrulama Kodu';
+      case 'promotion': return '📢 Tanıtım / Kampanya Mesajı';
+      default: return '✅ Güvenli Gönderici (İzin Verildi)';
     }
   };
 
