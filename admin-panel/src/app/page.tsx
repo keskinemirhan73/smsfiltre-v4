@@ -114,7 +114,6 @@ export default function LandingPage() {
           <div className="flex gap-6 text-sm text-[#a9bfd3] font-medium">
             <Link href="/privacy" className="hover:text-white transition-colors">Gizlilik Politikası</Link>
             <Link href="/terms" className="hover:text-white transition-colors">Kullanım Koşulları</Link>
-            <Link href="/admin" className="hover:text-[#22d3ee] transition-colors">Yönetici Paneli</Link>
           </div>
         </div>
       </footer>
