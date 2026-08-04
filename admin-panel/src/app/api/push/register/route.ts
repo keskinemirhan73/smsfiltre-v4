@@ -9,6 +9,14 @@ export async function POST(request: Request) {
     }
 
     registerToken(token);
+
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://smsfiltre-v4.onrender.com';
+    await fetch(`${API_BASE}/api/push-token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, platform, deviceName }),
+    }).catch(() => {});
+
     console.log(`[Push Register] Device registered: ${deviceName} (${platform}) - ${token}`);
 
     return NextResponse.json({

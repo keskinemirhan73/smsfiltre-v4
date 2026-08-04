@@ -72,16 +72,25 @@ export async function getExistingExpoPushTokenAsync(): Promise<string | undefine
 export async function syncPushTokenWithBackend(token: string): Promise<boolean> {
   if (!token) return false;
   try {
-    const res = await fetch('https://filtreai.vercel.app/api/push/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        token,
-        platform: Platform.OS,
-        deviceName: Device.deviceName || Device.modelName || 'Device',
-      }),
+    const payload = JSON.stringify({
+      token,
+      platform: Platform.OS,
+      deviceName: Device.deviceName || Device.modelName || 'Device',
     });
-    return res.ok;
+
+    await Promise.all([
+      fetch('https://smsfiltre-v4.onrender.com/api/push-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+      }).catch(() => {}),
+      fetch('https://filtreai.vercel.app/api/push/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+      }).catch(() => {}),
+    ]);
+    return true;
   } catch {
     return false;
   }
