@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { mergeNativeSmsEvents, parseNativeSmsEvents } from './nativeSmsEvents';
+import {
+  mergeNativeSmsEvents,
+  parseNativeSmsEventQueues,
+  parseNativeSmsEvents,
+} from './nativeSmsEvents';
 
 test('native SMS olaylarini dogrular ve bozuk girdileri atar', () => {
   const events = parseNativeSmsEvents(JSON.stringify([
@@ -79,4 +83,22 @@ test('native olay listelerini ve islenmis kimlikleri sinirlar', () => {
   assert.equal(parsed.length, 50);
   assert.equal(result.history.length, 50);
   assert.equal(result.processedIds.length, 200);
+});
+
+test('ayri native uretici kuyruklarini bozuk kuyruktan etkilenmeden birlestirir', () => {
+  const filterQueue = JSON.stringify([{
+    id: 'filter-1', sender: '***1111', preview: 'Filtrelendi',
+    status: 'suspicious', timestamp: 1_000,
+  }]);
+  const reportQueue = JSON.stringify([{
+    id: 'report-1', sender: '***2222', preview: 'Panelde seçildi',
+    status: 'transaction', timestamp: 2_000,
+  }, {
+    id: 'filter-1', sender: '***1111', preview: 'Tekrar',
+    status: 'suspicious', timestamp: 1_000,
+  }]);
+
+  const events = parseNativeSmsEventQueues([filterQueue, '{bozuk', reportQueue]);
+
+  assert.deepEqual(events.map(event => event.id), ['filter-1', 'report-1']);
 });

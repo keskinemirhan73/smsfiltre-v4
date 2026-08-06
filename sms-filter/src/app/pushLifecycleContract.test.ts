@@ -10,6 +10,10 @@ test('push token degisikliklerini ve uygulama on plana donusunu yeniden kaydeder
   assert.match(appSource, /AppState\.addEventListener\(['"]change['"]/);
   assert.match(appSource, /syncPushTokenWithBackend\(token\.data\)/);
   assert.match(appSource, /getExistingExpoPushTokenAsync/);
+  assert.match(
+    appSource,
+    /state\s*===\s*['"]active['"][\s\S]*FilterManager\.importNativeSmsEvents\(\)/,
+  );
 });
 
 test('push yasam dongusu aboneliklerini kapanista temizler', () => {

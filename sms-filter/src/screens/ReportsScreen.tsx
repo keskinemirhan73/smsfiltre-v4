@@ -1,12 +1,40 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator, RefreshControl } from 'react-native';
-import { Flag, ShieldBan, ShieldCheck, Trash2, Send, CheckCircle2, ShieldAlert, Sparkles, MessageSquare } from 'lucide-react-native';
+import { Flag, ShieldBan, ShieldCheck, Trash2, ShieldAlert, Sparkles, Receipt, Megaphone } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme, spacing, radii } from '../theme';
 import { FilterManager, FilterRule, HistoryItem } from '../modules/FilterManager';
 import { parseCustomRuleKeyword } from '../services/customRuleInput';
 import { SecurityUtils } from '../utils/SecurityUtils';
+
+type ActivityCategory = FilterRule['category'];
+type ActivityFilter = 'all' | ActivityCategory;
+
+const categoryColor = (category: ActivityCategory) => ({
+  junk: '#EF4444',
+  allowed: '#10B981',
+  transaction: '#3B82F6',
+  promotion: '#F59E0B',
+})[category];
+
+const categoryLabel = (category: ActivityCategory) => ({
+  junk: 'İstenmeyen / Engellendi',
+  allowed: 'İzin Verilen / Güvenli',
+  transaction: 'İşlem Mesajı',
+  promotion: 'Promosyon Mesajı',
+})[category];
+
+const historyCategory = (status: HistoryItem['status']): ActivityCategory =>
+  status === 'blocked' ? 'junk' : status;
+
+function CategoryIcon({ category, size = 18 }: { category: ActivityCategory; size?: number }) {
+  const color = categoryColor(category);
+  if (category === 'junk') return <ShieldBan color={color} size={size} />;
+  if (category === 'allowed') return <ShieldCheck color={color} size={size} />;
+  if (category === 'transaction') return <Receipt color={color} size={size} />;
+  return <Megaphone color={color} size={size} />;
+}
 
 export default function ReportsScreen() {
   const theme = useAppTheme();
@@ -16,7 +44,7 @@ export default function ReportsScreen() {
   const [reportInput, setReportInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'junk' | 'allowed'>('all');
+  const [activeFilter, setActiveFilter] = useState<ActivityFilter>('all');
 
   const loadData = async () => {
     setRefreshing(true);
@@ -44,10 +72,14 @@ export default function ReportsScreen() {
       Alert.alert('Eksik Bilgi', 'Lütfen şikayet etmek istediğiniz gönderici numarasını veya mesaj başlığını yazın.');
       return;
     }
+    const parsed = parseCustomRuleKeyword(reportInput);
+    if (!parsed) {
+      Alert.alert('Geçersiz Bilgi', 'Gönderici veya mesaj kuralı en fazla 200 karakter olmalıdır.');
+      return;
+    }
     setIsSubmitting(true);
     try {
-      const parsed = parseCustomRuleKeyword(reportInput);
-      const keyword = parsed ? parsed.keyword : reportInput.trim();
+      const keyword = parsed.keyword;
 
       const newRule: FilterRule = {
         id: Date.now().toString(),
@@ -86,10 +118,14 @@ export default function ReportsScreen() {
   };
 
   const filteredRules = rules.filter(r => {
-    if (activeFilter === 'junk') return r.category === 'junk';
-    if (activeFilter === 'allowed') return r.category === 'allowed';
-    return true;
+    return activeFilter === 'all' || r.category === activeFilter;
   });
+
+  const filteredEvents = events.filter(event =>
+    activeFilter === 'all' || historyCategory(event.status) === activeFilter
+  );
+
+  const visibleItemCount = filteredRules.length + filteredEvents.length;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
@@ -129,6 +165,7 @@ export default function ReportsScreen() {
             placeholderTextColor={theme.textMuted}
             value={reportInput}
             onChangeText={setReportInput}
+            maxLength={200}
           />
 
           <View style={styles.actionBtnRow}>
@@ -176,7 +213,7 @@ export default function ReportsScreen() {
               style={[styles.chip, activeFilter === 'all' && { backgroundColor: '#8B5CF6' }]}
               onPress={() => setActiveFilter('all')}
             >
-              <Text style={[styles.chipText, activeFilter === 'all' && { color: '#FFF' }]}>Tüm İşlemler ({rules.length})</Text>
+              <Text style={[styles.chipText, activeFilter === 'all' && { color: '#FFF' }]}>Tüm İşlemler ({rules.length + events.length})</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -192,11 +229,25 @@ export default function ReportsScreen() {
             >
               <Text style={[styles.chipText, activeFilter === 'allowed' && { color: '#FFF' }]}>🟢 İzinliler</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.chip, activeFilter === 'transaction' && { backgroundColor: '#3B82F6' }]}
+              onPress={() => setActiveFilter('transaction')}
+            >
+              <Text style={[styles.chipText, activeFilter === 'transaction' && { color: '#FFF' }]}>İşlem</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.chip, activeFilter === 'promotion' && { backgroundColor: '#F59E0B' }]}
+              onPress={() => setActiveFilter('promotion')}
+            >
+              <Text style={[styles.chipText, activeFilter === 'promotion' && { color: '#FFF' }]}>Promosyon</Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
 
         {/* List of Rules & Native Events */}
-        {filteredRules.length === 0 ? (
+        {visibleItemCount === 0 ? (
           <View style={[styles.emptyCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <ShieldAlert color={theme.textMuted} size={36} />
             <Text style={[styles.emptyTitle, { color: theme.text }]}>Henüz Kayıtlı İşlem Yok</Text>
@@ -205,25 +256,56 @@ export default function ReportsScreen() {
             </Text>
           </View>
         ) : (
-          filteredRules.map(rule => (
-            <View key={rule.id} style={[styles.ruleCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              <View style={styles.ruleInfo}>
-                <View style={[styles.ruleBadge, { backgroundColor: rule.category === 'junk' ? '#EF444420' : '#10B98120' }]}>
-                  {rule.category === 'junk' ? <ShieldBan color="#EF4444" size={18} /> : <ShieldCheck color="#10B981" size={18} />}
+          <View style={styles.activityList}>
+            {filteredEvents.length > 0 && (
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>SMS İşlem Geçmişi</Text>
+            )}
+            {filteredEvents.map(event => {
+              const category = historyCategory(event.status);
+              const color = categoryColor(category);
+              return (
+                <View key={`event-${event.id}`} style={[styles.ruleCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                  <View style={styles.ruleInfo}>
+                    <View style={[styles.ruleBadge, { backgroundColor: `${color}20` }]}>
+                      <CategoryIcon category={category} />
+                    </View>
+                    <View style={styles.ruleTextCol}>
+                      <Text style={[styles.ruleKeyword, { color: theme.text }]}>{event.sender}</Text>
+                      <Text style={[styles.ruleCategory, { color }]}>{categoryLabel(category)}</Text>
+                      <Text style={[styles.eventPreview, { color: theme.textMuted }]}>{event.preview}</Text>
+                      <Text style={[styles.eventDate, { color: theme.textMuted }]}>
+                        {new Date(event.timestamp).toLocaleString('tr-TR')}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
-                <View style={styles.ruleTextCol}>
-                  <Text style={[styles.ruleKeyword, { color: theme.text }]}>{rule.keyword}</Text>
-                  <Text style={[styles.ruleCategory, { color: rule.category === 'junk' ? '#EF4444' : '#10B981' }]}>
-                    {rule.category === 'junk' ? 'İstenmeyen / Engellendi' : 'İzin Verilen / Güvenli'}
-                  </Text>
-                </View>
-              </View>
+              );
+            })}
 
-              <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteRule(rule.id)}>
-                <Trash2 color="#EF4444" size={18} />
-              </TouchableOpacity>
-            </View>
-          ))
+            {filteredRules.length > 0 && (
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Cihaz İçi Kurallar</Text>
+            )}
+            {filteredRules.map(rule => {
+              const color = categoryColor(rule.category);
+              return (
+                <View key={`rule-${rule.id}`} style={[styles.ruleCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                  <View style={styles.ruleInfo}>
+                    <View style={[styles.ruleBadge, { backgroundColor: `${color}20` }]}>
+                      <CategoryIcon category={rule.category} />
+                    </View>
+                    <View style={styles.ruleTextCol}>
+                      <Text style={[styles.ruleKeyword, { color: theme.text }]}>{rule.keyword}</Text>
+                      <Text style={[styles.ruleCategory, { color }]}>{categoryLabel(rule.category)}</Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteRule(rule.id)}>
+                    <Trash2 color="#EF4444" size={18} />
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </View>
         )}
       </ScrollView>
     </View>
@@ -374,6 +456,23 @@ const styles = StyleSheet.create({
   ruleCategory: {
     fontSize: 12,
     marginTop: 2,
+  },
+  activityList: {
+    gap: spacing.sm,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  eventPreview: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  eventDate: {
+    fontSize: 11,
+    marginTop: 3,
   },
   deleteBtn: {
     padding: spacing.sm,

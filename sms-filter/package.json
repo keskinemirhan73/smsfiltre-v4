@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
-    "@bacons/apple-targets": "^5.0.0",
+    "@bacons/apple-targets": "4.0.7",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^6.6.1",
     "@react-navigation/native": "^6.1.18",
@@ -34,6 +34,7 @@
     "react-native-svg": "15.12.1"
   },
   "devDependencies": {
+    "@expo/prebuild-config": "54.0.9",
     "@types/crypto-js": "^4.2.2",
     "@types/react": "~19.1.10",
     "patch-package": "^8.0.1",

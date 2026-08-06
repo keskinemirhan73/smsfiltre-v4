@@ -80,7 +80,12 @@
                 },
                 {
                   "bundleIdentifier": "com.filtreai.app.smsreport",
-                  "targetName": "smsreport"
+                  "targetName": "smsreport",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.filtreai.app"
+                    ]
+                  }
                 }
               ]
             }

@@ -166,6 +166,9 @@ export default function App() {
     });
     const appStateSub = AppState.addEventListener('change', state => {
       if (state === 'active') {
+        FilterManager.importNativeSmsEvents().catch(error =>
+          console.warn('SMS raporları yenilenemedi:', error),
+        );
         syncExistingPushToken().catch(error =>
           console.warn('Push token yenileme basarisiz:', error),
         );

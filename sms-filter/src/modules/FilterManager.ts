@@ -2,7 +2,7 @@ import { SecureStorage as AsyncStorage } from '../utils/SecureStorage';
 import { Platform } from 'react-native';
 import { ThreatCloudService } from '../services/ThreatCloudService';
 import { buildNativeFilterPayload } from '../services/nativeFilterPayload';
-import { mergeNativeSmsEvents, parseNativeSmsEvents } from '../services/nativeSmsEvents';
+import { mergeNativeSmsEvents, parseNativeSmsEventQueues } from '../services/nativeSmsEvents';
 
 const APP_GROUP = 'group.com.filtreai.app';
 const STORAGE_KEY = '@junkman_rules';
@@ -10,6 +10,7 @@ const SETTINGS_KEY = '@junkman_settings';
 const STATS_KEY = '@junkman_stats';
 const LEARNING_KEY = '@junkman_learning_db';
 const NATIVE_SMS_EVENT_QUEUE_KEY = 'smsfilter_event_queue_json';
+const NATIVE_SMS_REPORT_EVENT_QUEUE_KEY = 'smsfilter_report_event_queue_json';
 const NATIVE_PROCESSED_IDS_KEY = '@FiltreAI_Native_Processed_Event_IDs';
 
 // ─── Types ───────────────────────────────────────────────────
@@ -488,19 +489,21 @@ export class FilterManager {
 
   static async importNativeSmsEvents(): Promise<number> {
     try {
-      let rawEvents: string | null = null;
+      let rawEventQueues: Array<string | null> = [];
       if (Platform.OS === 'android') {
-        rawEvents = await this.readNativePreference(NATIVE_SMS_EVENT_QUEUE_KEY);
+        rawEventQueues = [await this.readNativePreference(NATIVE_SMS_EVENT_QUEUE_KEY)];
       } else if (Platform.OS === 'ios') {
         try {
           const { ExtensionStorage } = require('@bacons/apple-targets');
           const storage = new ExtensionStorage(APP_GROUP);
-          rawEvents = storage.get(NATIVE_SMS_EVENT_QUEUE_KEY) as string;
+          rawEventQueues = [
+            storage.get(NATIVE_SMS_EVENT_QUEUE_KEY) as string,
+            storage.get(NATIVE_SMS_REPORT_EVENT_QUEUE_KEY) as string,
+          ];
         } catch {}
       }
 
-      if (!rawEvents) return 0;
-      const events = parseNativeSmsEvents(rawEvents);
+      const events = parseNativeSmsEventQueues(rawEventQueues);
       if (events.length === 0) return 0;
 
       const processedRaw = await AsyncStorage.getItem(NATIVE_PROCESSED_IDS_KEY);

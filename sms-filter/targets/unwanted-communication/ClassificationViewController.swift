@@ -20,7 +20,7 @@ final class ClassificationViewController: ILClassificationUIExtensionViewControl
 
         var subtitle: String {
             switch self {
-            case .junk: return "Spam veya dolandırıcılık şüphesi"
+            case .junk: return "Spam olarak bildirir ve göndericiyi engeller"
             case .allowed: return "Güvenilir ve görmek istediğiniz mesaj"
             case .transaction: return "Sipariş, ödeme veya doğrulama bildirimi"
             case .promotion: return "Kampanya veya tanıtım mesajı"
@@ -38,13 +38,33 @@ final class ClassificationViewController: ILClassificationUIExtensionViewControl
 
         var responseAction: ILClassificationAction {
             switch self {
-            case .junk: return .reportJunk
+            case .junk: return .reportJunkAndBlockSender
             case .allowed: return .reportNotJunk
             case .transaction, .promotion: return .none
             }
         }
+
+        var eventStatus: String {
+            switch self {
+            case .junk: return "suspicious"
+            case .allowed: return "allowed"
+            case .transaction: return "transaction"
+            case .promotion: return "promotion"
+            }
+        }
+
+        var eventPreview: String {
+            switch self {
+            case .junk: return "Mesajlar uygulamasından engellendi."
+            case .allowed: return "Mesajlar uygulamasından izin verildi."
+            case .transaction: return "Mesajlar panelinde işlem olarak seçildi."
+            case .promotion: return "Mesajlar panelinde promosyon olarak seçildi."
+            }
+        }
     }
 
+    private let eventQueueKey = "smsfilter_report_event_queue_json"
+    private let maximumQueuedEvents = 50
     private let selectionStack = UIStackView()
     private var selectedCategory: ReportCategory?
     private var categoryButtons: [ReportCategory: UIButton] = [:]
@@ -63,16 +83,61 @@ final class ClassificationViewController: ILClassificationUIExtensionViewControl
     }
 
     override func classificationResponse(for request: ILClassificationRequest) -> ILClassificationResponse {
-        guard request is ILMessageClassificationRequest else {
+        guard let messageRequest = request as? ILMessageClassificationRequest else {
             return ILClassificationResponse(action: .none)
         }
         guard let category = selectedCategory else {
             return ILClassificationResponse(action: .none)
         }
 
+        persistReportEvents(from: messageRequest, category: category)
+
         let response = ILClassificationResponse(action: category.responseAction)
         response.userInfo = ["category": category.rawValue]
         return response
+    }
+
+    private func persistReportEvents(
+        from messageRequest: ILMessageClassificationRequest,
+        category: ReportCategory
+    ) {
+        guard let defaults = UserDefaults(suiteName: "group.com.filtreai.app") else { return }
+
+        let existingEvents: [[String: Any]] = {
+            guard
+                let rawQueue = defaults.string(forKey: eventQueueKey),
+                let queueData = rawQueue.data(using: .utf8),
+                let decoded = try? JSONSerialization.jsonObject(with: queueData) as? [[String: Any]]
+            else { return [] }
+            return decoded
+        }()
+
+        let baseTimestamp = Int(Date().timeIntervalSince1970 * 1_000)
+        let newEvents = messageRequest.messageCommunications.enumerated().map { index, communication in
+            [
+                "id": "report-\(UUID().uuidString)",
+                "sender": maskedSender(communication.sender),
+                "preview": category.eventPreview,
+                "status": category.eventStatus,
+                "timestamp": baseTimestamp + index,
+            ] as [String: Any]
+        }
+
+        guard !newEvents.isEmpty else { return }
+        let queuedEvents = Array((existingEvents + newEvents).suffix(maximumQueuedEvents))
+        guard
+            let encoded = try? JSONSerialization.data(withJSONObject: queuedEvents),
+            let rawQueue = String(data: encoded, encoding: .utf8)
+        else { return }
+        defaults.set(rawQueue, forKey: eventQueueKey)
+    }
+
+    private func maskedSender(_ sender: String?) -> String {
+        guard let sender else { return "Bilinmeyen" }
+        let trimmed = sender.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "Bilinmeyen" }
+        guard trimmed.count > 4 else { return "***" }
+        return "***\(trimmed.suffix(4))"
     }
 
     private func configureInterface() {
@@ -112,7 +177,7 @@ final class ClassificationViewController: ILClassificationUIExtensionViewControl
         }
 
         let privacyLabel = UILabel()
-        privacyLabel.text = "İstenmeyen veya İzin Verilen seçip Bitti dediğinizde Apple, rapor SMS'ini +905438260667 alıcısıyla oluşturur. Göndermeden önce onaylayabilir veya iptal edebilirsiniz. Standart SMS/operatör ücretleri uygulanabilir. Telefon numaranız alıcı tarafından görülebilir. İşlem ve Promosyon seçimleri ile çağrı bildirimleri SMS göndermez. FiltreAI bu raporu kendi sunucusuna göndermez."
+        privacyLabel.text = "İstenmeyen seçimi göndericiyi Apple'ın sistem engel listesine ekler. İstenmeyen veya İzin Verilen seçip Bitti dediğinizde Apple, rapor SMS'ini +905438260667 alıcısıyla oluşturur. Göndermeden önce onaylayabilir veya iptal edebilirsiniz. Standart SMS/operatör ücretleri uygulanabilir. Telefon numaranız alıcı tarafından görülebilir. İşlem ve Promosyon seçimleri ile çağrı bildirimleri SMS göndermez. FiltreAI bu raporu kendi sunucusuna göndermez."
         privacyLabel.font = .preferredFont(forTextStyle: .footnote)
         privacyLabel.textColor = .secondaryLabel
         privacyLabel.adjustsFontForContentSizeCategory = true

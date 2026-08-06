@@ -34,16 +34,22 @@ test('iOS raporlama targeti doğru extension tipini ve bundle kimliğini kullan�
 });
 
 test('EAS yeni raporlama targeti için ayrı imzalama profili üretir', () => {
+  const targetConfig = readTargetFile('expo-target.config.js');
   const appConfig = JSON.parse(readFileSync(resolve(projectRoot, 'app.json'), 'utf8'));
   const extensions = appConfig.expo.extra.eas.build.experimental.ios.appExtensions;
 
-  assert.ok(
-    extensions.some(
-      (extension: { bundleIdentifier?: string; targetName?: string }) =>
-        extension.bundleIdentifier === 'com.filtreai.app.smsreport'
-        && extension.targetName === 'smsreport',
-    ),
+  const reportingExtension = extensions.find(
+    (extension: { bundleIdentifier?: string; targetName?: string }) =>
+      extension.bundleIdentifier === 'com.filtreai.app.smsreport'
+      && extension.targetName === 'smsreport',
   );
+  assert.ok(reportingExtension);
+  assert.deepEqual(
+    reportingExtension.entitlements?.['com.apple.security.application-groups'],
+    ['group.com.filtreai.app'],
+  );
+  assert.match(targetConfig, /com\.apple\.security\.application-groups/);
+  assert.match(targetConfig, /group\.com\.filtreai\.app/);
 });
 
 test('iOS raporlama paneli dört sınıf sunar ve seçim yapılmadan Bitti düğmesini açmaz', () => {
@@ -69,10 +75,29 @@ test('iOS raporlama yanıtları güvenli Apple sınıflandırma eylemlerine eşl
 
   assert.match(source, /override func prepare\(for request: ILClassificationRequest\)/);
   assert.match(source, /override func classificationResponse\(for request: ILClassificationRequest\) -> ILClassificationResponse/);
-  assert.match(source, /guard request is ILMessageClassificationRequest else/);
-  assert.match(source, /\.reportJunk/);
+  assert.match(source, /guard let messageRequest = request as\? ILMessageClassificationRequest else/);
+  assert.match(source, /\.reportJunkAndBlockSender/);
+  assert.match(source, /sistem engel listesine ekler/);
   assert.match(source, /\.reportNotJunk/);
   assert.match(source, /ILClassificationResponse\(action:/);
   assert.match(source, /response\.userInfo\s*=\s*\["category": category\.rawValue\]/);
   assert.match(source, /çağrı bildirimleri SMS göndermez/i);
+});
+
+test('iOS reporting panel writes a masked selection to the App Group event queue', () => {
+  const source = readTargetFile('ClassificationViewController.swift');
+
+  assert.match(source, /UserDefaults\(suiteName:\s*"group\.com\.filtreai\.app"\)/);
+  assert.match(source, /smsfilter_report_event_queue_json/);
+  assert.doesNotMatch(source, /"smsfilter_event_queue_json"/);
+  assert.match(source, /messageRequest\.messageCommunications/);
+  assert.match(source, /communication\.sender/);
+  assert.match(source, /guard trimmed\.count > 4 else \{ return "\*\*\*" \}/);
+  assert.match(source, /persistReportEvents\(from:\s*messageRequest,\s*category:\s*category\)/);
+  assert.match(source, /"status":\s*category\.eventStatus/);
+  assert.match(source, /"timestamp":/);
+  assert.doesNotMatch(source, /communication\.messageBody/);
+
+  const managerSource = readFileSync(resolve(projectRoot, 'src/modules/FilterManager.ts'), 'utf8');
+  assert.match(managerSource, /smsfilter_report_event_queue_json/);
 });

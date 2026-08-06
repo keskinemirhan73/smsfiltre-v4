@@ -51,6 +51,19 @@ export function parseNativeSmsEvents(rawValue: string | null): NativeSmsEvent[] 
   }
 }
 
+export function parseNativeSmsEventQueues(
+  rawValues: Array<string | null>,
+): NativeSmsEvent[] {
+  const seenIds = new Set<string>();
+  return rawValues
+    .flatMap(rawValue => parseNativeSmsEvents(rawValue))
+    .filter(event => {
+      if (seenIds.has(event.id)) return false;
+      seenIds.add(event.id);
+      return true;
+    });
+}
+
 function historyStatus(status: NativeSmsStatus): HistoryEntry['status'] {
   return status === 'suspicious' ? 'blocked' : status;
 }

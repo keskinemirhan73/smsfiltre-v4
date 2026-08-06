@@ -1,0 +1,84 @@
+name: Build signed iOS IPA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-local-production
+  cancel-in-progress: false
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: sms-filter
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: sms-filter/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      - name: Install EAS CLI
+        run: npm install --global eas-cli@21.6.0
+
+      - name: Build signed production IPA locally
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          test -n "$EXPO_TOKEN"
+          eas build \
+            --platform ios \
+            --profile production \
+            --local \
+            --non-interactive \
+            --freeze-credentials \
+            --output "$GITHUB_WORKSPACE/FiltreAI.ipa"
+
+      - name: Verify IPA contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          verify_dir="$(mktemp -d)"
+          unzip -q "$GITHUB_WORKSPACE/FiltreAI.ipa" -d "$verify_dir"
+          app="$verify_dir/Payload/FiltreAI.app"
+          report_extension="$app/PlugIns/smsreport.appex"
+
+          test -d "$report_extension"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Info.plist")" = "1.0.8"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionAttributes:ILClassificationExtensionSMSReportDestination' "$report_extension/Info.plist")" = "+905438260667"
+          strings "$app/FiltreAI" | grep -F "ExtensionStorage" >/dev/null
+          strings "$app/main.jsbundle" | grep -F "smsfilter_report_event_queue_json" >/dev/null
+          strings "$report_extension/smsreport" | grep -F "smsfilter_report_event_queue_json" >/dev/null
+
+          security cms -D -i "$app/embedded.mobileprovision" > "$verify_dir/app-profile.plist"
+          security cms -D -i "$report_extension/embedded.mobileprovision" > "$verify_dir/report-profile.plist"
+          /usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.security.application-groups:0' "$verify_dir/app-profile.plist" | grep -Fx "group.com.filtreai.app" >/dev/null
+          /usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.security.application-groups:0' "$verify_dir/report-profile.plist" | grep -Fx "group.com.filtreai.app" >/dev/null
+
+      - name: Upload verified IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: FiltreAI-iOS-production
+          path: FiltreAI.ipa
+          if-no-files-found: error
+          retention-days: 7
