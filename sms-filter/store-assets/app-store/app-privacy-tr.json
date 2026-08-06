@@ -2,12 +2,20 @@
   "tracking": false,
   "dataTypes": [
     {
+      "type": "Contact Info > Phone Number",
+      "collected": true,
+      "linkedToUser": true,
+      "usedForTracking": false,
+      "purpose": "App Functionality",
+      "details": "Kullanıcı İstenmeyen veya İzin Verilen rapor SMS'ini onaylayıp gönderirse telefon numarası FiltreAI yönetici hattı tarafından görülebilir."
+    },
+    {
       "type": "User Content > Emails or Text Messages",
       "collected": true,
       "linkedToUser": true,
       "usedForTracking": false,
       "purpose": "App Functionality",
-      "details": "Yalnızca kullanıcı tarafından başlatılan spam bildirimi; Akıllı Analiz cihaz üzerinde kalır."
+      "details": "Yalnızca kullanıcı tarafından başlatılıp sistem SMS ekranında onaylanan rapor; Akıllı Analiz cihaz üzerinde kalır."
     },
     {
       "type": "User Content > Other User Content",

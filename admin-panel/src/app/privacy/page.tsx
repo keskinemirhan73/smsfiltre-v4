@@ -32,7 +32,7 @@ export default function PrivacyPolicy() {
               FiltreAI olarak kişisel verilerinize ve gizliliğinize büyük önem veriyoruz. Sizi nasıl koruduğumuzu öğrenin.
             </p>
             <p className="mt-2 text-sm text-[#22d3ee] font-bold">
-              Son Güncelleme: 1 Ağustos 2026
+              Son Güncelleme: 6 Ağustos 2026
             </p>
           </div>
         </div>
@@ -72,6 +72,10 @@ export default function PrivacyPolicy() {
               1. Toplanan Bilgiler
             </h3>
             <ul className="space-y-3 text-[#a9bfd3] ml-4 list-none">
+              <li className="flex items-start gap-2">
+                <CheckCircle size={18} className="text-[#7cff5b] mt-1 shrink-0" />
+                <span><strong>Apple Mesajlar raporlama akışı:</strong> İstenmeyen veya İzin Verilen seçip Bitti dediğinizde Apple, raporlanan mesaj için +905438260667 numaralı FiltreAI yönetici hattına gönderilecek bir SMS oluşturur. SMS&apos;i göndermeden önce onaylayabilir veya iptal edebilirsiniz; standart SMS/operatör ücretleri uygulanabilir ve telefon numaranız alıcı tarafından görülebilir. İşlem ve Promosyon seçimleri ile çağrı bildirimleri SMS göndermez. Alınan raporlar filtre güvenliğini geliştirmek ve kötüye kullanımı incelemek amacıyla, silme talebinize veya yöneticinin manuel silmesine kadar tutulabilir; sabit otomatik silme süresi uygulanmaz.</span>
+              </li>
               <li className="flex items-start gap-2">
                 <CheckCircle size={18} className="text-[#7cff5b] mt-1 shrink-0" />
                 <span><strong>Akıllı Analiz:</strong> 1.0.8 ve sonraki sürümlerde seçtiğiniz mesaj cihaz üzerinde kural tabanlı olarak analiz edilir. Analiz metni ve sonucu FiltreAI sunucusuna veya başka bir yapay zekâ sağlayıcısına gönderilmez. 1.0.7 ve önceki test sürümleri, kullanıcı tarafından seçilen analiz metnini sonuç üretmek için FiltreAI sunucusuna gönderebilir. Bu eski sürümlerden gelen metinlerin yeni bir sunucu kaydı oluşturulmaz; daha önce oluşturulmuş kayıtlar en geç 7 gün içinde otomatik olarak silinir.</span>
@@ -120,8 +124,10 @@ export default function PrivacyPolicy() {
               Bulut özellikleri; Render üzerinde çalışan FiltreAI sunucusu,
               MongoDB Atlas veritabanı, Expo bildirim hizmeti ve
               tehdit kurallarını dağıtmak için GitHub altyapısını kullanabilir.
-              Veriler aktarım sırasında HTTPS ile korunur ve satılmaz veya
-              reklam takibi için kullanılmaz.
+              Sunucuya giden veriler aktarım sırasında HTTPS ile korunur. Apple
+              Mesajlar raporları ise kullanıcı onayından sonra operatörün SMS
+              altyapısıyla iletilir. Veriler satılmaz veya reklam takibi için
+              kullanılmaz.
             </p>
             <p className="text-[#a9bfd3] leading-relaxed">
               1.0.8 ve sonraki sürümlerde Akıllı Analiz metni cihazda kalır.

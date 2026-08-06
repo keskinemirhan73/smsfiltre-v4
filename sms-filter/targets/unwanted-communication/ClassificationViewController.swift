@@ -63,6 +63,9 @@ final class ClassificationViewController: ILClassificationUIExtensionViewControl
     }
 
     override func classificationResponse(for request: ILClassificationRequest) -> ILClassificationResponse {
+        guard request is ILMessageClassificationRequest else {
+            return ILClassificationResponse(action: .none)
+        }
         guard let category = selectedCategory else {
             return ILClassificationResponse(action: .none)
         }
@@ -109,7 +112,7 @@ final class ClassificationViewController: ILClassificationUIExtensionViewControl
         }
 
         let privacyLabel = UILabel()
-        privacyLabel.text = "Seçiminiz bu cihazdaki Apple raporlama akışında kullanılır. FiltreAI telefon numaranızı veya mesaj içeriğini kendi sunucusuna göndermez."
+        privacyLabel.text = "İstenmeyen veya İzin Verilen seçip Bitti dediğinizde Apple, rapor SMS'ini +905438260667 alıcısıyla oluşturur. Göndermeden önce onaylayabilir veya iptal edebilirsiniz. Standart SMS/operatör ücretleri uygulanabilir. Telefon numaranız alıcı tarafından görülebilir. İşlem ve Promosyon seçimleri ile çağrı bildirimleri SMS göndermez. FiltreAI bu raporu kendi sunucusuna göndermez."
         privacyLabel.font = .preferredFont(forTextStyle: .footnote)
         privacyLabel.textColor = .secondaryLabel
         privacyLabel.adjustsFontForContentSizeCategory = true

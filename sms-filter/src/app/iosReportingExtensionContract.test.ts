@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
+import plistParser from '@expo/plist';
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const targetRoot = resolve(projectRoot, 'targets/unwanted-communication');
@@ -12,17 +13,24 @@ const readTargetFile = (name: string) => readFileSync(resolve(targetRoot, name),
 test('iOS raporlama targeti doğru extension tipini ve bundle kimliğini kullanır', () => {
   const config = readTargetFile('expo-target.config.js');
   const plist = readTargetFile('Info.plist');
+  const parsedPlist = plistParser.parse(plist) as {
+    NSExtension?: {
+      NSExtensionAttributes?: {
+        ILClassificationExtensionSMSReportDestination?: unknown;
+      };
+    };
+  };
 
   assert.match(config, /type:\s*["']unwanted-communication["']/);
   assert.match(config, /bundleIdentifier:\s*["']\.smsreport["']/);
   assert.match(plist, /com\.apple\.identitylookup\.classification-ui/);
   assert.match(plist, /\$\(PRODUCT_MODULE_NAME\)\.ClassificationViewController/);
-  assert.match(
-    plist,
-    /<key>NSExtensionAttributes<\/key>\s*<dict>\s*<\/dict>/,
-    'Apple, Unwanted Communication Reporting extension i\u00e7in NSExtensionAttributes s\u00f6zl\u00fc\u011f\u00fcn\u00fc zorunlu tutar.',
+  assert.equal(
+    parsedPlist.NSExtension?.NSExtensionAttributes?.ILClassificationExtensionSMSReportDestination,
+    '+905438260667',
+    'Onaylı SMS rapor hedefi doğrudan NSExtensionAttributes altında bulunmalıdır.',
   );
-  assert.doesNotMatch(plist, /ILClassificationExtension(?:Network|SMS)ReportDestination/);
+  assert.doesNotMatch(plist, /ILClassificationExtensionNetworkReportDestination/);
 });
 
 test('EAS yeni raporlama targeti için ayrı imzalama profili üretir', () => {
@@ -50,6 +58,10 @@ test('iOS raporlama paneli dört sınıf sunar ve seçim yapılmadan Bitti düğ
   assert.match(source, /Promosyon/);
   assert.match(source, /extensionContext\.isReadyForClassificationResponse\s*=\s*false/);
   assert.match(source, /extensionContext\.isReadyForClassificationResponse\s*=\s*true/);
+  assert.match(source, /Göndermeden önce onaylayabilir veya iptal edebilirsiniz/);
+  assert.match(source, /Standart SMS\/operatör ücretleri uygulanabilir/);
+  assert.match(source, /İşlem ve Promosyon seçimleri ile çağrı bildirimleri SMS göndermez/);
+  assert.match(source, /telefon numaranız alıcı tarafından görülebilir/i);
 });
 
 test('iOS raporlama yanıtları güvenli Apple sınıflandırma eylemlerine eşlenir', () => {
@@ -57,8 +69,10 @@ test('iOS raporlama yanıtları güvenli Apple sınıflandırma eylemlerine eşl
 
   assert.match(source, /override func prepare\(for request: ILClassificationRequest\)/);
   assert.match(source, /override func classificationResponse\(for request: ILClassificationRequest\) -> ILClassificationResponse/);
+  assert.match(source, /guard request is ILMessageClassificationRequest else/);
   assert.match(source, /\.reportJunk/);
   assert.match(source, /\.reportNotJunk/);
   assert.match(source, /ILClassificationResponse\(action:/);
   assert.match(source, /response\.userInfo\s*=\s*\["category": category\.rawValue\]/);
+  assert.match(source, /çağrı bildirimleri SMS göndermez/i);
 });

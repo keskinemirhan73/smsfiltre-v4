@@ -1,6 +1,6 @@
 # FiltreAI Gizlilik Politikası
 
-**Yürürlük ve son güncelleme tarihi:** 1 Ağustos 2026
+**Yürürlük ve son güncelleme tarihi:** 6 Ağustos 2026
 
 ## 1. Yerel SMS filtreleme
 
@@ -20,6 +20,16 @@ daha önce oluşturulmuş kayıtlar en geç 7 gün içinde otomatik olarak silin
 
 ## 2. İsteğe bağlı olarak iletilen veriler
 
+- **Apple Mesajlar raporlama akışı:** Kullanıcı raporlama panelinde İstenmeyen
+  veya İzin Verilen seçip Bitti dediğinde Apple, raporlanan mesaj için
+  `+905438260667` numaralı FiltreAI yönetici hattına gönderilecek bir SMS
+  oluşturur. Kullanıcı bu SMS'i göndermeden önce onaylayabilir veya iptal
+  edebilir; standart SMS/operatör ücretleri uygulanabilir ve telefon numaranız
+  alıcı tarafından görülebilir. İşlem ve Promosyon seçimleri ile çağrı
+  bildirimleri SMS göndermez. Alınan raporlar filtre güvenliğini geliştirmek ve kötüye kullanımı
+  incelemek amacıyla yönetici cihazında, kullanıcı silme talebinde bulunana veya
+  yönetici manuel olarak silene kadar tutulabilir; sabit otomatik silme süresi
+  uygulanmaz. FiltreAI aynı raporu kendi sunucusuna göndermez.
 - **Gönüllü spam bildirimleri:** Kullanıcının bildirdiği anahtar kelime veya
   maskelenmiş mesaj metni; varsa push token ve isteğin IP adresiyle birlikte
   raporu saymak, kötüye kullanımı önlemek ve topluluk kurallarını geliştirmek
@@ -50,8 +60,9 @@ gerekli verileri işler.
 
 ## 5. Saklama ve güvenlik
 
-Veriler aktarım sırasında HTTPS ile korunur. 1.0.8 ve sonraki sürümlerde Akıllı
-Analiz metni cihazda kalır. 1.0.7 ve önceki test sürümlerinden daha önce
+Sunucuya giden veriler aktarım sırasında HTTPS ile korunur. Apple Mesajlar
+raporları ise kullanıcı onayından sonra operatörün SMS altyapısıyla iletilir.
+1.0.8 ve sonraki sürümlerde Akıllı Analiz metni cihazda kalır. 1.0.7 ve önceki test sürümlerinden daha önce
 oluşturulmuş analiz kayıtları en geç 7 gün içinde otomatik olarak silinir. Push
 token'ları, IP adresleri ve gönüllü spam raporları hizmet için gerekli
 olduğu sürece veya silinme talebi işlenene kadar saklanabilir; bu diğer

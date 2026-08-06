@@ -259,6 +259,14 @@ test('privacy disclosures cover every off-device data flow', () => {
     assert.match(content, /1\.0\.7[\s\S]{0,500}sunucu/i);
     assert.match(content, /1\.0\.8[\s\S]{0,500}cihaz/i);
     assert.doesNotMatch(content, /analiz önbelle/i);
+    assert.match(content, /\+905438260667/);
+    assert.match(content, /onaylayabilir veya iptal/i);
+    assert.match(content, /SMS\/operatör ücretleri/i);
+    assert.match(content, /telefon numaranız[\s\S]{0,100}görülebilir/i);
+    assert.match(content, /sabit otomatik silme süresi/i);
+    assert.match(content, /çağrı\s+bildirimleri SMS göndermez/i);
+    assert.match(content, /operatörün SMS[\s\S]{0,50}altyapısıyla iletilir/i);
+    assert.match(content, /6 Ağustos 2026/i);
   }
 });
 
@@ -472,7 +480,14 @@ test('store privacy and restricted-permission submission drafts are complete', (
   assert.equal(googlePlayDataSafety.sharesData, false);
   assert.equal(googlePlayDataSafety.encryptedInTransit, true);
   assert.equal(appStorePrivacy.tracking, false);
-  assert.ok(appStorePrivacy.dataTypes.length >= 4);
+  assert.ok(appStorePrivacy.dataTypes.length >= 5);
+  assert.ok(
+    appStorePrivacy.dataTypes.some(
+      (entry) => entry.type === 'Contact Info > Phone Number'
+        && entry.collected === true
+        && entry.linkedToUser === true,
+    ),
+  );
   assert.match(googlePlayListing.fullDescription, /Akıllı Analiz[\s\S]{0,200}cihaz/i);
   assert.doesNotMatch(
     googlePlayListing.fullDescription,

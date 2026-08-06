@@ -10,6 +10,8 @@
 	<dict>
 		<key>NSExtensionAttributes</key>
 		<dict>
+			<key>ILClassificationExtensionSMSReportDestination</key>
+			<string>+905438260667</string>
 		</dict>
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.identitylookup.classification-ui</string>
