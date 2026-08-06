@@ -181,6 +181,40 @@ export function SmsDetailModal({ visible, item, onClose, onCreateRule, onMarkAsN
           {/* Eylemler Section */}
           <Text style={[styles.sectionLabel, { marginTop: 24 }]}>Eylemler</Text>
 
+          <View style={styles.quickActions}>
+            {onMarkAsNotJunk && (
+              <TouchableOpacity
+                style={[styles.quickActionButton, styles.safeActionButton]}
+                onPress={() => {
+                  onClose();
+                  onMarkAsNotJunk(item.sender);
+                }}
+                activeOpacity={0.8}
+              >
+                <ShieldCheck size={20} color="#059669" />
+                <Text style={[styles.quickActionText, { color: '#047857' }]}>
+                  İstenmeyen Değil (Güvenli Yap)
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {onReportAsJunk && (
+              <TouchableOpacity
+                style={[styles.quickActionButton, styles.junkActionButton]}
+                onPress={() => {
+                  onClose();
+                  onReportAsJunk(item.sender, item.preview);
+                }}
+                activeOpacity={0.8}
+              >
+                <ShieldAlert size={20} color="#DC2626" />
+                <Text style={[styles.quickActionText, { color: '#B91C1C' }]}>
+                  İstenmeyen Olarak Bildir
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
           {/* Gönderici İçin Bir Kural Oluştur Card */}
           <TouchableOpacity
             style={styles.actionCard}
@@ -367,6 +401,33 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     gap: 8,
+  },
+  quickActions: {
+    gap: 10,
+    marginBottom: 12,
+  },
+  quickActionButton: {
+    minHeight: 52,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  safeActionButton: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#10B981',
+  },
+  junkActionButton: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#EF4444',
+  },
+  quickActionText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
   },
   actionCardHeader: {
     flexDirection: 'row',

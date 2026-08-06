@@ -1,24 +1,25 @@
 import { NextResponse } from 'next/server';
 import { verifyTOTP } from '../../../../lib/totp';
-
-// Global / in-memory or store push tokens
-// In production, tokens are stored when devices register via /api/push/register
-const registeredPushTokens = new Set<string>();
+import { getAdminSecrets, secretsMatch } from '../../../../lib/adminSecrets';
 
 export async function POST(request: Request) {
   try {
     const authHeader = request.headers.get('Authorization') || '';
     const tokenStr = authHeader.replace('Bearer ', '').trim();
     const [pass, code] = tokenStr.split(':');
-    const adminSecret = process.env.ADMIN_PASSWORD || 'admin';
-    const totpSecret = process.env.ADMIN_TOTP_SECRET || 'ELXGOYHKNLCA7YKW';
+    const secrets = getAdminSecrets();
+    if (!secrets) {
+      return NextResponse.json(
+        { error: 'Yönetici erişimi sunucuda yapılandırılmamış.' },
+        { status: 503 },
+      );
+    }
 
-    const isPassValid = (pass === adminSecret) || (pass === 'admin');
-    if (!isPassValid) {
+    if (!secretsMatch(pass, secrets.password)) {
       return NextResponse.json({ error: 'Yetkisiz erişim (Şifre hatalı).' }, { status: 401 });
     }
 
-    if (totpSecret && (!code || !verifyTOTP(code, totpSecret))) {
+    if (!code || !verifyTOTP(code, secrets.totpSecret)) {
       return NextResponse.json({ error: 'Yetkisiz erişim (Google Authenticator 2FA Kodu Hatalı veya Süresi Doldu).' }, { status: 401 });
     }
 
@@ -55,10 +56,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Bildirim gönderilirken bir hata oluştu.' }, { status: 500 });
   }
 }
-
-export function registerToken(tokenStr: string) {
-  if (tokenStr && tokenStr.startsWith('ExponentPushToken')) {
-    registeredPushTokens.add(tokenStr);
-  }
-}
-export { registeredPushTokens };

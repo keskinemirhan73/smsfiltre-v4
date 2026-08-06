@@ -224,6 +224,14 @@ const termsPage = readFileSync(
   new URL('../src/app/terms/page.tsx', import.meta.url),
   'utf8',
 );
+const verifyTwoFactorRoute = readFileSync(
+  new URL('../src/app/api/admin/verify-2fa/route.ts', import.meta.url),
+  'utf8',
+);
+const sendNotificationRoute = readFileSync(
+  new URL('../src/app/api/admin/send-notification/route.ts', import.meta.url),
+  'utf8',
+);
 
 const googlePlayReleaseNotes = readFileSync(
   new URL(
@@ -583,6 +591,15 @@ test('automatic SMS detection is not described as background cloud AI', () => {
     dashboardScreen,
     /cihazınızda analiz edilir/i,
   );
+});
+
+test('admin APIs fail closed without production secrets', () => {
+  for (const route of [verifyTwoFactorRoute, sendNotificationRoute]) {
+    assert.doesNotMatch(route, /ADMIN_PASSWORD\s*\|\|\s*['"]admin['"]/);
+    assert.doesNotMatch(route, /ADMIN_TOTP_SECRET\s*\|\|/);
+    assert.doesNotMatch(route, /pass(?:word)?\s*===\s*['"]admin['"]/);
+    assert.match(route, /503/);
+  }
 });
 
 test('SMS permission follows a prominent disclosure and consent flow', () => {

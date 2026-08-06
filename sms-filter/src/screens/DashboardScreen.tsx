@@ -17,6 +17,7 @@ import { SmsDetailModal } from '../components/SmsDetailModal';
 import { SecureStorage } from '../utils/SecureStorage';
 import { getExistingExpoPushTokenAsync, registerForPushNotificationsAsync, requestNotificationPermissionAsync } from '../services/PushNotificationService';
 import { createPublicJsonRequest } from '../services/publicApiRequest';
+import { setSenderCategory, setSenderWhitelistState } from '../services/senderRulePolicy';
 import {
   buildThreatDistribution,
   buildWeeklySuspiciousSeries,
@@ -536,34 +537,25 @@ export default function DashboardScreen() {
         onMarkAsNotJunk={async (sender) => {
           if (!sender) return;
           const rules = await FilterManager.loadRules();
-          const newRule: FilterRule = {
-            id: Date.now().toString(),
-            keyword: sender,
-            type: 'word',
-            category: 'allowed',
-            matchTarget: 'sender'
-          };
-          await FilterManager.saveRules([...rules, newRule]);
+          await FilterManager.saveRules(setSenderCategory(rules, sender, 'allowed'));
           
           const settings = await FilterManager.loadSettings();
-          if (!settings.whitelist.includes(sender)) {
-            settings.whitelist.push(sender);
-            await FilterManager.saveSettings(settings);
-          }
+          await FilterManager.saveSettings({
+            ...settings,
+            whitelist: setSenderWhitelistState(settings.whitelist, sender, true),
+          });
           
           Alert.alert("İstenmeyen Değil (Güvenli Liste)", `"${sender}" artık güvenli gönderici olarak kaydedildi.`);
         }}
         onReportAsJunk={async (sender, preview) => {
           if (!sender) return;
           const rules = await FilterManager.loadRules();
-          const newRule: FilterRule = {
-            id: Date.now().toString(),
-            keyword: sender,
-            type: 'word',
-            category: 'junk',
-            matchTarget: 'sender'
-          };
-          await FilterManager.saveRules([...rules, newRule]);
+          await FilterManager.saveRules(setSenderCategory(rules, sender, 'junk'));
+          const settings = await FilterManager.loadSettings();
+          await FilterManager.saveSettings({
+            ...settings,
+            whitelist: setSenderWhitelistState(settings.whitelist, sender, false),
+          });
           await handleDetailedReport(preview, 'İstenmeyen', 'Kullanıcı istenmeyen olarak bildirdi.');
           Alert.alert("İstenmeyen Olarak Bildirildi", `"${sender}" engellenenler listesine eklendi ve rapor kaydedildi.`);
         }}

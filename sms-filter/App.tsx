@@ -5,7 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Shield, Settings, Sparkles, Trophy, Flag } from 'lucide-react-native';
-import { useColorScheme, DeviceEventEmitter, Linking } from 'react-native';
+import { useColorScheme, AppState, DeviceEventEmitter, Linking } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 
@@ -28,7 +28,12 @@ import { getInitialRoute, InitialRoute } from './src/app/startupPolicy';
 import { hasCompletedOnboarding } from './src/app/onboardingStorage';
 import { getRemainingSplashDuration } from './src/app/splashPolicy';
 
-import { registerForPushNotificationsAsync, syncPushTokenWithBackend, scheduleWeeklySafetyNotification } from './src/services/PushNotificationService';
+import {
+  getExistingExpoPushTokenAsync,
+  registerForPushNotificationsAsync,
+  scheduleWeeklySafetyNotification,
+  syncPushTokenWithBackend,
+} from './src/services/PushNotificationService';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -142,8 +147,29 @@ export default function App() {
       }
     });
 
-    registerForPushNotificationsAsync().then(token => {
-      if (token) syncPushTokenWithBackend(token);
+    const syncExistingPushToken = async () => {
+      const token = await getExistingExpoPushTokenAsync();
+      if (token) await syncPushTokenWithBackend(token);
+    };
+
+    registerForPushNotificationsAsync()
+      .then(token => {
+        if (token) return syncPushTokenWithBackend(token);
+        return undefined;
+      })
+      .catch(error => console.warn('Push kaydi baslatilamadi:', error));
+
+    const pushTokenSub = Notifications.addPushTokenListener(token => {
+      syncPushTokenWithBackend(token.data).catch(error =>
+        console.warn('Yeni push token kaydedilemedi:', error),
+      );
+    });
+    const appStateSub = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        syncExistingPushToken().catch(error =>
+          console.warn('Push token yenileme basarisiz:', error),
+        );
+      }
     });
     scheduleWeeklySafetyNotification();
 
@@ -153,6 +179,8 @@ export default function App() {
     return () => {
       sub.remove();
       linkSub.remove();
+      pushTokenSub.remove();
+      appStateSub.remove();
     };
   }, []);
 

@@ -5,9 +5,21 @@ const test = require('node:test');
 
 const {
   validateAnalyzeInput,
+  validateNotificationInput,
   validatePushTokenInput,
   validateReportInput,
 } = require('../src/validation/publicInput');
+
+test('admin notification input is trimmed and bounded', () => {
+  assert.deepEqual(
+    validateNotificationInput({ title: '  Guvenlik  ', body: '  Yeni kural aktif  ' }),
+    { ok: true, title: 'Guvenlik', body: 'Yeni kural aktif' },
+  );
+  assert.equal(validateNotificationInput({ title: '', body: 'mesaj' }).ok, false);
+  assert.equal(validateNotificationInput({ title: 'x'.repeat(101), body: 'mesaj' }).ok, false);
+  assert.equal(validateNotificationInput({ title: 'baslik', body: 'x'.repeat(501) }).ok, false);
+  assert.equal(validateNotificationInput({ title: 42, body: 'mesaj' }).ok, false);
+});
 
 const TOKEN_FIELD = ['to', 'ken'].join('');
 const backendSource = readFileSync(resolve(__dirname, '../index.js'), 'utf8');

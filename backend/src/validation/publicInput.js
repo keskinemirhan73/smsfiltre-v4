@@ -3,6 +3,8 @@ const ANALYSIS_TEXT_MAX_LENGTH = 4000;
 const REPORT_TEXT_MIN_LENGTH = 3;
 const REPORT_TEXT_MAX_LENGTH = 500;
 const PUSH_TOKEN_MAX_LENGTH = 256;
+const NOTIFICATION_TITLE_MAX_LENGTH = 100;
+const NOTIFICATION_BODY_MAX_LENGTH = 500;
 const REPORT_TYPES = new Set(['word', 'number']);
 
 function invalid(error) {
@@ -78,8 +80,33 @@ function validatePushTokenInput(body, isValidPushToken) {
   return { ok: true, token: body.token };
 }
 
+function validateNotificationInput(body) {
+  if (
+    !body ||
+    typeof body !== 'object' ||
+    typeof body.title !== 'string' ||
+    typeof body.body !== 'string'
+  ) {
+    return invalid('Gecerli bir bildirim basligi ve mesaji gereklidir.');
+  }
+
+  const title = body.title.trim();
+  const notificationBody = body.body.trim();
+  if (
+    title.length === 0 ||
+    title.length > NOTIFICATION_TITLE_MAX_LENGTH ||
+    notificationBody.length === 0 ||
+    notificationBody.length > NOTIFICATION_BODY_MAX_LENGTH
+  ) {
+    return invalid('Bildirim basligi veya mesaji izin verilen uzunlukta degil.');
+  }
+
+  return { ok: true, title, body: notificationBody };
+}
+
 module.exports = {
   validateAnalyzeInput,
+  validateNotificationInput,
   validatePushTokenInput,
   validateReportInput,
 };

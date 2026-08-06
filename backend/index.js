@@ -6,8 +6,10 @@ const mongoose = require('mongoose');
 const { Expo } = require('expo-server-sdk');
 const { createAdminAuth } = require('./src/middleware/adminAuth');
 const { analyzeMessage } = require('./src/services/messageAnalysis');
+const { deliverPushBroadcast } = require('./src/services/pushDelivery');
 const {
   validateAnalyzeInput,
+  validateNotificationInput,
   validatePushTokenInput,
   validateReportInput,
 } = require('./src/validation/publicInput');
@@ -55,7 +57,7 @@ app.use('/api/report', expensiveOperationLimiter);
 
 // Environment variables
 const MONGODB_URI = process.env.MONGODB_URI;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD?.trim();
 const PORT = process.env.PORT || 5000;
 const THRESHOLD = 5; 
 
@@ -312,45 +314,38 @@ app.post('/api/reject/:id', verifyAdmin, async (req, res) => {
 // ADMIN API: Send Global Notification
 app.post('/api/admin/send-notification', verifyAdmin, async (req, res) => {
   try {
-    const { title, body } = req.body;
-    if (!title || !body) return res.status(400).json({ error: 'Başlık ve mesaj gereklidir' });
+    const validation = validateNotificationInput(req.body);
+    if (!validation.ok) return res.status(400).json({ error: validation.error });
+    const { title, body } = validation;
 
     const devices = await DeviceToken.find();
-    let messages = [];
-    
-    for (let device of devices) {
-      messages.push({
-        to: device.token,
-        sound: 'default',
-        title: title,
-        body: body,
-      });
-    }
+    const delivery = await deliverPushBroadcast({
+      expo,
+      isValidToken: Expo.isExpoPushToken,
+      tokens: devices.map(device => device.token),
+      title,
+      body,
+    });
 
-    let chunks = expo.chunkPushNotifications(messages);
-    let successCount = 0;
-    let failureCount = 0;
-
-    for (let chunk of chunks) {
-      try {
-        let ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-        for (let ticket of ticketChunk) {
-          if (ticket.status === 'ok') successCount++;
-          else failureCount++;
-        }
-      } catch (error) {
-        console.error(error);
-        failureCount += chunk.length;
-      }
+    if (delivery.staleTokens.length > 0) {
+      await DeviceToken.deleteMany({ token: { $in: delivery.staleTokens } });
     }
 
     // Save history
     const history = new NotificationHistory({
-      title, body, sentToCount: devices.length, successCount, failureCount
+      title,
+      body,
+      sentToCount: delivery.attemptedCount,
+      successCount: delivery.successCount,
+      failureCount: delivery.failureCount,
     });
     await history.save();
     
-    res.json({ success: true, message: `${successCount} cihaza bildirim gönderildi.`, successCount, failureCount });
+    res.json({
+      success: true,
+      message: `${delivery.successCount} cihaza bildirim gönderildi.`,
+      ...delivery,
+    });
   } catch (error) {
     console.error('[PUSH ERROR]', error);
     res.status(500).json({ error: 'Bildirim gönderilemedi' });

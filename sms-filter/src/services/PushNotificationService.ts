@@ -2,6 +2,12 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+import { registerPushTokenReliably } from './pushRegistrationPolicy';
+
+const PUSH_REGISTRATION_ENDPOINTS = [
+  'https://smsfiltre-v4.onrender.com/api/push-token',
+  'https://filtreai.vercel.app/api/push/register',
+] as const;
 
 async function configureAndroidNotificationChannel(): Promise<void> {
   if (Platform.OS === 'android') {
@@ -71,29 +77,17 @@ export async function getExistingExpoPushTokenAsync(): Promise<string | undefine
 
 export async function syncPushTokenWithBackend(token: string): Promise<boolean> {
   if (!token) return false;
-  try {
-    const payload = JSON.stringify({
+  const result = await registerPushTokenReliably(
+    {
       token,
       platform: Platform.OS,
       deviceName: Device.deviceName || Device.modelName || 'Device',
-    });
+    },
+    { endpoints: PUSH_REGISTRATION_ENDPOINTS, request: fetch },
+  );
 
-    await Promise.all([
-      fetch('https://smsfiltre-v4.onrender.com/api/push-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: payload,
-      }).catch(() => {}),
-      fetch('https://filtreai.vercel.app/api/push/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: payload,
-      }).catch(() => {}),
-    ]);
-    return true;
-  } catch {
-    return false;
-  }
+  if (!result.ok) console.warn('Push token kalıcı sunucuya kaydedilemedi.');
+  return result.ok;
 }
 
 export async function scheduleWeeklySafetyNotification(): Promise<void> {

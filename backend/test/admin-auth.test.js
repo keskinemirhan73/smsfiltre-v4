@@ -64,3 +64,20 @@ test('admin endpoints accept the configured bearer token', () => {
   assert.equal(response.statusCode, 200);
   assert.equal(nextCalled, true);
 });
+
+test('literal admin never bypasses a configured production secret', () => {
+  const middleware = createAdminAuth('a-long-random-secret');
+  const response = createResponse();
+  let nextCalled = false;
+
+  middleware(
+    { headers: { authorization: 'Bearer admin' } },
+    response,
+    () => {
+      nextCalled = true;
+    },
+  );
+
+  assert.equal(response.statusCode, 401);
+  assert.equal(nextCalled, false);
+});

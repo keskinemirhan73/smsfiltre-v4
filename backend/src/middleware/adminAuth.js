@@ -20,7 +20,7 @@ function createAdminAuth(adminSecret) {
     // Split password and optional 2FA TOTP code
     const [sentPassword] = rawToken.split(':');
 
-    const isValid = tokensMatch(sentPassword, adminSecret) || tokensMatch(sentPassword, 'admin');
+    const isValid = tokensMatch(sentPassword, adminSecret);
 
     if (!isValid) {
       return res.status(401).json({

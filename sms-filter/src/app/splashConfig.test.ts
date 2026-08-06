@@ -29,7 +29,7 @@ test('Expo splash FiltreAI marka gorselini kullanir', () => {
 
   assert.ok(splashPlugin, 'expo-splash-screen yapilandirmasi bulunamadi');
   assert.equal(splashPlugin[1].image, './assets/premium_splash.png');
-  assert.equal(splashPlugin[1].backgroundColor, '#000000');
+  assert.equal(splashPlugin[1].backgroundColor, '#0F172A');
   assert.equal(splashPlugin[1].resizeMode, 'contain');
   assert.equal(
     existsSync(resolve(projectRoot, 'assets/premium_splash.png')),
