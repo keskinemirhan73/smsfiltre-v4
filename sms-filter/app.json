@@ -77,6 +77,10 @@
                       "group.com.filtreai.app"
                     ]
                   }
+                },
+                {
+                  "bundleIdentifier": "com.filtreai.app.smsreport",
+                  "targetName": "smsreport"
                 }
               ]
             }

@@ -10,4 +10,20 @@ if (!config.ios.appleTeamId) {
   );
 }
 
-console.log('iOS kimlikleri hazır: ana uygulama, mesaj filtresi ve App Group yapılandırıldı.');
+const appExtensions = config.extra?.eas?.build?.experimental?.ios?.appExtensions ?? [];
+const requiredExtensions = [
+  ['com.filtreai.app.messagefilter', 'smsfilter'],
+  ['com.filtreai.app.smsreport', 'smsreport'],
+];
+
+for (const [bundleIdentifier, targetName] of requiredExtensions) {
+  const configured = appExtensions.some(
+    (extension) => extension.bundleIdentifier === bundleIdentifier
+      && extension.targetName === targetName,
+  );
+  if (!configured) {
+    throw new Error(`iOS build hazır değil: ${targetName} imzalama hedefi eksik.`);
+  }
+}
+
+console.log('iOS kimlikleri hazır: ana uygulama, mesaj filtresi, raporlama paneli ve App Group yapılandırıldı.');

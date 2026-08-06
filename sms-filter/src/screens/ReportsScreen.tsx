@@ -165,28 +165,35 @@ export default function ReportsScreen() {
         </View>
 
         {/* Filter Chips */}
-        <View style={styles.filterRow}>
-          <TouchableOpacity
-            style={[styles.chip, activeFilter === 'all' && { backgroundColor: '#8B5CF6' }]}
-            onPress={() => setActiveFilter('all')}
-          >
-            <Text style={[styles.chipText, activeFilter === 'all' && { color: '#FFF' }]}>Tüm İşlemler ({rules.length})</Text>
-          </TouchableOpacity>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterContent}
+          directionalLockEnabled
+        >
+          <View style={styles.filterRow}>
+            <TouchableOpacity
+              style={[styles.chip, activeFilter === 'all' && { backgroundColor: '#8B5CF6' }]}
+              onPress={() => setActiveFilter('all')}
+            >
+              <Text style={[styles.chipText, activeFilter === 'all' && { color: '#FFF' }]}>Tüm İşlemler ({rules.length})</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.chip, activeFilter === 'junk' && { backgroundColor: '#EF4444' }]}
-            onPress={() => setActiveFilter('junk')}
-          >
-            <Text style={[styles.chipText, activeFilter === 'junk' && { color: '#FFF' }]}>🚫 Engellenenler</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.chip, activeFilter === 'junk' && { backgroundColor: '#EF4444' }]}
+              onPress={() => setActiveFilter('junk')}
+            >
+              <Text style={[styles.chipText, activeFilter === 'junk' && { color: '#FFF' }]}>🚫 Engellenenler</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.chip, activeFilter === 'allowed' && { backgroundColor: '#10B981' }]}
-            onPress={() => setActiveFilter('allowed')}
-          >
-            <Text style={[styles.chipText, activeFilter === 'allowed' && { color: '#FFF' }]}>🟢 İzinliler</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={[styles.chip, activeFilter === 'allowed' && { backgroundColor: '#10B981' }]}
+              onPress={() => setActiveFilter('allowed')}
+            >
+              <Text style={[styles.chipText, activeFilter === 'allowed' && { color: '#FFF' }]}>🟢 İzinliler</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
 
         {/* List of Rules & Native Events */}
         {filteredRules.length === 0 ? (
@@ -305,6 +312,9 @@ const styles = StyleSheet.create({
   filterRow: {
     flexDirection: 'row',
     gap: spacing.sm,
+  },
+  filterContent: {
+    paddingRight: spacing.md,
   },
   chip: {
     paddingHorizontal: spacing.md,
