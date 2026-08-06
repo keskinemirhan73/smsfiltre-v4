@@ -8,6 +8,9 @@
 	<string>FiltreAI</string>
 	<key>NSExtension</key>
 	<dict>
+		<key>NSExtensionAttributes</key>
+		<dict>
+		</dict>
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.identitylookup.classification-ui</string>
 		<key>NSExtensionPrincipalClass</key>

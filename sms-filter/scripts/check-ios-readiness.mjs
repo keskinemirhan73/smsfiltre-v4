@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -24,6 +25,16 @@ for (const [bundleIdentifier, targetName] of requiredExtensions) {
   if (!configured) {
     throw new Error(`iOS build hazır değil: ${targetName} imzalama hedefi eksik.`);
   }
+}
+
+const reportingPlist = readFileSync(
+  new URL('../targets/unwanted-communication/Info.plist', import.meta.url),
+  'utf8',
+);
+if (!/<key>NSExtensionAttributes<\/key>\s*<dict>[\s\S]*?<\/dict>/.test(reportingPlist)) {
+  throw new Error(
+    'iOS build haz\u0131r de\u011fil: smsreport Info.plist i\u00e7inde NSExtensionAttributes s\u00f6zl\u00fc\u011f\u00fc eksik.',
+  );
 }
 
 console.log('iOS kimlikleri hazır: ana uygulama, mesaj filtresi, raporlama paneli ve App Group yapılandırıldı.');

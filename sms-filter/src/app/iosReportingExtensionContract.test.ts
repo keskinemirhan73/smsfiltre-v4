@@ -17,6 +17,11 @@ test('iOS raporlama targeti doğru extension tipini ve bundle kimliğini kullan�
   assert.match(config, /bundleIdentifier:\s*["']\.smsreport["']/);
   assert.match(plist, /com\.apple\.identitylookup\.classification-ui/);
   assert.match(plist, /\$\(PRODUCT_MODULE_NAME\)\.ClassificationViewController/);
+  assert.match(
+    plist,
+    /<key>NSExtensionAttributes<\/key>\s*<dict>\s*<\/dict>/,
+    'Apple, Unwanted Communication Reporting extension i\u00e7in NSExtensionAttributes s\u00f6zl\u00fc\u011f\u00fcn\u00fc zorunlu tutar.',
+  );
   assert.doesNotMatch(plist, /ILClassificationExtension(?:Network|SMS)ReportDestination/);
 });
 
