@@ -232,6 +232,10 @@ const sendNotificationRoute = readFileSync(
   new URL('../src/app/api/admin/send-notification/route.ts', import.meta.url),
   'utf8',
 );
+const adminSecrets = readFileSync(
+  new URL('../src/lib/adminSecrets.ts', import.meta.url),
+  'utf8',
+);
 
 const googlePlayReleaseNotes = readFileSync(
   new URL(
@@ -614,6 +618,27 @@ test('admin APIs fail closed without production secrets', () => {
     assert.doesNotMatch(route, /ADMIN_TOTP_SECRET\s*\|\|/);
     assert.doesNotMatch(route, /pass(?:word)?\s*===\s*['"]admin['"]/);
     assert.match(route, /503/);
+  }
+});
+
+test('admin credentials have one environment-only source with no legacy fallback', () => {
+  assert.match(
+    adminSecrets,
+    /process\.env\.ADMIN_PASSWORD\?\.trim\(\)/,
+  );
+  assert.match(
+    adminSecrets,
+    /process\.env\.ADMIN_TOTP_SECRET\?\.trim\(\)/,
+  );
+  assert.doesNotMatch(
+    adminSecrets,
+    /ADMIN_(?:PASSWORD|TOTP_SECRET)[^;\n]*(?:\|\||\?\?)/,
+  );
+  assert.doesNotMatch(adminSecrets, /OLD|LEGACY|PREVIOUS|FALLBACK/i);
+
+  for (const route of [verifyTwoFactorRoute, sendNotificationRoute]) {
+    assert.match(route, /getAdminSecrets\(\)/);
+    assert.doesNotMatch(route, /process\.env\.(?:ADMIN_PASSWORD|ADMIN_TOTP_SECRET)/);
   }
 });
 
