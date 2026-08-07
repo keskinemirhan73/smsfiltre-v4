@@ -86,3 +86,12 @@ jobs:
           path: FiltreAI.ipa
           if-no-files-found: error
           retention-days: 7
+
+      - name: Submit to App Store Connect / TestFlight
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          eas submit \
+            --platform ios \
+            --path "$GITHUB_WORKSPACE/FiltreAI.ipa" \
+            --non-interactive
