@@ -46,7 +46,11 @@ private func isWithinSchedule(_ settings: [String: Any]) -> Bool {
         : (current >= start || current <= end)
 }
 
+private let eventQueueLock = NSLock()
+
 private func recordEvent(sender: String, action: ILMessageFilterAction) {
+    eventQueueLock.lock()
+    defer { eventQueueLock.unlock() }
     guard let defaults = UserDefaults(suiteName: "group.com.filtreai.app") else { return }
     let jsonStr = defaults.string(forKey: "smsfilter_event_queue_json") ?? "[]"
     var queue: [[String: Any]] = []
@@ -184,6 +188,7 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
                   let type = rule["type"] as? String,
                   let category = rule["category"] as? String,
                   let matchTarget = rule["matchTarget"] as? String else { continue }
+            let matchMode = rule["matchMode"] as? String ?? "contains"
 
             let textToCheck: String
             switch matchTarget {
@@ -192,14 +197,20 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
             default: textToCheck = "\(sender) \(body)"
             }
 
-            let isMatch = type == "regex"
-                ? textToCheck.range(of: keyword, options: [.regularExpression, .caseInsensitive]) != nil
-                : textToCheck.range(of: keyword, options: .caseInsensitive) != nil
+            let isMatch: Bool
+            if type == "regex" {
+                isMatch = textToCheck.range(of: keyword, options: [.regularExpression, .caseInsensitive]) != nil
+            } else if matchTarget == "sender" && matchMode == "exact" {
+                isMatch = sender.trimmingCharacters(in: .whitespacesAndNewlines)
+                    .compare(keyword.trimmingCharacters(in: .whitespacesAndNewlines), options: .caseInsensitive) == .orderedSame
+            } else {
+                isMatch = textToCheck.range(of: keyword, options: .caseInsensitive) != nil
+            }
 
             if isMatch {
-                if category == "transaction" && !filterTransactions {
+                if category == "transaction" && matchMode != "exact" && !filterTransactions {
                     response.action = .allow
-                } else if category == "promotion" && !filterPromotions {
+                } else if category == "promotion" && matchMode != "exact" && !filterPromotions {
                     response.action = .allow
                 } else {
                     response.action = categoryAction(category, mapping: mapping)

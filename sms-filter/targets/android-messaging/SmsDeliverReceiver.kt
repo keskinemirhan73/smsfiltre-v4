@@ -114,6 +114,7 @@ class SmsDeliverReceiver : BroadcastReceiver() {
                             val type = rule.optString("type", "word")
                             val category = rule.optString("category", "junk")
                             val matchTarget = rule.optString("matchTarget", "content")
+                            val matchMode = rule.optString("matchMode", "contains")
 
                             val textToCheck = when (matchTarget) {
                                 "sender" -> sender
@@ -123,6 +124,8 @@ class SmsDeliverReceiver : BroadcastReceiver() {
 
                             val isMatch = if (type == "regex") {
                                 try { Regex(keyword, RegexOption.IGNORE_CASE).containsMatchIn(textToCheck) } catch (e: Exception) { false }
+                            } else if (matchTarget == "sender" && matchMode == "exact") {
+                                sender.trim().equals(keyword.trim(), ignoreCase = true)
                             } else {
                                 textToCheck.lowercase().contains(keyword.lowercase().trim())
                             }

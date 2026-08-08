@@ -17,7 +17,6 @@ import { SmsDetailModal } from '../components/SmsDetailModal';
 import { SecureStorage } from '../utils/SecureStorage';
 import { getExistingExpoPushTokenAsync, registerForPushNotificationsAsync, requestNotificationPermissionAsync } from '../services/PushNotificationService';
 import { createPublicJsonRequest } from '../services/publicApiRequest';
-import { setSenderCategory, setSenderWhitelistState } from '../services/senderRulePolicy';
 import {
   buildThreatDistribution,
   buildWeeklySuspiciousSeries,
@@ -536,31 +535,26 @@ export default function DashboardScreen() {
         onCreateRule={handleCreateRule}
         onMarkAsNotJunk={async (sender) => {
           if (!sender) return;
-          const rules = await FilterManager.loadRules();
-          await FilterManager.saveRules(setSenderCategory(rules, sender, 'allowed'));
-          
-          const settings = await FilterManager.loadSettings();
-          await FilterManager.saveSettings({
-            ...settings,
-            whitelist: setSenderWhitelistState(settings.whitelist, sender, true),
-          });
-          
+          const result = await FilterManager.categorizeSender(sender, 'allowed');
+          setRecentActivity(result.history);
           Alert.alert("İstenmeyen Değil (Güvenli Liste)", `"${sender}" artık güvenli gönderici olarak kaydedildi.`);
         }}
         onReportAsJunk={async (sender, preview) => {
           if (!sender) return;
-          const rules = await FilterManager.loadRules();
-          await FilterManager.saveRules(setSenderCategory(rules, sender, 'junk'));
-          const settings = await FilterManager.loadSettings();
-          await FilterManager.saveSettings({
-            ...settings,
-            whitelist: setSenderWhitelistState(settings.whitelist, sender, false),
-          });
+          const result = await FilterManager.categorizeSender(sender, 'junk');
+          setRecentActivity(result.history);
           await handleDetailedReport(preview, 'İstenmeyen', 'Kullanıcı istenmeyen olarak bildirdi.');
           Alert.alert("İstenmeyen Olarak Bildirildi", `"${sender}" engellenenler listesine eklendi ve rapor kaydedildi.`);
         }}
-        onReport={(preview, category, notes) => {
-          handleDetailedReport(preview, category, notes);
+        onCategorizeSender={async (sender, category) => {
+          const result = await FilterManager.categorizeSender(sender, category);
+          setRecentActivity(result.history);
+          Alert.alert(
+            result.nativeSynced ? 'Kategori Kaydedildi' : 'Yerelde Kaydedildi',
+            result.nativeSynced
+              ? `"${sender}" için yeni kategori bundan sonraki uygun mesajlarda kullanılacak.`
+              : 'Kural saklandı ancak cihaza aktarılamadı. Uygulamayı yeniden açıp tekrar deneyin.',
+          );
         }}
       />
 

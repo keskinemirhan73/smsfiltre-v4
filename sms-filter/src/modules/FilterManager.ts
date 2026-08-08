@@ -3,6 +3,12 @@ import { Platform } from 'react-native';
 import { ThreatCloudService } from '../services/ThreatCloudService';
 import { buildNativeFilterPayload } from '../services/nativeFilterPayload';
 import { mergeNativeSmsEvents, parseNativeSmsEventQueues } from '../services/nativeSmsEvents';
+import {
+  createManualCategoryHistory,
+  resolveUserRuleCategory,
+  type MessageCategory,
+} from '../services/messageCategoryPolicy';
+import { parseSenderRuleInput, senderRuleMatches, setSenderCategory, setSenderWhitelistState } from '../services/senderRulePolicy';
 
 const APP_GROUP = 'group.com.filtreai.app';
 const STORAGE_KEY = '@junkman_rules';
@@ -20,6 +26,7 @@ export interface FilterRule {
   type: 'word' | 'regex';
   category: 'junk' | 'transaction' | 'promotion' | 'allowed';
   matchTarget: 'sender' | 'content' | 'both';
+  matchMode?: 'exact' | 'contains';
 }
 
 export interface AppSettings {
@@ -72,6 +79,7 @@ export interface HistoryItem {
   status: 'blocked' | 'transaction' | 'promotion' | 'allowed';
   category: string;
   timestamp: number;
+  source?: 'native' | 'manual' | 'simulator';
 }
 
 const HISTORY_KEY = '@junkman_history';
@@ -285,6 +293,14 @@ export class NaiveBayesClassifier {
 
 // ─── FilterManager Class ─────────────────────────────────────
 export class FilterManager {
+  private static nativeImportInFlight: Promise<number> | null = null;
+  private static storageMutationQueue: Promise<unknown> = Promise.resolve();
+
+  private static withStorageMutation<T>(operation: () => Promise<T>): Promise<T> {
+    const queued = this.storageMutationQueue.then(operation, operation);
+    this.storageMutationQueue = queued.then(() => undefined, () => undefined);
+    return queued;
+  }
 
   // Rules
   static async loadRules(): Promise<FilterRule[]> {
@@ -294,9 +310,11 @@ export class FilterManager {
     } catch { return defaultRules; }
   }
 
-  static async saveRules(rules: FilterRule[]) {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(rules));
-    await this.syncToNative(rules, await this.loadSettings());
+  static saveRules(rules: FilterRule[]) {
+    return this.withStorageMutation(async () => {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(rules));
+      await this.syncToNative(rules, await this.loadSettings());
+    });
   }
 
   // Settings
@@ -307,13 +325,11 @@ export class FilterManager {
     } catch { return defaultSettings; }
   }
 
-  static async saveSettings(settings: AppSettings): Promise<void> {
-    try {
+  static saveSettings(settings: AppSettings): Promise<void> {
+    return this.withStorageMutation(async () => {
       await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-    } catch (e) {
-      console.warn('Storage Error:', e);
-    }
-    await this.syncToNative(await this.loadRules(), settings);
+      await this.syncToNative(await this.loadRules(), settings);
+    });
   }
 
   // Stats
@@ -338,7 +354,7 @@ export class FilterManager {
     } catch { return []; }
   }
 
-  static async addHistory(item: Omit<HistoryItem, 'id' | 'timestamp'>) {
+  private static async addHistoryUnlocked(item: Omit<HistoryItem, 'id' | 'timestamp'>) {
     const history = await this.loadHistory();
     const newItem: HistoryItem = {
       ...item,
@@ -346,11 +362,49 @@ export class FilterManager {
       timestamp: Date.now(),
     };
     const updatedHistory = [newItem, ...history].slice(0, 50);
-    try {
-      await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(updatedHistory));
-    } catch (e) {
-      console.warn('Storage Error:', e);
-    }
+    await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(updatedHistory));
+  }
+
+  static addHistory(item: Omit<HistoryItem, 'id' | 'timestamp'>) {
+    return this.withStorageMutation(() => this.addHistoryUnlocked(item));
+  }
+
+  static categorizeSender(senderInput: string, category: MessageCategory) {
+    const sender = parseSenderRuleInput(senderInput);
+    if (!sender) return Promise.reject(new Error('Geçerli bir gönderen adı veya numarası girin.'));
+
+    return this.withStorageMutation(async () => {
+      const [rules, settings] = await Promise.all([
+        this.loadRules(),
+        this.loadSettings(),
+      ]);
+      const updatedRules = setSenderCategory(rules, sender, category);
+      const updatedSettings = {
+        ...settings,
+        whitelist: setSenderWhitelistState(settings.whitelist, sender, category === 'allowed'),
+      };
+      const originalHistory = await this.loadHistory();
+
+      try {
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedRules));
+        await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(updatedSettings));
+        await this.addHistoryUnlocked(createManualCategoryHistory(sender, category));
+      } catch (error) {
+        await Promise.allSettled([
+          AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(rules)),
+          AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)),
+          AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(originalHistory)),
+        ]);
+        throw error;
+      }
+      const nativeSynced = await this.syncToNative(updatedRules, updatedSettings);
+
+      return {
+        rules: updatedRules,
+        history: await this.loadHistory(),
+        nativeSynced,
+      };
+    });
   }
 
   // (Eski statik metod) Artık kullanılmıyor, classifyMessage içinde doğrudan bulut veritabanını okuyacağız.
@@ -417,19 +471,26 @@ export class FilterManager {
       let isMatch = false;
       if (rule.type === 'regex') {
         try { isMatch = new RegExp(rule.keyword, 'i').test(textToCheck); } catch {}
+      } else if (rule.matchTarget === 'sender' && rule.matchMode === 'exact') {
+        isMatch = senderRuleMatches(sender, rule.keyword);
       } else {
         isMatch = textToCheck.toLowerCase().includes(rule.keyword.toLowerCase());
       }
 
       if (isMatch) {
-        if (rule.category === 'transaction' && !settings.filterTransactions) return 'allowed';
-        if (rule.category === 'promotion' && !settings.filterPromotions) return 'allowed';
+        const category = resolveUserRuleCategory(
+          rule.category,
+          rule.matchTarget,
+          settings.filterTransactions,
+          settings.filterPromotions,
+          rule.matchMode,
+        );
         
         // Kategori Eşleme (Kullanıcı bu kategoriyi farklı bir yere yönlendirmiş olabilir)
-        if (rule.category === 'junk') return settings.categoryMapping.spam as any;
-        if (rule.category === 'transaction') return settings.categoryMapping.transaction as any;
-        if (rule.category === 'promotion') return settings.categoryMapping.promotion as any;
-        return rule.category;
+        if (category === 'junk') return settings.categoryMapping.spam as any;
+        if (category === 'transaction') return settings.categoryMapping.transaction as any;
+        if (category === 'promotion') return settings.categoryMapping.promotion as any;
+        return category;
       }
     }
 
@@ -488,6 +549,22 @@ export class FilterManager {
   }
 
   static async importNativeSmsEvents(): Promise<number> {
+    if (this.nativeImportInFlight) return this.nativeImportInFlight;
+
+    const operation = this.performNativeSmsEventImport();
+    this.nativeImportInFlight = operation;
+    try {
+      return await operation;
+    } finally {
+      if (this.nativeImportInFlight === operation) this.nativeImportInFlight = null;
+    }
+  }
+
+  private static performNativeSmsEventImport(): Promise<number> {
+    return this.withStorageMutation(() => this.performNativeSmsEventImportUnlocked());
+  }
+
+  private static async performNativeSmsEventImportUnlocked(): Promise<number> {
     try {
       let rawEventQueues: Array<string | null> = [];
       if (Platform.OS === 'android') {
@@ -532,26 +609,25 @@ export class FilterManager {
     }
   }
 
-  static async syncToNative(rules: FilterRule[], settings: AppSettings) {
+  static async syncToNative(rules: FilterRule[], settings: AppSettings): Promise<boolean> {
     try {
       const cloudDb = await ThreatCloudService.getDatabase();
       const payload = buildNativeFilterPayload(rules, settings, cloudDb);
       if (Platform.OS === 'ios') {
-        try {
-          const { ExtensionStorage } = require('@bacons/apple-targets');
-          const storage = new ExtensionStorage(APP_GROUP);
-          storage.set('smsfilter_config_json', payload);
-        } catch {}
+        const { ExtensionStorage } = require('@bacons/apple-targets');
+        const storage = new ExtensionStorage(APP_GROUP);
+        storage.set('smsfilter_config_json', payload);
+        return storage.get('smsfilter_config_json') === payload;
       } else if (Platform.OS === 'android') {
-        try {
-          const sharedPreferencesModule = require('react-native-shared-preferences');
-          const SP = sharedPreferencesModule.default ?? sharedPreferencesModule;
-          SP.setName('smsfilter_prefs');
-          SP.setItem('smsfilter_config_json', payload);
-        } catch {}
+        const sharedPreferencesModule = require('react-native-shared-preferences');
+        const SP = sharedPreferencesModule.default ?? sharedPreferencesModule;
+        SP.setName('smsfilter_prefs');
+        SP.setItem('smsfilter_config_json', payload);
       }
+      return true;
     } catch (error) {
-      console.log('Error syncing to native:', error);
+      console.warn('Native filtre ayarları eşitlenemedi.');
+      return false;
     }
   }
 }

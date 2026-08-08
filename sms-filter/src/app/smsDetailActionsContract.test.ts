@@ -16,3 +16,12 @@ test('SMS detayında güvenli ve istenmeyen eylemleri kullanıcıya görünür k
   assert.match(detailModal, /onMarkAsNotJunk\(item\.sender\)/);
   assert.match(detailModal, /onReportAsJunk\(item\.sender, item\.preview\)/);
 });
+
+test('SMS detayındaki kategori seçimi gerçek gönderici kuralını kaydeder', () => {
+  assert.match(detailModal, /key:\s*['"]junk['"]/);
+  assert.match(detailModal, /key:\s*['"]allowed['"]/);
+  assert.match(detailModal, /key:\s*['"]transaction['"]/);
+  assert.match(detailModal, /key:\s*['"]promotion['"]/);
+  assert.match(detailModal, /onCategorizeSender\(item\.sender, selectedCategory\)/);
+  assert.match(detailModal, /Kategoriyi Kaydet/);
+});

@@ -6,6 +6,7 @@ interface NativeRule {
   type: 'word' | 'regex';
   category: string;
   matchTarget: string;
+  matchMode?: 'exact' | 'contains';
 }
 
 interface NativeThreatDatabase {

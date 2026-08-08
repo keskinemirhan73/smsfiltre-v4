@@ -18,3 +18,14 @@ test('bulut senkronizasyonundan sonra native tehdit kurallari yenilenir', () => 
   );
   assert.match(syncSource, /FilterManager\.initializeNativeFiltering\(\)/);
 });
+
+test('eşzamanlı native olay içe aktarımları tek işlemde birleştirilir', () => {
+  const managerSource = readFileSync(
+    resolve(projectRoot, 'src/modules/FilterManager.ts'),
+    'utf8',
+  );
+  assert.match(managerSource, /nativeImportInFlight/);
+  assert.match(managerSource, /performNativeSmsEventImport/);
+  assert.match(managerSource, /storageMutationQueue/);
+  assert.match(managerSource, /withStorageMutation/);
+});

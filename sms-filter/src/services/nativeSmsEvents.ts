@@ -15,6 +15,7 @@ interface HistoryEntry {
   status: 'blocked' | 'transaction' | 'promotion' | 'allowed';
   category: string;
   timestamp: number;
+  source?: 'native' | 'manual' | 'simulator';
 }
 
 interface StatsSnapshot {
@@ -87,6 +88,7 @@ export function mergeNativeSmsEvents(
       status: historyStatus(event.status),
       category: event.status,
       timestamp: event.timestamp,
+      source: 'native' as const,
     })),
     ...existingHistory,
   ].slice(0, 50);

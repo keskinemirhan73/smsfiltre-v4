@@ -1,39 +1,43 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert, ActivityIndicator, RefreshControl } from 'react-native';
-import { Flag, ShieldBan, ShieldCheck, Trash2, ShieldAlert, Sparkles, Receipt, Megaphone } from 'lucide-react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  AppState,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { Flag, Megaphone, Receipt, ShieldAlert, ShieldBan, ShieldCheck, Sparkles, Trash2 } from 'lucide-react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAppTheme, spacing, radii } from '../theme';
-import { FilterManager, FilterRule, HistoryItem } from '../modules/FilterManager';
-import { parseCustomRuleKeyword } from '../services/customRuleInput';
-import { SecurityUtils } from '../utils/SecurityUtils';
+import { FilterManager, type FilterRule, type HistoryItem } from '../modules/FilterManager';
+import { messageCategoryOption, type MessageCategory } from '../services/messageCategoryPolicy';
+import { parseSenderRuleInput } from '../services/senderRulePolicy';
+import { radii, spacing, useAppTheme } from '../theme';
 
-type ActivityCategory = FilterRule['category'];
+type ActivityCategory = MessageCategory;
 type ActivityFilter = 'all' | ActivityCategory;
-
-const categoryColor = (category: ActivityCategory) => ({
-  junk: '#EF4444',
-  allowed: '#10B981',
-  transaction: '#3B82F6',
-  promotion: '#F59E0B',
-})[category];
-
-const categoryLabel = (category: ActivityCategory) => ({
-  junk: 'İstenmeyen / Engellendi',
-  allowed: 'İzin Verilen / Güvenli',
-  transaction: 'İşlem Mesajı',
-  promotion: 'Promosyon Mesajı',
-})[category];
 
 const historyCategory = (status: HistoryItem['status']): ActivityCategory =>
   status === 'blocked' ? 'junk' : status;
 
 function CategoryIcon({ category, size = 18 }: { category: ActivityCategory; size?: number }) {
-  const color = categoryColor(category);
+  const color = messageCategoryOption(category).color;
   if (category === 'junk') return <ShieldBan color={color} size={size} />;
   if (category === 'allowed') return <ShieldCheck color={color} size={size} />;
   if (category === 'transaction') return <Receipt color={color} size={size} />;
   return <Megaphone color={color} size={size} />;
+}
+
+function eventSourceLabel(source: HistoryItem['source']) {
+  if (source === 'manual') return 'Manuel düzeltme';
+  if (source === 'native') return 'iOS / cihaz filtresi';
+  if (source === 'simulator') return 'Test simülatörü';
+  return 'Yerel geçmiş';
 }
 
 export default function ReportsScreen() {
@@ -45,436 +49,232 @@ export default function ReportsScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<ActivityFilter>('all');
+  const [loadError, setLoadError] = useState('');
+  const [syncMessage, setSyncMessage] = useState('');
 
-  const loadData = async () => {
-    setRefreshing(true);
+  const loadData = useCallback(async (showRefreshing = true) => {
+    if (showRefreshing) setRefreshing(true);
     try {
-      await FilterManager.importNativeSmsEvents();
-      const loadedRules = await FilterManager.loadRules();
-      const loadedHistory = await FilterManager.loadHistory();
+      const importedCount = await FilterManager.importNativeSmsEvents();
+      const [loadedRules, loadedHistory] = await Promise.all([
+        FilterManager.loadRules(),
+        FilterManager.loadHistory(),
+      ]);
       setRules(loadedRules);
       setEvents(loadedHistory);
+      setLoadError('');
+      setSyncMessage(importedCount > 0 ? `${importedCount} yeni cihaz işlemi aktarıldı.` : 'Cihaz işlemleri güncel.');
     } catch {
-      // quiet fallback
+      setLoadError('İşlem geçmişi okunamadı. Yenilemek için aşağı çekin.');
     } finally {
-      setRefreshing(false);
+      if (showRefreshing) setRefreshing(false);
     }
-  };
+  }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-    }, [])
-  );
+  useFocusEffect(useCallback(() => {
+    loadData();
+  }, [loadData]));
 
-  const handleQuickReport = async (category: 'junk' | 'allowed') => {
-    if (!reportInput.trim()) {
-      Alert.alert('Eksik Bilgi', 'Lütfen şikayet etmek istediğiniz gönderici numarasını veya mesaj başlığını yazın.');
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') loadData(false);
+    });
+    return () => subscription.remove();
+  }, [loadData]);
+
+  const handleSenderCategoryChange = async (category: ActivityCategory) => {
+    const sender = parseSenderRuleInput(reportInput);
+    if (!sender) {
+      Alert.alert('Geçersiz Bilgi', 'Gönderici adı veya numarası en fazla 64 karakter olmalıdır.');
       return;
     }
-    const parsed = parseCustomRuleKeyword(reportInput);
-    if (!parsed) {
-      Alert.alert('Geçersiz Bilgi', 'Gönderici veya mesaj kuralı en fazla 200 karakter olmalıdır.');
-      return;
-    }
+
     setIsSubmitting(true);
     try {
-      const keyword = parsed.keyword;
-
-      const newRule: FilterRule = {
-        id: Date.now().toString(),
-        keyword,
-        type: 'word',
-        category,
-        matchTarget: 'both',
-      };
-      const updated = [newRule, ...rules];
-      setRules(updated);
-      await FilterManager.saveRules(updated);
-
-      const safeKeyword = SecurityUtils.maskPII(keyword);
-      await fetch('https://smsfiltre-v4.onrender.com/api/report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword: safeKeyword, type: 'word', category }),
-      }).catch(() => {});
+      const result = await FilterManager.categorizeSender(sender, category);
+      setRules(result.rules);
+      setEvents(result.history);
 
       setReportInput('');
       Alert.alert(
-        category === 'junk' ? '🛡️ İstenmeyen Olarak İşlendi' : '🟢 Güvenli Olarak İzin Verildi',
-        `"${keyword}" başarıyla kaydedildi ve topluluk koruma ağına işlendi! 🚀`
+        result.nativeSynced ? 'Gönderen Güncellendi' : 'Yerelde Kaydedildi',
+        result.nativeSynced
+          ? `“${sender}” bundan sonraki uygun SMS/MMS mesajları için ${messageCategoryOption(category).label} olarak kaydedildi.`
+          : 'Kural cihazda saklandı ancak iOS filtresine şu anda aktarılamadı. Uygulamayı yeniden açıp tekrar deneyin.',
       );
-    } catch {
-      Alert.alert('İşlem Başarılı', 'Kural cihaz içi veritabanına işlendi.');
+    } catch (error) {
+      Alert.alert('İşlem Tamamlanamadı', error instanceof Error ? error.message : 'Lütfen yeniden deneyin.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleDeleteRule = async (ruleId: string) => {
-    const updated = rules.filter(r => r.id !== ruleId);
+    const updated = rules.filter(rule => rule.id !== ruleId);
     setRules(updated);
     await FilterManager.saveRules(updated);
   };
 
-  const filteredRules = rules.filter(r => {
-    return activeFilter === 'all' || r.category === activeFilter;
-  });
-
-  const filteredEvents = events.filter(event =>
-    activeFilter === 'all' || historyCategory(event.status) === activeFilter
-  );
-
-  const visibleItemCount = filteredRules.length + filteredEvents.length;
+  const filteredRules = rules.filter(rule => activeFilter === 'all' || rule.category === activeFilter);
+  const filteredEvents = events.filter(event => activeFilter === 'all' || historyCategory(event.status) === activeFilter);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background, paddingTop: insets.top }]}>
-      {/* Title Header */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={[styles.iconBadge, { backgroundColor: '#8B5CF620' }]}>
-            <Flag color="#8B5CF6" size={24} />
-          </View>
-          <View>
-            <Text style={[styles.title, { color: theme.text }]}>İşlemler & Raporlar</Text>
-            <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-              Apple Mesajlar & Cihaz İçi Bildirim Hub'ı
-            </Text>
-          </View>
+        <View style={[styles.iconBadge, { backgroundColor: '#8B5CF620' }]}><Flag color="#8B5CF6" size={24} /></View>
+        <View style={styles.headerText}>
+          <Text style={[styles.title, { color: theme.text }]}>İşlemler & Raporlar</Text>
+          <Text style={[styles.subtitle, { color: theme.textMuted }]}>Geçmiş ve aktif gönderen kuralları</Text>
         </View>
       </View>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadData} colors={['#8B5CF6']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData()} colors={['#8B5CF6']} />}
       >
-        {/* Quick Add Report Card */}
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.cardHeader}>
             <Sparkles color="#8B5CF6" size={20} />
-            <Text style={[styles.cardTitle, { color: theme.text }]}>Hızlı Gönderici & Mesaj Bildir</Text>
+            <Text style={[styles.cardTitle, { color: theme.text }]}>Göndericiyi Düzelt</Text>
           </View>
           <Text style={[styles.cardSub, { color: theme.textMuted }]}>
-            Şüpheli bahis, dolandırıcılık SMS numarası veya SMS kelimesini anında bildirerek kendi kuralınızı oluşturun:
+            Bankkart gibi bir göndereni gelecekteki uygun SMS/MMS mesajları için seçtiğiniz kategoriye alın.
+            Bu işlem eski mesajı taşımaz. iOS mevcut Mesajlar geçmişine erişmez ve bilinen kişilerde filtreyi çağırmayabilir.
           </Text>
-
           <TextInput
             style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
-            placeholder="Gönderici no (örn: +90850...) veya SMS metni..."
+            placeholder="Gönderen adı veya numarası (ör. Bankkart)"
             placeholderTextColor={theme.textMuted}
             value={reportInput}
             onChangeText={setReportInput}
-            maxLength={200}
+            maxLength={64}
+            autoCapitalize="none"
           />
-
-          <View style={styles.actionBtnRow}>
-            <TouchableOpacity
-              style={[styles.reportBtn, { backgroundColor: '#EF4444' }]}
-              onPress={() => handleQuickReport('junk')}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color="#FFF" size="small" />
-              ) : (
-                <>
-                  <ShieldBan color="#FFF" size={18} />
-                  <Text style={styles.reportBtnText}>İstenmeyen Yap</Text>
-                </>
-              )}
+          <View style={styles.categoryGrid}>
+            <TouchableOpacity style={[styles.categoryButton, { backgroundColor: '#EF4444' }]} onPress={() => handleSenderCategoryChange('junk')} disabled={isSubmitting}>
+              <CategoryIcon category="junk" /><Text style={styles.categoryButtonText}>İstenmeyen</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.reportBtn, { backgroundColor: '#10B981' }]}
-              onPress={() => handleQuickReport('allowed')}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <ActivityIndicator color="#FFF" size="small" />
-              ) : (
-                <>
-                  <ShieldCheck color="#FFF" size={18} />
-                  <Text style={styles.reportBtnText}>Güvenli Yap</Text>
-                </>
-              )}
+            <TouchableOpacity style={[styles.categoryButton, { backgroundColor: '#10B981' }]} onPress={() => handleSenderCategoryChange('allowed')} disabled={isSubmitting}>
+              <CategoryIcon category="allowed" /><Text style={styles.categoryButtonText}>Güvenli</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.categoryButton, { backgroundColor: '#3B82F6' }]} onPress={() => handleSenderCategoryChange('transaction')} disabled={isSubmitting}>
+              <CategoryIcon category="transaction" /><Text style={styles.categoryButtonText}>İşlem</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.categoryButton, { backgroundColor: '#F59E0B' }]} onPress={() => handleSenderCategoryChange('promotion')} disabled={isSubmitting}>
+              <CategoryIcon category="promotion" /><Text style={styles.categoryButtonText}>Tanıtım</Text>
             </TouchableOpacity>
           </View>
+          {isSubmitting && <ActivityIndicator color="#8B5CF6" />}
         </View>
 
-        {/* Filter Chips */}
+        <View style={[styles.infoCard, { backgroundColor: loadError ? '#EF444415' : '#3B82F615', borderColor: loadError ? '#EF444450' : '#3B82F650' }]}>
+          <ShieldAlert color={loadError ? '#EF4444' : '#3B82F6'} size={18} />
+          <Text style={[styles.infoText, { color: loadError ? '#EF4444' : theme.textMuted }]}>{loadError || syncMessage}</Text>
+        </View>
+
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.filterRow}
           contentContainerStyle={styles.filterContent}
-          directionalLockEnabled
         >
-          <View style={styles.filterRow}>
-            <TouchableOpacity
-              style={[styles.chip, activeFilter === 'all' && { backgroundColor: '#8B5CF6' }]}
-              onPress={() => setActiveFilter('all')}
-            >
-              <Text style={[styles.chipText, activeFilter === 'all' && { color: '#FFF' }]}>Tüm İşlemler ({rules.length + events.length})</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.chip, activeFilter === 'junk' && { backgroundColor: '#EF4444' }]}
-              onPress={() => setActiveFilter('junk')}
-            >
-              <Text style={[styles.chipText, activeFilter === 'junk' && { color: '#FFF' }]}>🚫 Engellenenler</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.chip, activeFilter === 'allowed' && { backgroundColor: '#10B981' }]}
-              onPress={() => setActiveFilter('allowed')}
-            >
-              <Text style={[styles.chipText, activeFilter === 'allowed' && { color: '#FFF' }]}>🟢 İzinliler</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.chip, activeFilter === 'transaction' && { backgroundColor: '#3B82F6' }]}
-              onPress={() => setActiveFilter('transaction')}
-            >
-              <Text style={[styles.chipText, activeFilter === 'transaction' && { color: '#FFF' }]}>İşlem</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.chip, activeFilter === 'promotion' && { backgroundColor: '#F59E0B' }]}
-              onPress={() => setActiveFilter('promotion')}
-            >
-              <Text style={[styles.chipText, activeFilter === 'promotion' && { color: '#FFF' }]}>Promosyon</Text>
-            </TouchableOpacity>
-          </View>
+          {(['all', 'junk', 'allowed', 'transaction', 'promotion'] as ActivityFilter[]).map(filter => {
+            const active = activeFilter === filter;
+            const color = filter === 'all' ? '#8B5CF6' : messageCategoryOption(filter).color;
+            const label = filter === 'all' ? 'Tümü' : messageCategoryOption(filter).shortLabel;
+            return (
+              <TouchableOpacity key={filter} style={[styles.chip, active && { backgroundColor: color }]} onPress={() => setActiveFilter(filter)}>
+                <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </ScrollView>
 
-        {/* List of Rules & Native Events */}
-        {visibleItemCount === 0 ? (
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>SMS İşlem Geçmişi</Text>
+          <Text style={[styles.sectionCount, { color: theme.textMuted }]}>{filteredEvents.length}</Text>
+        </View>
+        {filteredEvents.length === 0 ? (
           <View style={[styles.emptyCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-            <ShieldAlert color={theme.textMuted} size={36} />
-            <Text style={[styles.emptyTitle, { color: theme.text }]}>Henüz Kayıtlı İşlem Yok</Text>
-            <Text style={[styles.emptySub, { color: theme.textMuted }]}>
-              Apple Mesajlar uygulamasından bildirdiğiniz veya yukarıdan eklediğiniz kurallar burada canlı olarak listelenir.
-            </Text>
+            <ShieldAlert color={theme.textMuted} size={32} />
+            <Text style={[styles.emptyTitle, { color: theme.text }]}>Henüz işlem görünmüyor</Text>
+            <Text style={[styles.emptySub, { color: theme.textMuted }]}>iOS mevcut Mesajlar geçmişine erişmez. Yeni filtre olayları, Mesajlar’dan yapılan uygun raporlar ve manuel düzeltmeler burada görünür.</Text>
           </View>
-        ) : (
-          <View style={styles.activityList}>
-            {filteredEvents.length > 0 && (
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>SMS İşlem Geçmişi</Text>
-            )}
-            {filteredEvents.map(event => {
-              const category = historyCategory(event.status);
-              const color = categoryColor(category);
-              return (
-                <View key={`event-${event.id}`} style={[styles.ruleCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                  <View style={styles.ruleInfo}>
-                    <View style={[styles.ruleBadge, { backgroundColor: `${color}20` }]}>
-                      <CategoryIcon category={category} />
-                    </View>
-                    <View style={styles.ruleTextCol}>
-                      <Text style={[styles.ruleKeyword, { color: theme.text }]}>{event.sender}</Text>
-                      <Text style={[styles.ruleCategory, { color }]}>{categoryLabel(category)}</Text>
-                      <Text style={[styles.eventPreview, { color: theme.textMuted }]}>{event.preview}</Text>
-                      <Text style={[styles.eventDate, { color: theme.textMuted }]}>
-                        {new Date(event.timestamp).toLocaleString('tr-TR')}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              );
-            })}
+        ) : filteredEvents.map(event => {
+          const category = historyCategory(event.status);
+          const option = messageCategoryOption(category);
+          return (
+            <View key={`event-${event.id}`} style={[styles.ruleCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <View style={[styles.ruleBadge, { backgroundColor: `${option.color}20` }]}><CategoryIcon category={category} /></View>
+              <View style={styles.ruleTextCol}>
+                <Text style={[styles.ruleKeyword, { color: theme.text }]}>{event.sender}</Text>
+                <Text style={[styles.ruleCategory, { color: option.color }]}>{option.label}</Text>
+                <Text style={[styles.eventPreview, { color: theme.textMuted }]}>{event.preview}</Text>
+                <Text style={[styles.eventDate, { color: theme.textMuted }]}>{eventSourceLabel(event.source)} · {new Date(event.timestamp).toLocaleString('tr-TR')}</Text>
+              </View>
+            </View>
+          );
+        })}
 
-            {filteredRules.length > 0 && (
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>Cihaz İçi Kurallar</Text>
-            )}
-            {filteredRules.map(rule => {
-              const color = categoryColor(rule.category);
-              return (
-                <View key={`rule-${rule.id}`} style={[styles.ruleCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-                  <View style={styles.ruleInfo}>
-                    <View style={[styles.ruleBadge, { backgroundColor: `${color}20` }]}>
-                      <CategoryIcon category={rule.category} />
-                    </View>
-                    <View style={styles.ruleTextCol}>
-                      <Text style={[styles.ruleKeyword, { color: theme.text }]}>{rule.keyword}</Text>
-                      <Text style={[styles.ruleCategory, { color }]}>{categoryLabel(rule.category)}</Text>
-                    </View>
-                  </View>
-
-                  <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDeleteRule(rule.id)}>
-                    <Trash2 color="#EF4444" size={18} />
-                  </TouchableOpacity>
-                </View>
-              );
-            })}
-          </View>
-        )}
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>Aktif Cihaz Kuralları</Text>
+          <Text style={[styles.sectionCount, { color: theme.textMuted }]}>{filteredRules.length}</Text>
+        </View>
+        {filteredRules.map(rule => {
+          const option = messageCategoryOption(rule.category);
+          return (
+            <View key={`rule-${rule.id}`} style={[styles.ruleCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+              <View style={[styles.ruleBadge, { backgroundColor: `${option.color}20` }]}><CategoryIcon category={rule.category} /></View>
+              <View style={styles.ruleTextCol}>
+                <Text style={[styles.ruleKeyword, { color: theme.text }]}>{rule.keyword}</Text>
+                <Text style={[styles.ruleCategory, { color: option.color }]}>{option.label} · {rule.matchTarget === 'sender' ? 'Gönderen' : rule.matchTarget === 'content' ? 'İçerik' : 'Gönderen + İçerik'}</Text>
+              </View>
+              <TouchableOpacity style={[styles.deleteButton, isSubmitting && styles.disabledButton]} disabled={isSubmitting} onPress={() => handleDeleteRule(rule.id)}><Trash2 color="#EF4444" size={18} /></TouchableOpacity>
+            </View>
+          );
+        })}
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  iconBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  subtitle: {
-    fontSize: 13,
-    marginTop: 2,
-  },
-  scrollContent: {
-    padding: spacing.lg,
-    gap: spacing.lg,
-  },
-  card: {
-    padding: spacing.lg,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    gap: spacing.md,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  cardSub: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  input: {
-    height: 46,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    paddingHorizontal: spacing.md,
-    fontSize: 14,
-  },
-  actionBtnRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  reportBtn: {
-    flex: 1,
-    height: 44,
-    borderRadius: radii.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-  },
-  reportBtnText: {
-    color: '#FFF',
-    fontWeight: '700',
-    fontSize: 13,
-  },
-  filterRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  filterContent: {
-    paddingRight: spacing.md,
-  },
-  chip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.full,
-    backgroundColor: '#8E8E9320',
-  },
-  chipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#8E8E93',
-  },
-  emptyCard: {
-    padding: spacing.xl,
-    borderRadius: radii.xl,
-    borderWidth: 1,
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  emptySub: {
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  ruleCard: {
-    padding: spacing.md,
-    borderRadius: radii.lg,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  ruleInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    flex: 1,
-  },
-  ruleBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ruleTextCol: {
-    flex: 1,
-  },
-  ruleKeyword: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  ruleCategory: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  activityList: {
-    gap: spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: spacing.xs,
-    marginBottom: spacing.xs,
-  },
-  eventPreview: {
-    fontSize: 12,
-    marginTop: 4,
-  },
-  eventDate: {
-    fontSize: 11,
-    marginTop: 3,
-  },
-  deleteBtn: {
-    padding: spacing.sm,
-  },
+  container: { flex: 1 },
+  header: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  headerText: { flex: 1 },
+  iconBadge: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 20, fontWeight: '700' },
+  subtitle: { fontSize: 13, marginTop: 2 },
+  scrollContent: { padding: spacing.lg, paddingBottom: 120, gap: spacing.md },
+  card: { padding: spacing.lg, borderRadius: radii.xl, borderWidth: 1, gap: spacing.md },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  cardTitle: { fontSize: 17, fontWeight: '700' },
+  cardSub: { fontSize: 13, lineHeight: 19 },
+  input: { height: 48, borderRadius: radii.lg, borderWidth: 1, paddingHorizontal: spacing.md, fontSize: 14 },
+  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  categoryButton: { width: '48%', minHeight: 44, borderRadius: radii.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs },
+  categoryButtonText: { color: '#FFF', fontWeight: '700', fontSize: 13 },
+  infoCard: { minHeight: 44, borderRadius: radii.lg, borderWidth: 1, paddingHorizontal: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  infoText: { flex: 1, fontSize: 12, lineHeight: 17 },
+  filterRow: { flexGrow: 0 },
+  filterContent: { gap: spacing.sm, paddingRight: spacing.md },
+  chip: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radii.full, backgroundColor: '#8E8E9320' },
+  chipText: { fontSize: 13, fontWeight: '600', color: '#8E8E93' },
+  chipTextActive: { color: '#FFF' },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.sm },
+  sectionTitle: { fontSize: 15, fontWeight: '700' },
+  sectionCount: { fontSize: 13, fontWeight: '700' },
+  emptyCard: { padding: spacing.xl, borderRadius: radii.xl, borderWidth: 1, alignItems: 'center', gap: spacing.sm },
+  emptyTitle: { fontSize: 16, fontWeight: '700' },
+  emptySub: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
+  ruleCard: { padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  ruleBadge: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  ruleTextCol: { flex: 1 },
+  ruleKeyword: { fontSize: 15, fontWeight: '700' },
+  ruleCategory: { fontSize: 12, marginTop: 2 },
+  eventPreview: { fontSize: 12, marginTop: 4 },
+  eventDate: { fontSize: 11, marginTop: 3 },
+  deleteButton: { padding: spacing.sm },
+  disabledButton: { opacity: 0.4 },
 });

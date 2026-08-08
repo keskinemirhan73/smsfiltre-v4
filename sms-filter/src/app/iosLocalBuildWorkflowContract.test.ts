@@ -10,7 +10,8 @@ const workflow = readFileSync(
 
 test('GitHub Actions builds iOS locally on manual dispatch or the release branch', () => {
   assert.match(workflow, /workflow_dispatch:/);
-  assert.match(workflow, /push:\s*\n\s*branches:\s*\n\s*- ['"]codex\/ios-local-build['"]/);
+  assert.match(workflow, /branches:[\s\S]*- ['"]main['"]/);
+  assert.match(workflow, /branches:[\s\S]*- ['"]codex\/ios-local-build['"]/);
   assert.match(workflow, /runs-on:\s*macos-15/);
   assert.match(workflow, /permissions:\s*\n\s*contents:\s*read/);
   assert.match(workflow, /EXPO_TOKEN:\s*\$\{\{ secrets\.EXPO_TOKEN \}\}/);

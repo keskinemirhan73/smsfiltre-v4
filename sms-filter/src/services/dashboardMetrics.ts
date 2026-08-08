@@ -3,6 +3,7 @@ type ActivityStatus = 'blocked' | 'transaction' | 'promotion' | 'allowed';
 interface ActivityRecord {
   timestamp: number;
   status: ActivityStatus;
+  source?: 'native' | 'manual' | 'simulator';
 }
 
 interface DashboardStats {
@@ -29,7 +30,8 @@ export function reconcileDashboardStats(
   stats: DashboardStats,
   history: readonly ActivityRecord[],
 ): DashboardStats {
-  const historyCounts = history.reduce(
+  const analyzedHistory = history.filter(item => item.source !== 'manual');
+  const historyCounts = analyzedHistory.reduce(
     (counts, item) => ({
       blockedCount: counts.blockedCount + (item.status === 'blocked' ? 1 : 0),
       transactionCount: counts.transactionCount + (item.status === 'transaction' ? 1 : 0),
@@ -47,7 +49,7 @@ export function reconcileDashboardStats(
     promotionCount,
     analyzedCount: Math.max(
       stats.analyzedCount,
-      history.length,
+      analyzedHistory.length,
       blockedCount + transactionCount + promotionCount,
     ),
   };
@@ -65,6 +67,7 @@ export function buildWeeklySuspiciousSeries(
     const startOfDay = new Date(date).setHours(0, 0, 0, 0);
     const endOfDay = new Date(date).setHours(23, 59, 59, 999);
     const val = history.filter(item =>
+      item.source !== 'manual' &&
       item.status === 'blocked' &&
       item.timestamp >= startOfDay &&
       item.timestamp <= endOfDay
