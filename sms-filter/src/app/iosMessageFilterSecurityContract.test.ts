@@ -24,3 +24,14 @@ test('iOS beyaz liste yalniz tam gonderici eslesmesine izin verir', () => {
 test('iOS filtre uzantisi mesajlari aga gondermez veya loglamaz', () => {
   assert.doesNotMatch(extensionSource, /URLSession|Network|fetch\(|print\(|NSLog/);
 });
+
+test('iOS filtre olay kuyruğu extension kapanmadan kalıcı App Group verisine yazılır', () => {
+  assert.match(extensionSource, /"source":\s*"filter"/);
+  assert.match(extensionSource, /defaults\.set\(outputData, forKey: "smsfilter_event_queue_json"\)/);
+  assert.match(extensionSource, /defaults\.synchronize\(\)/);
+});
+
+test('iOS filtre uzantısı yalnız uygulamada onaylanmış kuralları kullanır', () => {
+  assert.doesNotMatch(extensionSource, /smsfilter_pending_sender_override/);
+  assert.doesNotMatch(extensionSource, /smsfilter_report_sender_override/);
+});

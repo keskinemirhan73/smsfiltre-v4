@@ -10,9 +10,19 @@ test('reports exist only in the main tab and render imported native activity', (
   const appSource = readFileSync(resolve(projectRoot, 'App.tsx'), 'utf8');
   const reportsSource = readFileSync(resolve(projectRoot, 'src/screens/ReportsScreen.tsx'), 'utf8');
   const rulesSource = readFileSync(resolve(projectRoot, 'src/screens/RulesScreen.tsx'), 'utf8');
+  const managerSource = readFileSync(resolve(projectRoot, 'src/modules/FilterManager.ts'), 'utf8');
 
   assert.match(appSource, /name="Raporlar"/);
   assert.match(reportsSource, /FilterManager\.importNativeSmsEvents\(\)/);
+  assert.match(reportsSource, /source === ['"]report['"]/);
+  assert.match(reportsSource, /Mesajlar raporu/);
+  assert.match(reportsSource, /Bekleyen Gönderici Ayarları/);
+  assert.match(reportsSource, /loadPendingSenderCorrections/);
+  assert.match(reportsSource, /confirmPendingSenderCorrection/);
+  assert.match(managerSource, /categorizeSenderUnlocked\(correction\.sender, category, id\)/);
+  assert.match(managerSource, /`manual-\$\{pendingId\}`/);
+  assert.match(reportsSource, /Sil ve İstenmeyen Olarak Bildir/);
+  assert.match(reportsSource, /Apple tarafından silinir/);
   assert.match(reportsSource, /FilterManager\.categorizeSender\(/);
   assert.match(reportsSource, /filteredEvents\.map/);
   assert.match(reportsSource, /event\.timestamp/);

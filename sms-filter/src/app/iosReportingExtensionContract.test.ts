@@ -76,8 +76,9 @@ test('iOS raporlama yanıtları güvenli Apple sınıflandırma eylemlerine eşl
   assert.match(source, /override func prepare\(for request: ILClassificationRequest\)/);
   assert.match(source, /override func classificationResponse\(for request: ILClassificationRequest\) -> ILClassificationResponse/);
   assert.match(source, /guard let messageRequest = request as\? ILMessageClassificationRequest else/);
-  assert.match(source, /\.reportJunkAndBlockSender/);
-  assert.match(source, /sistem engel listesine ekler/);
+  assert.match(source, /case \.junk: return \.reportJunk/);
+  assert.doesNotMatch(source, /\.reportJunkAndBlockSender/);
+  assert.doesNotMatch(source, /sistem engel listesine ekler/);
   assert.match(source, /\.reportNotJunk/);
   assert.match(source, /ILClassificationResponse\(action:/);
   assert.match(source, /response\.userInfo\s*=\s*\["category": category\.rawValue\]/);
@@ -96,6 +97,17 @@ test('iOS reporting panel writes a masked selection to the App Group event queue
   assert.match(source, /persistReportEvents\(from:\s*messageRequest,\s*category:\s*category\)/);
   assert.match(source, /"status":\s*category\.eventStatus/);
   assert.match(source, /"timestamp":/);
+  assert.match(source, /"source":\s*"report"/);
+  assert.match(source, /smsfilter_pending_sender_override_ids_json/);
+  assert.match(source, /smsfilter_pending_sender_override_/);
+  assert.match(source, /"sender":\s*sender/);
+  assert.match(source, /"category":\s*category\.rawValue/);
+  assert.match(source, /CharacterSet\.controlCharacters/);
+  assert.match(source, /sender\.count <= 64/);
+  assert.doesNotMatch(source, /rawSender[^\n]*prefix\(64\)/);
+  assert.match(source, /FiltreAI'yi açıp kuralı onaylayın/);
+  assert.match(source, /defaults\.set\(encoded, forKey: eventQueueKey\)/);
+  assert.match(source, /defaults\.synchronize\(\)/);
   assert.doesNotMatch(source, /communication\.messageBody/);
 
   const managerSource = readFileSync(resolve(projectRoot, 'src/modules/FilterManager.ts'), 'utf8');

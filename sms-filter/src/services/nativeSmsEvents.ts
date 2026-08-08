@@ -6,6 +6,7 @@ export interface NativeSmsEvent {
   preview: string;
   status: NativeSmsStatus;
   timestamp: number;
+  source?: 'filter' | 'report';
 }
 
 interface HistoryEntry {
@@ -15,7 +16,7 @@ interface HistoryEntry {
   status: 'blocked' | 'transaction' | 'promotion' | 'allowed';
   category: string;
   timestamp: number;
-  source?: 'native' | 'manual' | 'simulator';
+  source?: 'native' | 'report' | 'manual' | 'simulator';
 }
 
 interface StatsSnapshot {
@@ -28,6 +29,7 @@ interface StatsSnapshot {
 const VALID_STATUSES = new Set<NativeSmsStatus>([
   'suspicious', 'transaction', 'promotion', 'allowed',
 ]);
+const UNSAFE_DISPLAY_CHARACTERS = /[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/;
 
 function isNativeSmsEvent(value: unknown): value is NativeSmsEvent {
   if (!value || typeof value !== 'object') return false;
@@ -35,9 +37,11 @@ function isNativeSmsEvent(value: unknown): value is NativeSmsEvent {
   return (
     typeof event.id === 'string' && event.id.length > 0 && event.id.length <= 128 &&
     typeof event.sender === 'string' && event.sender.length <= 64 &&
+    !UNSAFE_DISPLAY_CHARACTERS.test(event.sender) &&
     typeof event.preview === 'string' && event.preview.length <= 160 &&
     typeof event.status === 'string' && VALID_STATUSES.has(event.status as NativeSmsStatus) &&
-    typeof event.timestamp === 'number' && Number.isFinite(event.timestamp) && event.timestamp > 0
+    typeof event.timestamp === 'number' && Number.isFinite(event.timestamp) && event.timestamp > 0 &&
+    (event.source === undefined || event.source === 'filter' || event.source === 'report')
   );
 }
 
@@ -58,6 +62,9 @@ export function parseNativeSmsEventQueues(
   const seenIds = new Set<string>();
   return rawValues
     .flatMap(rawValue => parseNativeSmsEvents(rawValue))
+    .map(event => event.source === undefined && event.id.startsWith('report-')
+      ? { ...event, source: 'report' as const }
+      : event)
     .filter(event => {
       if (seenIds.has(event.id)) return false;
       seenIds.add(event.id);
@@ -88,12 +95,12 @@ export function mergeNativeSmsEvents(
       status: historyStatus(event.status),
       category: event.status,
       timestamp: event.timestamp,
-      source: 'native' as const,
+      source: event.source === 'report' ? 'report' as const : 'native' as const,
     })),
     ...existingHistory,
   ].slice(0, 50);
 
-  const stats = newEvents.reduce<StatsSnapshot>((current, event) => ({
+  const stats = newEvents.filter(event => event.source !== 'report').reduce<StatsSnapshot>((current, event) => ({
     blockedCount: current.blockedCount + (event.status === 'suspicious' ? 1 : 0),
     analyzedCount: current.analyzedCount + 1,
     transactionCount: current.transactionCount + (event.status === 'transaction' ? 1 : 0),

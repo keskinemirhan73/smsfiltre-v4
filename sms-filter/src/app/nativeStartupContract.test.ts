@@ -28,4 +28,24 @@ test('eşzamanlı native olay içe aktarımları tek işlemde birleştirilir', (
   assert.match(managerSource, /performNativeSmsEventImport/);
   assert.match(managerSource, /storageMutationQueue/);
   assert.match(managerSource, /withStorageMutation/);
+  assert.match(managerSource, /smsfilter_pending_sender_override_ids_json/);
+  assert.match(managerSource, /mergePendingSenderCorrections/);
+  assert.match(managerSource, /loadPendingSenderCorrections/);
+});
+
+test('uygulama indeks dışında kalan bekleyen gönderici kayıtlarını da bulup temizler', () => {
+  const managerSource = readFileSync(
+    resolve(projectRoot, 'src/modules/FilterManager.ts'),
+    'utf8',
+  );
+  const appleTargetsPatch = readFileSync(
+    resolve(projectRoot, 'patches/@bacons+apple-targets+4.0.7.patch'),
+    'utf8',
+  );
+
+  assert.match(managerSource, /getKeys\(/);
+  assert.match(managerSource, /NATIVE_PENDING_SENDER_OVERRIDE_KEY_PREFIX\}pending-/);
+  assert.match(managerSource, /pendingKeysToRemove\.forEach/);
+  assert.match(appleTargetsPatch, /dictionaryRepresentation\(\)/);
+  assert.match(appleTargetsPatch, /getKeys/);
 });

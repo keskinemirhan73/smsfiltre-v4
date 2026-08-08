@@ -74,3 +74,13 @@ test('manuel kategori düzeltmeleri SMS analiz sayaçlarını ve haftalık trend
   ), { blockedCount: 0, analyzedCount: 0, transactionCount: 0, promotionCount: 0 });
   assert.equal(buildWeeklySuspiciousSeries(history, now).at(-1)?.val, 0);
 });
+
+test('Mesajlar raporları filtre analiz sayaçlarını ve engelleme trendini şişirmez', () => {
+  const now = new Date(2026, 7, 1, 12, 0, 0, 0);
+  const history = [{ status: 'blocked' as const, timestamp: now.getTime(), source: 'report' as const }];
+  assert.deepEqual(reconcileDashboardStats(
+    { blockedCount: 0, analyzedCount: 0, transactionCount: 0, promotionCount: 0 },
+    history,
+  ), { blockedCount: 0, analyzedCount: 0, transactionCount: 0, promotionCount: 0 });
+  assert.equal(buildWeeklySuspiciousSeries(history, now).at(-1)?.val, 0);
+});

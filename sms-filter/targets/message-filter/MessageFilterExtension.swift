@@ -52,9 +52,16 @@ private func recordEvent(sender: String, action: ILMessageFilterAction) {
     eventQueueLock.lock()
     defer { eventQueueLock.unlock() }
     guard let defaults = UserDefaults(suiteName: "group.com.filtreai.app") else { return }
-    let jsonStr = defaults.string(forKey: "smsfilter_event_queue_json") ?? "[]"
     var queue: [[String: Any]] = []
-    if let data = jsonStr.data(using: .utf8),
+    let queueData: Data?
+    if let storedData = defaults.data(forKey: "smsfilter_event_queue_json") {
+        queueData = storedData
+    } else if let jsonString = defaults.string(forKey: "smsfilter_event_queue_json") {
+        queueData = jsonString.data(using: .utf8)
+    } else {
+        queueData = nil
+    }
+    if let data = queueData,
        let parsed = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
         queue = parsed
     }
@@ -91,13 +98,14 @@ private func recordEvent(sender: String, action: ILMessageFilterAction) {
         "sender": maskSender(sender),
         "preview": previewStr,
         "status": statusStr,
+        "source": "filter",
         "timestamp": Int64(Date().timeIntervalSince1970 * 1000)
     ]
     queue.append(event)
 
-    if let outputData = try? JSONSerialization.data(withJSONObject: queue),
-       let outputStr = String(data: outputData, encoding: .utf8) {
-        defaults.set(outputStr, forKey: "smsfilter_event_queue_json")
+    if let outputData = try? JSONSerialization.data(withJSONObject: queue) {
+        defaults.set(outputData, forKey: "smsfilter_event_queue_json")
+        defaults.synchronize()
     }
 }
 

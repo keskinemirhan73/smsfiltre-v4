@@ -10,6 +10,10 @@ test('TypeScript sınıflandırıcı manuel gönderici kategori politikasını k
   const manager = readFileSync(resolve(projectRoot, 'src/modules/FilterManager.ts'), 'utf8');
   assert.match(manager, /resolveUserRuleCategory\(/);
   assert.match(manager, /FilterManager\.categorizeSender|static (?:async )?categorizeSender/);
+  assert.ok(
+    manager.indexOf('const exactSenderOverride') < manager.indexOf('const isForeignSender'),
+    'Kesin gönderen tercihi yabancı numara sezgisinden önce uygulanmalı.',
+  );
 });
 
 test('iOS kesin gönderici işlem ve tanıtım kurallarını genel filtre anahtarlarından bağımsız uygular', () => {

@@ -1,0 +1,48 @@
+diff --git a/node_modules/@bacons/apple-targets/build/ExtensionStorage.d.ts b/node_modules/@bacons/apple-targets/build/ExtensionStorage.d.ts
+index 042cb10..2c865a1 100644
+--- a/node_modules/@bacons/apple-targets/build/ExtensionStorage.d.ts
++++ b/node_modules/@bacons/apple-targets/build/ExtensionStorage.d.ts
+@@ -5,5 +5,6 @@ export declare class ExtensionStorage {
+     constructor(appGroup: string);
+     set(key: string, value?: string | number | Record<string, string | number> | Array<Record<string, string | number>>): void;
+     get(key: string): string | null;
++    getKeys(prefix: string): string[];
+     remove(key: string): void;
+ }
+diff --git a/node_modules/@bacons/apple-targets/build/ExtensionStorage.js b/node_modules/@bacons/apple-targets/build/ExtensionStorage.js
+index e0e2566..f031690 100644
+--- a/node_modules/@bacons/apple-targets/build/ExtensionStorage.js
++++ b/node_modules/@bacons/apple-targets/build/ExtensionStorage.js
+@@ -12,6 +12,7 @@ const nativeModule = ExtensionStorageModule !== null && ExtensionStorageModule !
+     setObject() { },
+     setArray() { },
+     get() { },
++    getKeys() { return []; },
+     remove() { },
+ };
+ const originalSetObject = nativeModule.setObject;
+@@ -52,6 +53,9 @@ class ExtensionStorage {
+     get(key) {
+         return nativeModule.get(key, this.appGroup);
+     }
++    getKeys(prefix) {
++        return nativeModule.getKeys(prefix, this.appGroup);
++    }
+     remove(key) {
+         nativeModule.remove(key, this.appGroup);
+     }
+diff --git a/node_modules/@bacons/apple-targets/ios/ExtensionStorageModule.swift b/node_modules/@bacons/apple-targets/ios/ExtensionStorageModule.swift
+index 56a949b..02685b6 100644
+--- a/node_modules/@bacons/apple-targets/ios/ExtensionStorageModule.swift
++++ b/node_modules/@bacons/apple-targets/ios/ExtensionStorageModule.swift
+@@ -8,3 +8,10 @@ public class ExtensionStorageModule: Module {
+         Function("remove") { (forKey: String, suiteName: String?) in
+             UserDefaults(suiteName: suiteName)?.removeObject(forKey: forKey)
+         }
++
++        Function("getKeys") { (prefix: String, suiteName: String?) -> [String] in
++            let defaults = UserDefaults(suiteName: suiteName)
++            return defaults?.dictionaryRepresentation().keys
++                .filter { $0.hasPrefix(prefix) }
++                .sorted() ?? []
++        }

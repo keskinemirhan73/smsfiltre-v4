@@ -4,6 +4,12 @@ import { ThreatCloudService } from '../services/ThreatCloudService';
 import { buildNativeFilterPayload } from '../services/nativeFilterPayload';
 import { mergeNativeSmsEvents, parseNativeSmsEventQueues } from '../services/nativeSmsEvents';
 import {
+  mergePendingSenderCorrections,
+  parseNativeSenderOverride,
+  parsePendingSenderOverrideIds,
+  type PendingSenderCorrection,
+} from '../services/nativeSenderOverrides';
+import {
   createManualCategoryHistory,
   resolveUserRuleCategory,
   type MessageCategory,
@@ -17,7 +23,10 @@ const STATS_KEY = '@junkman_stats';
 const LEARNING_KEY = '@junkman_learning_db';
 const NATIVE_SMS_EVENT_QUEUE_KEY = 'smsfilter_event_queue_json';
 const NATIVE_SMS_REPORT_EVENT_QUEUE_KEY = 'smsfilter_report_event_queue_json';
+const NATIVE_PENDING_SENDER_OVERRIDE_IDS_KEY = 'smsfilter_pending_sender_override_ids_json';
+const NATIVE_PENDING_SENDER_OVERRIDE_KEY_PREFIX = 'smsfilter_pending_sender_override_';
 const NATIVE_PROCESSED_IDS_KEY = '@FiltreAI_Native_Processed_Event_IDs';
+const PENDING_SENDER_CORRECTIONS_KEY = '@FiltreAI_Pending_Sender_Corrections';
 
 // ─── Types ───────────────────────────────────────────────────
 export interface FilterRule {
@@ -79,7 +88,7 @@ export interface HistoryItem {
   status: 'blocked' | 'transaction' | 'promotion' | 'allowed';
   category: string;
   timestamp: number;
-  source?: 'native' | 'manual' | 'simulator';
+  source?: 'native' | 'report' | 'manual' | 'simulator';
 }
 
 const HISTORY_KEY = '@junkman_history';
@@ -354,14 +363,17 @@ export class FilterManager {
     } catch { return []; }
   }
 
-  private static async addHistoryUnlocked(item: Omit<HistoryItem, 'id' | 'timestamp'>) {
+  private static async addHistoryUnlocked(
+    item: Omit<HistoryItem, 'id' | 'timestamp'>,
+    stableId?: string,
+  ) {
     const history = await this.loadHistory();
     const newItem: HistoryItem = {
       ...item,
-      id: Date.now().toString() + Math.random().toString(36).substring(7),
+      id: stableId ?? Date.now().toString() + Math.random().toString(36).substring(7),
       timestamp: Date.now(),
     };
-    const updatedHistory = [newItem, ...history].slice(0, 50);
+    const updatedHistory = [newItem, ...history.filter(entry => entry.id !== newItem.id)].slice(0, 50);
     await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(updatedHistory));
   }
 
@@ -373,7 +385,14 @@ export class FilterManager {
     const sender = parseSenderRuleInput(senderInput);
     if (!sender) return Promise.reject(new Error('Geçerli bir gönderen adı veya numarası girin.'));
 
-    return this.withStorageMutation(async () => {
+    return this.withStorageMutation(() => this.categorizeSenderUnlocked(sender, category));
+  }
+
+  private static async categorizeSenderUnlocked(
+    sender: string,
+    category: MessageCategory,
+    pendingId?: string,
+  ) {
       const [rules, settings] = await Promise.all([
         this.loadRules(),
         this.loadSettings(),
@@ -384,16 +403,29 @@ export class FilterManager {
         whitelist: setSenderWhitelistState(settings.whitelist, sender, category === 'allowed'),
       };
       const originalHistory = await this.loadHistory();
+      const originalPending = pendingId ? await this.loadPendingSenderCorrections() : [];
+      const updatedPending = pendingId
+        ? originalPending.filter(entry => entry.id !== pendingId)
+        : originalPending;
 
       try {
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updatedRules));
         await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(updatedSettings));
-        await this.addHistoryUnlocked(createManualCategoryHistory(sender, category));
+        await this.addHistoryUnlocked(
+          createManualCategoryHistory(sender, category),
+          pendingId ? `manual-${pendingId}` : undefined,
+        );
+        if (pendingId) {
+          await AsyncStorage.setItem(PENDING_SENDER_CORRECTIONS_KEY, JSON.stringify(updatedPending));
+        }
       } catch (error) {
         await Promise.allSettled([
           AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(rules)),
           AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)),
           AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(originalHistory)),
+          ...(pendingId
+            ? [AsyncStorage.setItem(PENDING_SENDER_CORRECTIONS_KEY, JSON.stringify(originalPending))]
+            : []),
         ]);
         throw error;
       }
@@ -403,11 +435,40 @@ export class FilterManager {
         rules: updatedRules,
         history: await this.loadHistory(),
         nativeSynced,
+        pending: updatedPending,
       };
-    });
   }
 
   // (Eski statik metod) Artık kullanılmıyor, classifyMessage içinde doğrudan bulut veritabanını okuyacağız.
+  static async loadPendingSenderCorrections(): Promise<PendingSenderCorrection[]> {
+    try {
+      const raw = await AsyncStorage.getItem(PENDING_SENDER_CORRECTIONS_KEY);
+      if (!raw) return [];
+      const parsed: unknown = JSON.parse(raw);
+      return Array.isArray(parsed) ? mergePendingSenderCorrections([], parsed as PendingSenderCorrection[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  static async confirmPendingSenderCorrection(id: string, category: MessageCategory) {
+    return this.withStorageMutation(async () => {
+      const pending = await this.loadPendingSenderCorrections();
+      const correction = pending.find(entry => entry.id === id);
+      if (!correction) throw new Error('Bekleyen gönderici ayarı bulunamadı. Listeyi yenileyin.');
+      return this.categorizeSenderUnlocked(correction.sender, category, id);
+    });
+  }
+
+  static dismissPendingSenderCorrection(id: string): Promise<PendingSenderCorrection[]> {
+    return this.withStorageMutation(async () => {
+      const pending = await this.loadPendingSenderCorrections();
+      const updated = pending.filter(entry => entry.id !== id);
+      await AsyncStorage.setItem(PENDING_SENDER_CORRECTIONS_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }
+
   static checkThreatDatabase(sender: string, body: string): boolean {
     return false;
   }
@@ -440,13 +501,33 @@ export class FilterManager {
       return settings.categoryMapping.spam as any;
     }
 
-    // Check whitelist (Beyaz Liste kontrolü en başta yapılır, yasaklardan bile güçlüdür)
-    if (settings.whitelist && settings.whitelist.includes(sender)) {
-      return 'allowed';
-    }
-
     // Check schedule
     if (!this.isInSchedule(settings)) return 'allowed';
+
+    // Kullanıcının kesin gönderen tercihi içerik ve risk sezgilerinden daha yüksek önceliklidir.
+    const exactSenderOverride = rules.find(rule =>
+      rule.matchTarget === 'sender' &&
+      rule.matchMode === 'exact' &&
+      senderRuleMatches(sender, rule.keyword),
+    );
+    if (exactSenderOverride) {
+      const category = resolveUserRuleCategory(
+        exactSenderOverride.category,
+        exactSenderOverride.matchTarget,
+        settings.filterTransactions,
+        settings.filterPromotions,
+        exactSenderOverride.matchMode,
+      );
+      if (category === 'junk') return settings.categoryMapping.spam as any;
+      if (category === 'transaction') return settings.categoryMapping.transaction as any;
+      if (category === 'promotion') return settings.categoryMapping.promotion as any;
+      return category;
+    }
+
+    // Beyaz liste büyük-küçük harf duyarsız tam gönderen eşleşmesidir.
+    if (settings.whitelist?.some(entry => senderRuleMatches(sender, entry))) {
+      return 'allowed';
+    }
 
     // Geçersiz / Yurtdışı Numara & Link Kontrolü (Örn: +855 Kamboçya numaralarından gelen phishing linkleri)
     const isForeignSender = sender.startsWith('+') && !sender.startsWith('+90');
@@ -567,20 +648,58 @@ export class FilterManager {
   private static async performNativeSmsEventImportUnlocked(): Promise<number> {
     try {
       let rawEventQueues: Array<string | null> = [];
+      let pendingCorrections: PendingSenderCorrection[] = [];
+      let pendingKeysToRemove: string[] = [];
+      let iosExtensionStorage: {
+        get(key: string): unknown;
+        getKeys(prefix: string): string[];
+        remove(key: string): void;
+      } | null = null;
       if (Platform.OS === 'android') {
         rawEventQueues = [await this.readNativePreference(NATIVE_SMS_EVENT_QUEUE_KEY)];
       } else if (Platform.OS === 'ios') {
         try {
           const { ExtensionStorage } = require('@bacons/apple-targets');
           const storage = new ExtensionStorage(APP_GROUP);
+          iosExtensionStorage = storage;
           rawEventQueues = [
             storage.get(NATIVE_SMS_EVENT_QUEUE_KEY) as string,
             storage.get(NATIVE_SMS_REPORT_EVENT_QUEUE_KEY) as string,
           ];
+          const indexedIds = parsePendingSenderOverrideIds(
+            storage.get(NATIVE_PENDING_SENDER_OVERRIDE_IDS_KEY) as string,
+          );
+          const enumeratedKeys: string[] = storage.getKeys(
+            `${NATIVE_PENDING_SENDER_OVERRIDE_KEY_PREFIX}pending-`,
+          );
+          const enumeratedIds = enumeratedKeys.map(key =>
+            key.slice(NATIVE_PENDING_SENDER_OVERRIDE_KEY_PREFIX.length),
+          );
+          const pendingIds = parsePendingSenderOverrideIds(JSON.stringify([...indexedIds, ...enumeratedIds]));
+          pendingCorrections = pendingIds.flatMap(id => {
+            const key = `${NATIVE_PENDING_SENDER_OVERRIDE_KEY_PREFIX}${id}`;
+            const rawCorrection = storage.get(key) as string | null;
+            const correction = parseNativeSenderOverride(rawCorrection);
+            if (!correction || correction.id !== id) {
+              if (rawCorrection !== null) pendingKeysToRemove.push(key);
+              return [];
+            }
+            pendingKeysToRemove.push(key);
+            return [correction];
+          });
         } catch {}
       }
 
       const events = parseNativeSmsEventQueues(rawEventQueues);
+      if (pendingCorrections.length > 0) {
+        const mergedPending = mergePendingSenderCorrections(
+          await this.loadPendingSenderCorrections(),
+          pendingCorrections,
+        );
+        await AsyncStorage.setItem(PENDING_SENDER_CORRECTIONS_KEY, JSON.stringify(mergedPending));
+      }
+      pendingKeysToRemove.forEach(key => iosExtensionStorage?.remove(key));
+
       if (events.length === 0) return 0;
 
       const processedRaw = await AsyncStorage.getItem(NATIVE_PROCESSED_IDS_KEY);

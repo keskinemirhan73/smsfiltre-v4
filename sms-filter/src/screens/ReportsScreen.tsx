@@ -16,6 +16,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FilterManager, type FilterRule, type HistoryItem } from '../modules/FilterManager';
 import { messageCategoryOption, type MessageCategory } from '../services/messageCategoryPolicy';
+import type { PendingSenderCorrection } from '../services/nativeSenderOverrides';
 import { parseSenderRuleInput } from '../services/senderRulePolicy';
 import { radii, spacing, useAppTheme } from '../theme';
 
@@ -35,6 +36,7 @@ function CategoryIcon({ category, size = 18 }: { category: ActivityCategory; siz
 
 function eventSourceLabel(source: HistoryItem['source']) {
   if (source === 'manual') return 'Manuel düzeltme';
+  if (source === 'report') return 'Mesajlar raporu';
   if (source === 'native') return 'iOS / cihaz filtresi';
   if (source === 'simulator') return 'Test simülatörü';
   return 'Yerel geçmiş';
@@ -45,6 +47,7 @@ export default function ReportsScreen() {
   const insets = useSafeAreaInsets();
   const [rules, setRules] = useState<FilterRule[]>([]);
   const [events, setEvents] = useState<HistoryItem[]>([]);
+  const [pendingCorrections, setPendingCorrections] = useState<PendingSenderCorrection[]>([]);
   const [reportInput, setReportInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -56,12 +59,14 @@ export default function ReportsScreen() {
     if (showRefreshing) setRefreshing(true);
     try {
       const importedCount = await FilterManager.importNativeSmsEvents();
-      const [loadedRules, loadedHistory] = await Promise.all([
+      const [loadedRules, loadedHistory, loadedPending] = await Promise.all([
         FilterManager.loadRules(),
         FilterManager.loadHistory(),
+        FilterManager.loadPendingSenderCorrections(),
       ]);
       setRules(loadedRules);
       setEvents(loadedHistory);
+      setPendingCorrections(loadedPending);
       setLoadError('');
       setSyncMessage(importedCount > 0 ? `${importedCount} yeni cihaz işlemi aktarıldı.` : 'Cihaz işlemleri güncel.');
     } catch {
@@ -109,6 +114,37 @@ export default function ReportsScreen() {
     }
   };
 
+  const handlePendingConfirmation = async (id: string, category: ActivityCategory) => {
+    setIsSubmitting(true);
+    try {
+      const result = await FilterManager.confirmPendingSenderCorrection(id, category);
+      setRules(result.rules);
+      setEvents(result.history);
+      setPendingCorrections(result.pending);
+      Alert.alert(
+        result.nativeSynced ? 'Kural Etkinleştirildi' : 'Kural Yerelde Kaydedildi',
+        result.nativeSynced
+          ? `Göndericinin bundan sonraki uygun mesajları ${messageCategoryOption(category).label} olarak sınıflandırılacak.`
+          : 'Kural kaydedildi ancak iOS filtresine aktarılamadı. Uygulamayı yeniden açıp senkronizasyonu tekrar deneyin.',
+      );
+    } catch (error) {
+      Alert.alert('Onaylanamadı', error instanceof Error ? error.message : 'Lütfen yeniden deneyin.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handlePendingDismiss = async (id: string) => {
+    setIsSubmitting(true);
+    try {
+      setPendingCorrections(await FilterManager.dismissPendingSenderCorrection(id));
+    } catch {
+      Alert.alert('Silinemedi', 'Bekleyen ayar silinemedi. Lütfen yeniden deneyin.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleDeleteRule = async (ruleId: string) => {
     const updated = rules.filter(rule => rule.id !== ruleId);
     setRules(updated);
@@ -133,6 +169,50 @@ export default function ReportsScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadData()} colors={['#8B5CF6']} />}
       >
+        {pendingCorrections.length > 0 && (
+          <View style={[styles.card, { backgroundColor: theme.surface, borderColor: '#8B5CF680' }]}>
+            <View style={styles.cardHeader}>
+              <ShieldCheck color="#8B5CF6" size={20} />
+              <Text style={[styles.cardTitle, { color: theme.text }]}>Bekleyen Gönderici Ayarları</Text>
+            </View>
+            <Text style={[styles.cardSub, { color: theme.textMuted }]}>
+              Mesajlar’da seçtiğiniz kategori henüz kural değildir. Göndericiyi kontrol edip aşağıdan onaylayın. “Sil ve Bildir” kullandıysanız eski mesaj Apple tarafından silinmiştir; bu ayar yalnız sonraki uygun SMS/MMS mesajlarını etkiler.
+            </Text>
+            {pendingCorrections.map(correction => {
+              const selectedOption = messageCategoryOption(correction.category);
+              return (
+                <View key={correction.id} style={[styles.pendingCard, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                  <View style={styles.pendingHeader}>
+                    <View style={styles.ruleTextCol}>
+                      <Text style={[styles.ruleKeyword, { color: theme.text }]}>{correction.sender}</Text>
+                      <Text style={[styles.ruleCategory, { color: selectedOption.color }]}>Mesajlar seçimi: {selectedOption.label}</Text>
+                    </View>
+                    <TouchableOpacity disabled={isSubmitting} onPress={() => handlePendingDismiss(correction.id)} style={styles.deleteButton}>
+                      <Trash2 color="#EF4444" size={18} />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.categoryGrid}>
+                    {(['junk', 'allowed', 'transaction', 'promotion'] as ActivityCategory[]).map(category => {
+                      const option = messageCategoryOption(category);
+                      return (
+                        <TouchableOpacity
+                          key={`${correction.id}-${category}`}
+                          style={[styles.categoryButton, { backgroundColor: option.color }, isSubmitting && styles.disabledButton]}
+                          disabled={isSubmitting}
+                          onPress={() => handlePendingConfirmation(correction.id, category)}
+                        >
+                          <CategoryIcon category={category} />
+                          <Text style={styles.categoryButtonText}>{option.shortLabel}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
         <View style={[styles.card, { backgroundColor: theme.surface, borderColor: theme.border }]}>
           <View style={styles.cardHeader}>
             <Sparkles color="#8B5CF6" size={20} />
@@ -141,6 +221,7 @@ export default function ReportsScreen() {
           <Text style={[styles.cardSub, { color: theme.textMuted }]}>
             Bankkart gibi bir göndereni gelecekteki uygun SMS/MMS mesajları için seçtiğiniz kategoriye alın.
             Bu işlem eski mesajı taşımaz. iOS mevcut Mesajlar geçmişine erişmez ve bilinen kişilerde filtreyi çağırmayabilir.
+            Mesajlar’da “Sil ve İstenmeyen Olarak Bildir” ile başlarsanız mesaj Apple tarafından silinir; FiltreAI silinen mesajı geri getiremez.
           </Text>
           <TextInput
             style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
@@ -269,6 +350,8 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 16, fontWeight: '700' },
   emptySub: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
   ruleCard: { padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  pendingCard: { padding: spacing.md, borderRadius: radii.lg, borderWidth: 1, gap: spacing.md },
+  pendingHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   ruleBadge: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   ruleTextCol: { flex: 1 },
   ruleKeyword: { fontSize: 15, fontWeight: '700' },

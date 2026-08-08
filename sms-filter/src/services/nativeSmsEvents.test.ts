@@ -18,6 +18,10 @@ test('native SMS olaylarini dogrular ve bozuk girdileri atar', () => {
     },
     { id: '', sender: '555', status: 'allowed', timestamp: 2_000 },
     { id: 'event-2', sender: '***', status: 'unknown', timestamp: 3_000 },
+    {
+      id: 'unsafe-sender', sender: '***\u202e', preview: 'Gizli',
+      status: 'allowed', timestamp: 4_000,
+    },
   ]));
 
   assert.equal(events.length, 1);
@@ -101,4 +105,27 @@ test('ayri native uretici kuyruklarini bozuk kuyruktan etkilenmeden birlestirir'
   const events = parseNativeSmsEventQueues([filterQueue, '{bozuk', reportQueue]);
 
   assert.deepEqual(events.map(event => event.id), ['filter-1', 'report-1']);
+  assert.equal(events.find(event => event.id === 'report-1')?.source, 'report');
+});
+
+test('Mesajlar raporu uygulama gecmisinde ayri kaynak olarak korunur', () => {
+  const events = parseNativeSmsEvents(JSON.stringify([{
+    id: 'report-1', sender: '***2222', preview: 'Mesajlar panelinde bildirildi.',
+    status: 'suspicious', timestamp: 2_000, source: 'report',
+  }]));
+  const result = mergeNativeSmsEvents(
+    [],
+    { blockedCount: 0, analyzedCount: 0, transactionCount: 0, promotionCount: 0 },
+    [],
+    events,
+  );
+
+  assert.equal(events[0].source, 'report');
+  assert.equal(result.history[0].source, 'report');
+  assert.deepEqual(result.stats, {
+    blockedCount: 0,
+    analyzedCount: 0,
+    transactionCount: 0,
+    promotionCount: 0,
+  });
 });
