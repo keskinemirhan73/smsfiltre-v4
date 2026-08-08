@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  filterUnprocessedSenderCorrections,
   mergePendingSenderCorrections,
   parseNativeSenderOverride,
+  parseNativeSenderOverrideQueue,
   parsePendingSenderOverrideIds,
 } from './nativeSenderOverrides';
 
@@ -47,4 +49,31 @@ test('aynı gönderen için yalnız en yeni bekleyen kategori gösterilir', () =
   assert.deepEqual(merged, [
     { id: 'new', sender: 'bankkart', category: 'transaction', timestamp: 20 },
   ]);
+});
+
+test('dayanikli native kuyruk gecerli secimleri okur ve bozuk kayitlari atar', () => {
+  const valid = {
+    id: 'pending-one', sender: 'BANKKART', category: 'junk' as const, timestamp: 1000,
+  };
+  const invalid = {
+    id: 'pending-bad', sender: 'BANKKART', category: 'unknown', timestamp: 1001,
+  };
+
+  assert.deepEqual(
+    parseNativeSenderOverrideQueue(JSON.stringify([valid, invalid, valid])),
+    [valid],
+  );
+  assert.deepEqual(parseNativeSenderOverrideQueue('{bozuk'), []);
+});
+
+test('guvenli depoya alinan native secimler yeniden ice aktarilmaz', () => {
+  const corrections = [
+    { id: 'pending-one', sender: 'BANKKART', category: 'junk' as const, timestamp: 1000 },
+    { id: 'pending-two', sender: 'BILINMEYEN', category: 'allowed' as const, timestamp: 1001 },
+  ];
+
+  assert.deepEqual(
+    filterUnprocessedSenderCorrections(corrections, ['pending-one']),
+    [corrections[1]],
+  );
 });

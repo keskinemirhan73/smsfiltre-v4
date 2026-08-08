@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  createNavigationContainerRef,
+  type NavigatorScreenParams,
+} from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -44,8 +48,23 @@ Notifications.setNotificationHandler({
   }),
 });
 
-const Tab = createBottomTabNavigator();
-const Stack = createNativeStackNavigator();
+type MainTabParamList = {
+  Dashboard: undefined;
+  Raporlar: undefined;
+  'Akıllı Analiz': undefined;
+  Katkılarım: undefined;
+  Ayarlar: undefined;
+};
+
+type RootStackParamList = {
+  Onboarding: undefined;
+  MainTabs: NavigatorScreenParams<MainTabParamList>;
+  Simulator: undefined;
+};
+
+const Tab = createBottomTabNavigator<MainTabParamList>();
+const Stack = createNativeStackNavigator<RootStackParamList>();
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
 function MainTabs() {
   const themeColors = useContext(ThemeContext);
@@ -114,14 +133,33 @@ export default function App() {
   const [appTheme, setAppTheme] = useState('system');
   const [initialRoute, setInitialRoute] = useState<InitialRoute | null>(null);
   const [showBrandSplash, setShowBrandSplash] = useState(true);
+  const queuedPendingCorrectionId = useRef<string | null>(null);
+  const lastOpenedPendingCorrectionId = useRef<string | null>(null);
+  const onboardingCompleteRef = useRef(false);
+
+  const openNewPendingCorrection = async () => {
+    if (!onboardingCompleteRef.current) return;
+    const pending = await FilterManager.loadPendingSenderCorrections();
+    const newest = pending[0];
+    if (!newest || newest.id === lastOpenedPendingCorrectionId.current) return;
+
+    lastOpenedPendingCorrectionId.current = newest.id;
+    if (navigationRef.isReady()) {
+      navigationRef.navigate('MainTabs', { screen: 'Raporlar' });
+      return;
+    }
+    queuedPendingCorrectionId.current = newest.id;
+  };
 
   useEffect(() => {
     FilterManager.loadSettings().then(s => setAppTheme(s.theme || 'system'));
 
     const initializeApp = async () => {
       const onboardingComplete = await hasCompletedOnboarding();
+      onboardingCompleteRef.current = onboardingComplete;
       await FilterManager.initializeNativeFiltering();
       await FilterManager.importNativeSmsEvents();
+      if (onboardingComplete) await openNewPendingCorrection();
       setInitialRoute(getInitialRoute(onboardingComplete));
     };
 
@@ -134,7 +172,9 @@ export default function App() {
     // Deep link listener
     const handleUrl = (url: string | null) => {
       if (url) {
-        FilterManager.importNativeSmsEvents().catch(() => {});
+        FilterManager.importNativeSmsEvents()
+          .then(() => openNewPendingCorrection())
+          .catch(() => {});
       }
     };
     Linking.getInitialURL().then(handleUrl);
@@ -166,9 +206,9 @@ export default function App() {
     });
     const appStateSub = AppState.addEventListener('change', state => {
       if (state === 'active') {
-        FilterManager.importNativeSmsEvents().catch(error =>
-          console.warn('SMS raporları yenilenemedi:', error),
-        );
+        FilterManager.importNativeSmsEvents()
+          .then(() => openNewPendingCorrection())
+          .catch(error => console.warn('SMS raporları yenilenemedi:', error));
         syncExistingPushToken().catch(error =>
           console.warn('Push token yenileme basarisiz:', error),
         );
@@ -216,6 +256,12 @@ export default function App() {
           <ToastProvider>
             <StatusBar style={isDark ? 'light' : 'dark'} />
             <NavigationContainer
+              ref={navigationRef}
+              onReady={() => {
+                if (!queuedPendingCorrectionId.current) return;
+                queuedPendingCorrectionId.current = null;
+                navigationRef.navigate('MainTabs', { screen: 'Raporlar' });
+              }}
               theme={{
               dark: isDark,
               colors: {

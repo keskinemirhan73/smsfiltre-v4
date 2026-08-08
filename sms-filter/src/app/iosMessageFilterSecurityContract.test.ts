@@ -25,10 +25,10 @@ test('iOS filtre uzantisi mesajlari aga gondermez veya loglamaz', () => {
   assert.doesNotMatch(extensionSource, /URLSession|Network|fetch\(|print\(|NSLog/);
 });
 
-test('iOS filtre olay kuyruğu extension kapanmadan kalıcı App Group verisine yazılır', () => {
-  assert.match(extensionSource, /"source":\s*"filter"/);
-  assert.match(extensionSource, /defaults\.set\(outputData, forKey: "smsfilter_event_queue_json"\)/);
-  assert.match(extensionSource, /defaults\.synchronize\(\)/);
+test('iOS mesaj filtre uzantisi karar olaylarini paylasilan alana aktarmaya calismaz', () => {
+  assert.doesNotMatch(extensionSource, /"source":\s*"filter"/);
+  assert.doesNotMatch(extensionSource, /smsfilter_event_queue_json/);
+  assert.doesNotMatch(extensionSource, /func recordEvent/);
 });
 
 test('iOS filtre uzantısı yalnız uygulamada onaylanmış kuralları kullanır', () => {

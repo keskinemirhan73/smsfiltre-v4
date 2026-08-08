@@ -43,6 +43,32 @@ export function parseNativeSenderOverride(rawValue: string | null): PendingSende
   }
 }
 
+export function parseNativeSenderOverrideQueue(rawValue: string | null): PendingSenderCorrection[] {
+  if (!rawValue) return [];
+  try {
+    const parsed: unknown = JSON.parse(rawValue);
+    if (!Array.isArray(parsed)) return [];
+    const byId = new Map<string, PendingSenderCorrection>();
+    parsed.slice(-MAX_PENDING_CORRECTIONS).forEach(value => {
+      if (isPendingSenderCorrection(value)) byId.set(value.id, { ...value });
+    });
+    return [...byId.values()];
+  } catch {
+    return [];
+  }
+}
+
+export function filterUnprocessedSenderCorrections(
+  corrections: readonly PendingSenderCorrection[],
+  processedIds: readonly string[],
+): PendingSenderCorrection[] {
+  const processed = new Set(processedIds.filter(isSafeId));
+  return corrections
+    .filter(isPendingSenderCorrection)
+    .filter(correction => !processed.has(correction.id))
+    .map(correction => ({ ...correction }));
+}
+
 export function parsePendingSenderOverrideIds(rawValue: string | null): string[] {
   if (!rawValue) return [];
   try {

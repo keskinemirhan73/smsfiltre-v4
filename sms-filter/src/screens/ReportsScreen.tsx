@@ -37,7 +37,7 @@ function CategoryIcon({ category, size = 18 }: { category: ActivityCategory; siz
 function eventSourceLabel(source: HistoryItem['source']) {
   if (source === 'manual') return 'Manuel düzeltme';
   if (source === 'report') return 'Mesajlar raporu';
-  if (source === 'native') return 'iOS / cihaz filtresi';
+  if (source === 'native') return 'Cihaz filtresi';
   if (source === 'simulator') return 'Test simülatörü';
   return 'Yerel geçmiş';
 }
@@ -67,8 +67,15 @@ export default function ReportsScreen() {
       setRules(loadedRules);
       setEvents(loadedHistory);
       setPendingCorrections(loadedPending);
-      setLoadError('');
-      setSyncMessage(importedCount > 0 ? `${importedCount} yeni cihaz işlemi aktarıldı.` : 'Cihaz işlemleri güncel.');
+      const nativeWarning = FilterManager.getNativeImportWarning();
+      setLoadError(nativeWarning ?? '');
+      setSyncMessage(
+        nativeWarning
+          ? ''
+          : importedCount > 0
+            ? `${importedCount} yeni cihaz işlemi aktarıldı.`
+            : 'Bekleyen yeni rapor bulunamadı.',
+      );
     } catch {
       setLoadError('İşlem geçmişi okunamadı. Yenilemek için aşağı çekin.');
     } finally {
@@ -280,7 +287,7 @@ export default function ReportsScreen() {
           <View style={[styles.emptyCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
             <ShieldAlert color={theme.textMuted} size={32} />
             <Text style={[styles.emptyTitle, { color: theme.text }]}>Henüz işlem görünmüyor</Text>
-            <Text style={[styles.emptySub, { color: theme.textMuted }]}>iOS mevcut Mesajlar geçmişine erişmez. Yeni filtre olayları, Mesajlar’dan yapılan uygun raporlar ve manuel düzeltmeler burada görünür.</Text>
+            <Text style={[styles.emptySub, { color: theme.textMuted }]}>iOS mevcut Mesajlar geçmişine erişmez. Mesajlar’dan yaptığınız uygun raporlar ve manuel düzeltmeler burada görünür. Önce Ayarlar &gt; Uygulamalar &gt; Telefon &gt; SMS/Arama Raporlama altında FiltreAI’yi seçin. Kategoriye dokunduktan sonra FiltreAI’yi açın.</Text>
           </View>
         ) : filteredEvents.map(event => {
           const category = historyCategory(event.status);

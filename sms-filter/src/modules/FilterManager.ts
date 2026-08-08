@@ -4,8 +4,10 @@ import { ThreatCloudService } from '../services/ThreatCloudService';
 import { buildNativeFilterPayload } from '../services/nativeFilterPayload';
 import { mergeNativeSmsEvents, parseNativeSmsEventQueues } from '../services/nativeSmsEvents';
 import {
+  filterUnprocessedSenderCorrections,
   mergePendingSenderCorrections,
   parseNativeSenderOverride,
+  parseNativeSenderOverrideQueue,
   parsePendingSenderOverrideIds,
   type PendingSenderCorrection,
 } from '../services/nativeSenderOverrides';
@@ -23,10 +25,12 @@ const STATS_KEY = '@junkman_stats';
 const LEARNING_KEY = '@junkman_learning_db';
 const NATIVE_SMS_EVENT_QUEUE_KEY = 'smsfilter_event_queue_json';
 const NATIVE_SMS_REPORT_EVENT_QUEUE_KEY = 'smsfilter_report_event_queue_json';
+const NATIVE_PENDING_SENDER_OVERRIDE_QUEUE_KEY = 'smsfilter_pending_sender_override_queue_json';
 const NATIVE_PENDING_SENDER_OVERRIDE_IDS_KEY = 'smsfilter_pending_sender_override_ids_json';
 const NATIVE_PENDING_SENDER_OVERRIDE_KEY_PREFIX = 'smsfilter_pending_sender_override_';
 const NATIVE_PROCESSED_IDS_KEY = '@FiltreAI_Native_Processed_Event_IDs';
 const PENDING_SENDER_CORRECTIONS_KEY = '@FiltreAI_Pending_Sender_Corrections';
+const PENDING_SENDER_PROCESSED_IDS_KEY = '@junkman_pending_sender_processed_ids';
 
 // ─── Types ───────────────────────────────────────────────────
 export interface FilterRule {
@@ -304,6 +308,7 @@ export class NaiveBayesClassifier {
 export class FilterManager {
   private static nativeImportInFlight: Promise<number> | null = null;
   private static storageMutationQueue: Promise<unknown> = Promise.resolve();
+  private static nativeImportWarning: string | null = null;
 
   private static withStorageMutation<T>(operation: () => Promise<T>): Promise<T> {
     const queued = this.storageMutationQueue.then(operation, operation);
@@ -532,13 +537,24 @@ export class FilterManager {
     // Geçersiz / Yurtdışı Numara & Link Kontrolü (Örn: +855 Kamboçya numaralarından gelen phishing linkleri)
     const isForeignSender = sender.startsWith('+') && !sender.startsWith('+90');
     const hasLink = /(https?:\/\/|[a-z0-9-]+\.(gd|ly|com|cc|top|xyz|me|co|site|info|fun|icu))/i.test(body);
-    if (isForeignSender && (hasLink || settings.blockForeignNumbers)) {
+    if (isForeignSender && (hasLink || (settings.invalidNumberFilter && settings.blockForeignNumbers))) {
       return settings.categoryMapping.spam as any;
     }
 
     // Yabancı Alfabe (Arapça) Kontrolü
     if (settings.blockArabic) {
       if (/[\u0600-\u06FF]/.test(body) || /[\u0600-\u06FF]/.test(sender)) {
+        return settings.categoryMapping.spam as any;
+      }
+    }
+
+    // Fraud heuristics run before general content rules, matching the iOS extension.
+    if (settings.fraudFilter && settings.customFraudKeywords?.length > 0) {
+      const lowerBody = body.toLowerCase();
+      if (settings.customFraudKeywords.some(keyword => {
+        const normalizedKeyword = keyword.trim().toLowerCase();
+        return normalizedKeyword.length > 0 && lowerBody.includes(normalizedKeyword);
+      })) {
         return settings.categoryMapping.spam as any;
       }
     }
@@ -595,23 +611,6 @@ export class FilterManager {
       }
     }
 
-    // Özel Hassas Kelime Avcısı (Dolandırıcılık Filtresi)
-    if (settings.fraudFilter && settings.customFraudKeywords && settings.customFraudKeywords.length > 0) {
-      const lowerBody = body.toLowerCase();
-      if (settings.customFraudKeywords.some(kw => lowerBody.includes(kw.toLowerCase()))) {
-        return settings.categoryMapping.spam as any;
-      }
-    }
-
-    // Naive Bayes ML Check (Akıllı Filtre / Proaktif Filtre)
-    if (settings.smartFilter && settings.proactiveFilter) {
-      const spamProbability = await NaiveBayesClassifier.predict(body);
-      // Hassasiyet eşiği (0.6 çok hassas, 0.9 daha gevşek vb.)
-      if (spamProbability >= (settings.aiSensitivity || 0.8)) {
-        return settings.categoryMapping.spam as any;
-      }
-    }
-
     return 'allowed';
   }
 
@@ -641,15 +640,24 @@ export class FilterManager {
     }
   }
 
+  static getNativeImportWarning(): string | null {
+    return this.nativeImportWarning;
+  }
+
   private static performNativeSmsEventImport(): Promise<number> {
     return this.withStorageMutation(() => this.performNativeSmsEventImportUnlocked());
   }
 
   private static async performNativeSmsEventImportUnlocked(): Promise<number> {
     try {
+      this.nativeImportWarning = null;
       let rawEventQueues: Array<string | null> = [];
       let pendingCorrections: PendingSenderCorrection[] = [];
       let pendingKeysToRemove: string[] = [];
+      let pendingIdsToMarkProcessed: string[] = [];
+      const processedPendingIds = parsePendingSenderOverrideIds(
+        await AsyncStorage.getItem(PENDING_SENDER_PROCESSED_IDS_KEY),
+      );
       let iosExtensionStorage: {
         get(key: string): unknown;
         getKeys(prefix: string): string[];
@@ -666,6 +674,12 @@ export class FilterManager {
             storage.get(NATIVE_SMS_EVENT_QUEUE_KEY) as string,
             storage.get(NATIVE_SMS_REPORT_EVENT_QUEUE_KEY) as string,
           ];
+          const queuedCorrections = filterUnprocessedSenderCorrections(
+            parseNativeSenderOverrideQueue(
+              storage.get(NATIVE_PENDING_SENDER_OVERRIDE_QUEUE_KEY) as string,
+            ),
+            processedPendingIds,
+          );
           const indexedIds = parsePendingSenderOverrideIds(
             storage.get(NATIVE_PENDING_SENDER_OVERRIDE_IDS_KEY) as string,
           );
@@ -676,7 +690,7 @@ export class FilterManager {
             key.slice(NATIVE_PENDING_SENDER_OVERRIDE_KEY_PREFIX.length),
           );
           const pendingIds = parsePendingSenderOverrideIds(JSON.stringify([...indexedIds, ...enumeratedIds]));
-          pendingCorrections = pendingIds.flatMap(id => {
+          const legacyCorrections = pendingIds.flatMap(id => {
             const key = `${NATIVE_PENDING_SENDER_OVERRIDE_KEY_PREFIX}${id}`;
             const rawCorrection = storage.get(key) as string | null;
             const correction = parseNativeSenderOverride(rawCorrection);
@@ -687,7 +701,17 @@ export class FilterManager {
             pendingKeysToRemove.push(key);
             return [correction];
           });
-        } catch {}
+          const unprocessedCorrections = filterUnprocessedSenderCorrections(
+            [...queuedCorrections, ...legacyCorrections],
+            processedPendingIds,
+          );
+          pendingCorrections = mergePendingSenderCorrections([], unprocessedCorrections);
+          pendingIdsToMarkProcessed = [
+            ...new Set(unprocessedCorrections.map(correction => correction.id)),
+          ];
+        } catch {
+          this.nativeImportWarning = 'iOS raporlama bağlantısı okunamadı. FiltreAI’yi kapatıp yeniden açın ve tekrar deneyin.';
+        }
       }
 
       const events = parseNativeSmsEventQueues(rawEventQueues);
@@ -697,6 +721,12 @@ export class FilterManager {
           pendingCorrections,
         );
         await AsyncStorage.setItem(PENDING_SENDER_CORRECTIONS_KEY, JSON.stringify(mergedPending));
+        await AsyncStorage.setItem(
+          PENDING_SENDER_PROCESSED_IDS_KEY,
+          JSON.stringify(
+            [...new Set([...processedPendingIds, ...pendingIdsToMarkProcessed])].slice(-50),
+          ),
+        );
       }
       pendingKeysToRemove.forEach(key => iosExtensionStorage?.remove(key));
 
@@ -723,6 +753,7 @@ export class FilterManager {
       );
       return merged.importedCount;
     } catch (error) {
+      this.nativeImportWarning = 'Cihaz işlemleri güvenli depoya aktarılamadı. Lütfen yeniden deneyin.';
       console.warn('Native SMS olayları içe aktarılamadı.');
       return 0;
     }

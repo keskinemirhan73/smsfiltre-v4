@@ -113,3 +113,25 @@ test('iOS reporting panel writes a masked selection to the App Group event queue
   const managerSource = readFileSync(resolve(projectRoot, 'src/modules/FilterManager.ts'), 'utf8');
   assert.match(managerSource, /smsfilter_report_event_queue_json/);
 });
+
+test('kategori dokunusu Bitti akisindan bagimsiz olarak dayanikli bekleyen kuyruga yazilir', () => {
+  const source = readTargetFile('ClassificationViewController.swift');
+
+  assert.match(source, /smsfilter_pending_sender_override_queue_json/);
+  assert.match(
+    source,
+    /@objc private func selectCategory[\s\S]*persistPendingSenderCorrections/,
+  );
+  assert.match(source, /defaults\.set\(encodedQueue, forKey: pendingOverrideQueueKey\)/);
+  assert.match(source, /override func prepare[\s\S]*activeMessageRequest/);
+  assert.match(source, /lastPendingTimestamp/);
+  assert.match(source, /max\(currentTimestamp, lastPendingTimestamp \+ 1\)/);
+  const responseBody = source.slice(
+    source.indexOf('override func classificationResponse'),
+    source.indexOf('private func persistReportEvents'),
+  );
+  assert.doesNotMatch(
+    responseBody,
+    /persistPendingSenderCorrections\(from:/,
+  );
+});

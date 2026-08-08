@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Alert, Animated } from 'react-native';
-import { ShieldCheck, ShieldAlert, Send, Receipt, Megaphone, BrainCircuit, Activity, RefreshCw } from 'lucide-react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, Animated } from 'react-native';
+import { ShieldCheck, ShieldAlert, Receipt, Megaphone, Activity, RefreshCw } from 'lucide-react-native';
 import { useAppTheme, spacing, radii } from '../theme';
-import { FilterManager, NaiveBayesClassifier } from '../modules/FilterManager';
+import { FilterManager } from '../modules/FilterManager';
 
 export default function TestSimulatorScreen() {
   const theme = useAppTheme();
@@ -47,16 +47,6 @@ export default function TestSimulatorScreen() {
     }, 600);
   };
 
-  const handleTrain = async (isSpam: boolean) => {
-    if (!body.trim()) return;
-    await NaiveBayesClassifier.train(body, isSpam);
-    Alert.alert(
-      "Öğrenme Başarılı",
-      isSpam ? "Mesaj içeriği akıllı filtre tarafından 'Tehlikeli' olarak işaretlendi." : "Mesaj içeriği akıllı filtre tarafından 'Güvenli' olarak işaretlendi.",
-      [{ text: 'Tamam', onPress: () => { setBody(''); setSender(''); setResult('none'); } }]
-    );
-  };
-
   const getResultConfig = () => {
     switch (result) {
       case 'junk': return {
@@ -95,7 +85,7 @@ export default function TestSimulatorScreen() {
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.text }]}>Filtre Simülatörü</Text>
           <Text style={[styles.subtitle, { color: theme.textMuted }]}>
-            Sistemin mesajları nasıl algıladığını test edin veya yerel filtrenizi geliştirin.
+            iOS filtre uzantısıyla aynı kural ve tehdit veritabanını kullanarak sonucu önceden görün.
           </Text>
         </View>
 
@@ -136,7 +126,7 @@ export default function TestSimulatorScreen() {
           ) : (
             <Activity color="#fff" size={24} />
           )}
-          <Text style={styles.testBtnText}>{isTesting ? 'Analiz Ediliyor...' : 'Akıllı Analizi Başlat'}</Text>
+          <Text style={styles.testBtnText}>{isTesting ? 'Analiz Ediliyor...' : 'Filtreyi Test Et'}</Text>
         </TouchableOpacity>
 
         {/* Animated Result Card */}
@@ -153,37 +143,6 @@ export default function TestSimulatorScreen() {
             <View style={styles.resultContent}>
               <Text style={[styles.resultTitle, { color: resultConfig.color }]}>{resultConfig.title}</Text>
               <Text style={[styles.resultDesc, { color: theme.text }]}>{resultConfig.desc}</Text>
-            </View>
-          </Animated.View>
-        )}
-
-        {/* Learning Section */}
-        {body.trim().length > 0 && result !== 'none' && (
-          <Animated.View style={[styles.learningSection, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            <View style={styles.learningHeader}>
-              <BrainCircuit color={theme.text} size={20} />
-              <Text style={[styles.learningTitle, { color: theme.text }]}>Modeli Eğit (Opsiyonel)</Text>
-            </View>
-            <Text style={[styles.learningDesc, { color: theme.textMuted }]}>
-              Filtre yanlış mı sınıflandırdı? Bu mesajın nasıl algılanması gerektiğini cihaza öğreterek kendi kişisel korumanızı güçlendirin.
-            </Text>
-            
-            <View style={styles.learningButtons}>
-              <TouchableOpacity 
-                style={[styles.trainBtn, { backgroundColor: 'rgba(16,185,129,0.1)', borderColor: 'rgba(16,185,129,0.3)' }]}
-                onPress={() => handleTrain(false)}
-              >
-                <ShieldCheck size={20} color={theme.secondary} style={{ marginBottom: 4 }} />
-                <Text style={[styles.trainBtnText, { color: theme.secondary }]}>Güvenli Olarak İşaretle</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.trainBtn, { backgroundColor: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)' }]}
-                onPress={() => handleTrain(true)}
-              >
-                <ShieldAlert size={20} color={theme.danger} style={{ marginBottom: 4 }} />
-                <Text style={[styles.trainBtnText, { color: theme.danger }]}>Tehlikeli Olarak İşaretle</Text>
-              </TouchableOpacity>
             </View>
           </Animated.View>
         )}
@@ -250,14 +209,6 @@ const styles = StyleSheet.create({
   resultTitle: { fontSize: 18, fontWeight: '800', marginBottom: 4 },
   resultDesc: { fontSize: 14, lineHeight: 20 },
   
-  learningSection: { marginBottom: spacing.xl },
-  learningHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm, gap: 8 },
-  learningTitle: { fontSize: 16, fontWeight: '800' },
-  learningDesc: { fontSize: 13, lineHeight: 18, marginBottom: spacing.md },
-  learningButtons: { flexDirection: 'row', gap: spacing.sm },
-  trainBtn: { flex: 1, paddingVertical: spacing.lg, paddingHorizontal: spacing.sm, borderRadius: radii.xl, borderWidth: 1, alignItems: 'center' },
-  trainBtnText: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
-
   quickLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 1, marginBottom: spacing.sm, marginTop: spacing.md },
   quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   quickBtn: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: radii.lg, borderWidth: 1 },

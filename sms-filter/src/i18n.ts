@@ -16,7 +16,7 @@ export const translations = {
     cloudDbUpToDate: 'Tehdit Veritabanı',
     threats: 'Tehlike',
     activateFilter: 'Filtreyi Aktifleştirin',
-    activateFilterDesc: 'Filtrelemenin çalışması için telefonunuzun Ayarlar > Mesajlar > Bilinmeyenleri Filtrele menüsüne giderek FiltreAI\'yi seçmeniz gerekmektedir.',
+    activateFilterDesc: 'Ayarlar > Uygulamalar > Mesajlar > Bilinmeyen Gönderenler > Metin Mesajı Filtresi bölümünden FiltreAI\'yi seçin.',
     setupNow: 'Hemen Kurulumu Yap',
     reportsAndStats: 'Rapor & İstatistikler',
     totalAnalyzed: 'Toplam İncelenen',
@@ -31,7 +31,7 @@ export const translations = {
     testNotification: 'Bildirim Test',
     statistics: 'İstatistikler',
     recentActivity: 'Son Aktiviteler',
-    noRecentActivity: 'Henüz mesaj filtrelenmedi.',
+    noRecentActivity: 'Henüz kayıtlı rapor veya manuel işlem yok.',
     reportToCommunity: 'Topluluğa Bildir',
     reportPlaceholder: 'Örn: deneme bonusu, yasadışı bahis',
 
@@ -92,8 +92,8 @@ export const translations = {
     activateFilterModalDesc: 'Gelen şüpheli mesajları tespit edip işaretlemek için aşağıdaki adımları takip edin.',
     activateFilterStep1: 'Telefonunuzun Ayarlar uygulamasına girin.',
     activateFilterStep2: 'Mesajlar bölümünü bulun ve açın.',
-    activateFilterStep3: 'Bilinmeyenleri Filtrele (veya İstenmeyenler) menüsüne dokunun.',
-    activateFilterStep4: 'FiltreAI uygulamasını seçip yeşil tik ile onaylayın.',
+    activateFilterStep3: 'Bilinmeyen Gönderenleri Tara’yı açın, ardından Metin Mesajı Filtresi’ne dokunun.',
+    activateFilterStep4: 'FiltreAI’yi seçin. Apple’ın Spam Filtresini ayrıca açık bırakabilirsiniz.',
     openSettingsBtn: 'Ayarları Aç',
 
     // Profile Screen
@@ -121,7 +121,7 @@ export const translations = {
     cloudDbUpToDate: 'Threat Database',
     threats: 'Threats',
     activateFilter: 'Activate the Filter',
-    activateFilterDesc: 'For filtering to work, go to Settings > Messages > Unknown & Spam on your phone and select FiltreAI.',
+    activateFilterDesc: 'Go to Settings > Apps > Messages > Unknown Senders > Text Message Filter and select FiltreAI.',
     setupNow: 'Setup Now',
     reportsAndStats: 'Reports & Statistics',
     totalAnalyzed: 'Total Analyzed',
@@ -136,7 +136,7 @@ export const translations = {
     testNotification: 'Test Notification',
     statistics: 'Statistics',
     recentActivity: 'Recent Activity',
-    noRecentActivity: 'No messages filtered yet.',
+    noRecentActivity: 'No saved reports or manual actions yet.',
     reportToCommunity: 'Report to Community',
     reportPlaceholder: 'e.g., trial bonus, illegal betting',
 
@@ -197,8 +197,8 @@ export const translations = {
     activateFilterModalDesc: 'Follow the steps below to detect and flag suspicious incoming messages.',
     activateFilterStep1: 'Go to your phone\'s Settings app.',
     activateFilterStep2: 'Find and open the Messages section.',
-    activateFilterStep3: 'Tap on Filter Unknown Senders (or Unknown & Spam).',
-    activateFilterStep4: 'Select FiltreAI and approve with the green checkmark.',
+    activateFilterStep3: 'Turn on Screen Unknown Senders, then open Text Message Filter.',
+    activateFilterStep4: 'Select FiltreAI. You can leave Apple’s Spam Filter enabled separately.',
     openSettingsBtn: 'Open Settings',
 
     // Profile Screen

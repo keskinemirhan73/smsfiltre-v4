@@ -90,7 +90,7 @@ export default function OnboardingScreen({ navigation }: any) {
             </View>
             <Text style={[styles.stepText, { color: theme.text }]}>
               {isEn
-                ? 'Enable "Filter Unknown Senders".'
+                ? 'Turn on "Screen Unknown Senders".'
                 : 'Bilinmeyen Gönderenleri Tara’yı etkinleştirin.'}
             </Text>
           </View>
@@ -102,8 +102,8 @@ export default function OnboardingScreen({ navigation }: any) {
             </View>
             <Text style={[styles.stepText, { color: theme.text }]}>
               {isEn
-                ? 'Under Message Filtering, enable FiltreAI.'
-                : 'Mesaj Filtresi altında FiltreAI’yi etkinleştirin.'}
+                ? 'Open Text Message Filter and select FiltreAI.'
+                : 'Metin Mesajı Filtresi’ni açıp FiltreAI’yi seçin.'}
             </Text>
           </View>
 
@@ -119,18 +119,15 @@ export default function OnboardingScreen({ navigation }: any) {
             </Text>
           </View>
 
-          {/* Step 6 Recommendation */}
+          {/* Step 6 */}
           <View style={styles.stepRow}>
             <View style={[styles.iconContainer, { backgroundColor: '#10B981' }]}>
               <CheckCircle2 size={22} color="#FFFFFF" />
             </View>
             <Text style={[styles.stepText, { color: theme.text }]}>
-              <Text style={{ fontWeight: '700', fontStyle: 'italic' }}>
-                {isEn ? 'Recommended: ' : 'Önerilir: '}
-              </Text>
               {isEn
-                ? 'Disable default "Filter Junk" as it may conflict with FiltreAI.'
-                : 'İstenmeyenleri Filtrele’yi devre dışı bırakın çünkü FiltreAI ile çakışabilir.'}
+                ? 'You can leave Apple’s Spam Filter on. FiltreAI works from the separate Text Message Filter selection.'
+                : 'Apple’ın Spam Filtresini açık bırakabilirsiniz. FiltreAI ayrı Metin Mesajı Filtresi seçiminden çalışır.'}
             </Text>
           </View>
         </View>

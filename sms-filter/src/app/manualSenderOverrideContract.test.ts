@@ -23,6 +23,15 @@ test('iOS kesin gönderici işlem ve tanıtım kurallarını genel filtre anahta
   );
   assert.match(source, /category == "transaction" && matchMode != "exact" && !filterTransactions/);
   assert.match(source, /category == "promotion" && matchMode != "exact" && !filterPromotions/);
+  assert.match(source, /let exactSenderOverride = findExactSenderOverrideCategory/);
+  assert.ok(
+    source.indexOf('let exactSenderOverride') < source.indexOf('let isWhitelisted'),
+    'iOS exact sender preference must run before the whitelist.',
+  );
+  assert.ok(
+    source.indexOf('let exactSenderOverride') < source.indexOf('let isForeignSender'),
+    'iOS exact sender preference must run before risk heuristics.',
+  );
 });
 
 test('kesin gönderen kuralları TypeScript, Swift ve Kotlin katmanlarında eşitlik kullanır', () => {

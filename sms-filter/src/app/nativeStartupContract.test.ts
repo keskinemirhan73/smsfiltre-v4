@@ -49,3 +49,36 @@ test('uygulama indeks dışında kalan bekleyen gönderici kayıtlarını da bul
   assert.match(appleTargetsPatch, /dictionaryRepresentation\(\)/);
   assert.match(appleTargetsPatch, /getKeys/);
 });
+
+test('uygulama dayanikli bekleyen kuyrugu ice aktarir ve yeni secimi otomatik acar', () => {
+  const appSource = readFileSync(resolve(projectRoot, 'App.tsx'), 'utf8');
+  const managerSource = readFileSync(
+    resolve(projectRoot, 'src/modules/FilterManager.ts'),
+    'utf8',
+  );
+
+  assert.match(managerSource, /smsfilter_pending_sender_override_queue_json/);
+  assert.match(managerSource, /@junkman_pending_sender_processed_ids/);
+  assert.match(managerSource, /parseNativeSenderOverrideQueue/);
+  assert.match(managerSource, /filterUnprocessedSenderCorrections/);
+  assert.match(appSource, /createNavigationContainerRef/);
+  assert.match(appSource, /loadPendingSenderCorrections\(\)/);
+  assert.match(appSource, /navigate\(['"]MainTabs['"],\s*\{\s*screen:\s*['"]Raporlar['"]/);
+  assert.match(appSource, /onboardingCompleteRef\.current/);
+  assert.match(appSource, /if \(!onboardingCompleteRef\.current\) return/);
+});
+
+test('native kopru hatasi guncel gorunumu gibi sessizce gosterilmez', () => {
+  const managerSource = readFileSync(
+    resolve(projectRoot, 'src/modules/FilterManager.ts'),
+    'utf8',
+  );
+  const reportsSource = readFileSync(
+    resolve(projectRoot, 'src/screens/ReportsScreen.tsx'),
+    'utf8',
+  );
+
+  assert.match(managerSource, /getNativeImportWarning/);
+  assert.match(managerSource, /nativeImportWarning\s*=/);
+  assert.match(reportsSource, /FilterManager\.getNativeImportWarning\(\)/);
+});

@@ -584,7 +584,7 @@ export default function DashboardScreen() {
 
               <View style={styles.setupStep}>
                 <View style={[styles.stepNumberBadge, { backgroundColor: theme.primary }]}><Text style={styles.stepNumberText}>2</Text></View>
-                <Text style={[styles.stepText, { color: theme.text }]}>Mesajlar cihazınızda analiz edilir. Yalnızca siz raporlamayı seçerseniz maskelenmiş içerik gönderilir.</Text>
+                <Text style={[styles.stepText, { color: theme.text }]}>Mesajlar cihazınızda analiz edilir. Raporlamayı seçerseniz Apple rapor SMS’i göndereni ve mesaj içeriğini içerebilir; göndermeden önce onaylayabilir veya iptal edebilirsiniz. Standart SMS ücreti uygulanabilir.</Text>
               </View>
               <View style={styles.setupStepDivider} />
 

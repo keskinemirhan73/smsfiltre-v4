@@ -32,6 +32,12 @@ test('reports exist only in the main tab and render imported native activity', (
   assert.match(reportsSource, /Göndericiyi Düzelt/);
   assert.match(reportsSource, /Bankkart/);
   assert.match(reportsSource, /iOS mevcut Mesajlar geçmişine erişmez/);
+  assert.doesNotMatch(reportsSource, /Yeni filtre olayları/);
+  assert.match(reportsSource, /Mesajlar’dan yaptığınız uygun raporlar ve manuel düzeltmeler/);
+  assert.match(reportsSource, /SMS\/Arama Raporlama altında FiltreAI’yi seçin/);
+  assert.match(reportsSource, /Kategoriye dokunduktan sonra FiltreAI’yi açın/);
+  assert.doesNotMatch(reportsSource, /Cihaz işlemleri güncel/);
+  assert.match(reportsSource, /Bekleyen yeni rapor bulunamadı/);
   assert.match(reportsSource, /eski mesajı taşımaz/);
   for (const category of ['junk', 'allowed', 'transaction', 'promotion']) {
     assert.match(reportsSource, new RegExp(`handleSenderCategoryChange\\(['"]${category}['"]\\)`));

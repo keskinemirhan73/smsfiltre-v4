@@ -46,67 +46,26 @@ private func isWithinSchedule(_ settings: [String: Any]) -> Bool {
         : (current >= start || current <= end)
 }
 
-private let eventQueueLock = NSLock()
+private func findExactSenderOverrideCategory(
+    sender: String,
+    rules: [[String: Any]]
+) -> String? {
+    for rule in rules {
+        guard rule["matchTarget"] as? String == "sender",
+              rule["matchMode"] as? String == "exact",
+              let keyword = rule["keyword"] as? String,
+              !keyword.isEmpty,
+              keyword.count <= 160,
+              let category = rule["category"] as? String else { continue }
 
-private func recordEvent(sender: String, action: ILMessageFilterAction) {
-    eventQueueLock.lock()
-    defer { eventQueueLock.unlock() }
-    guard let defaults = UserDefaults(suiteName: "group.com.filtreai.app") else { return }
-    var queue: [[String: Any]] = []
-    let queueData: Data?
-    if let storedData = defaults.data(forKey: "smsfilter_event_queue_json") {
-        queueData = storedData
-    } else if let jsonString = defaults.string(forKey: "smsfilter_event_queue_json") {
-        queueData = jsonString.data(using: .utf8)
-    } else {
-        queueData = nil
+        let matches = sender.trimmingCharacters(in: .whitespacesAndNewlines)
+            .compare(
+                keyword.trimmingCharacters(in: .whitespacesAndNewlines),
+                options: .caseInsensitive
+            ) == .orderedSame
+        if matches { return category }
     }
-    if let data = queueData,
-       let parsed = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
-        queue = parsed
-    }
-
-    if queue.count > 50 {
-        queue = Array(queue.suffix(49))
-    }
-
-    let maskSender: (String) -> String = { s in
-        let trimmed = s.trimmingCharacters(in: .whitespacesAndNewlines)
-        let suffix = String(trimmed.suffix(4))
-        return suffix.isEmpty ? "Bilinmeyen" : "***\(suffix)"
-    }
-
-    let statusStr: String
-    let previewStr: String
-    switch action {
-    case .junk:
-        statusStr = "suspicious"
-        previewStr = "Şüpheli SMS iOS filtre tarafından yakalandı."
-    case .transaction:
-        statusStr = "transaction"
-        previewStr = "İşlem SMS'i iOS filtre tarafından sınıflandırıldı."
-    case .promotion:
-        statusStr = "promotion"
-        previewStr = "Tanıtım SMS'i iOS filtre tarafından sınıflandırıldı."
-    default:
-        statusStr = "allowed"
-        previewStr = "SMS iOS filtre tarafından analiz edildi."
-    }
-
-    let event: [String: Any] = [
-        "id": UUID().uuidString,
-        "sender": maskSender(sender),
-        "preview": previewStr,
-        "status": statusStr,
-        "source": "filter",
-        "timestamp": Int64(Date().timeIntervalSince1970 * 1000)
-    ]
-    queue.append(event)
-
-    if let outputData = try? JSONSerialization.data(withJSONObject: queue) {
-        defaults.set(outputData, forKey: "smsfilter_event_queue_json")
-        defaults.synchronize()
-    }
+    return nil
 }
 
 extension MessageFilterExtension: ILMessageFilterQueryHandling {
@@ -135,6 +94,20 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
             threatDatabase = json["threatDb"] as? [[String: Any]] ?? []
         }
 
+        guard isWithinSchedule(settings) else {
+            response.action = .allow
+            completion(response)
+            return
+        }
+
+        let mapping = settings["categoryMapping"] as? [String: Any] ?? [:]
+        let exactSenderOverride = findExactSenderOverrideCategory(sender: sender, rules: rules)
+        if let exactSenderOverride {
+            response.action = categoryAction(exactSenderOverride, mapping: mapping)
+            completion(response)
+            return
+        }
+
         let whitelist = settings["whitelist"] as? [String] ?? []
         let isWhitelisted = whitelist.contains { entry in
             let value = entry.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -142,14 +115,12 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
             return sender.compare(value, options: .caseInsensitive) == .orderedSame
         }
 
-        guard !isWhitelisted, isWithinSchedule(settings) else {
+        guard !isWhitelisted else {
             response.action = .allow
-            recordEvent(sender: sender, action: response.action)
             completion(response)
             return
         }
 
-        let mapping = settings["categoryMapping"] as? [String: Any] ?? [:]
         let invalidNumberFilter = settings["invalidNumberFilter"] as? Bool ?? false
         let blockForeignNumbers = settings["blockForeignNumbers"] as? Bool ?? false
         let isForeignSender = sender.hasPrefix("+") && !sender.hasPrefix("+90")
@@ -157,7 +128,6 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
 
         if isForeignSender && (hasLinkInBody || (invalidNumberFilter && blockForeignNumbers)) {
             response.action = categoryAction("junk", mapping: mapping)
-            recordEvent(sender: sender, action: response.action)
             completion(response)
             return
         }
@@ -168,7 +138,6 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
                 || sender.range(of: "[\\u0600-\\u06FF]", options: .regularExpression) != nil
         ) {
             response.action = categoryAction("junk", mapping: mapping)
-            recordEvent(sender: sender, action: response.action)
             completion(response)
             return
         }
@@ -182,7 +151,6 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
                    && lowerBody.contains(normalized)
            }) {
             response.action = categoryAction("junk", mapping: mapping)
-            recordEvent(sender: sender, action: response.action)
             completion(response)
             return
         }
@@ -197,6 +165,7 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
                   let category = rule["category"] as? String,
                   let matchTarget = rule["matchTarget"] as? String else { continue }
             let matchMode = rule["matchMode"] as? String ?? "contains"
+            if matchTarget == "sender" && matchMode == "exact" { continue }
 
             let textToCheck: String
             switch matchTarget {
@@ -223,7 +192,6 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
                 } else {
                     response.action = categoryAction(category, mapping: mapping)
                 }
-                recordEvent(sender: sender, action: response.action)
                 completion(response)
                 return
             }
@@ -247,7 +215,6 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
 
                 if isMatch {
                     response.action = categoryAction("junk", mapping: mapping)
-                    recordEvent(sender: sender, action: response.action)
                     completion(response)
                     return
                 }
@@ -255,7 +222,6 @@ extension MessageFilterExtension: ILMessageFilterQueryHandling {
         }
 
         response.action = .allow
-        recordEvent(sender: sender, action: response.action)
         completion(response)
     }
 }

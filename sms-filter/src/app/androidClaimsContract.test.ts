@@ -34,3 +34,33 @@ test('Google Play aciklamasi Android sinirini acikca belirtir', () => {
   assert.match(listing.fullDescription, /mesajları cihazın Mesajlar uygulamasından silmez/i);
   assert.match(listing.fullDescription, /teslim edilmesini engellemez/i);
 });
+
+test('iOS test ekrani gercek uzantida kullanilmayan yerel modeli egittigini iddia etmez', () => {
+  const simulatorSource = readFileSync(
+    resolve(projectRoot, 'src/screens/TestSimulatorScreen.tsx'),
+    'utf8',
+  );
+
+  assert.doesNotMatch(simulatorSource, /NaiveBayesClassifier/);
+  assert.doesNotMatch(simulatorSource, /Modeli Eğit/);
+  assert.doesNotMatch(simulatorSource, /cihaza öğreterek/);
+  assert.match(simulatorSource, /iOS filtre uzantısıyla aynı kural/);
+
+  const managerSource = readFileSync(
+    resolve(projectRoot, 'src/modules/FilterManager.ts'),
+    'utf8',
+  );
+  const classifyMessage = managerSource.slice(
+    managerSource.indexOf('static async classifyMessage'),
+    managerSource.indexOf('// Native sync'),
+  );
+  assert.doesNotMatch(classifyMessage, /NaiveBayesClassifier\.predict/);
+  assert.ok(
+    classifyMessage.indexOf('settings.customFraudKeywords') < classifyMessage.indexOf('// Check custom rules'),
+    'Simulator and iOS extension must apply fraud heuristics before general rules.',
+  );
+  assert.match(
+    classifyMessage,
+    /hasLink \|\| \(settings\.invalidNumberFilter && settings\.blockForeignNumbers\)/,
+  );
+});

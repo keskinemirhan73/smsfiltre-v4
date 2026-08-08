@@ -64,11 +64,14 @@ final class ClassificationViewController: ILClassificationUIExtensionViewControl
     }
 
     private let eventQueueKey = "smsfilter_report_event_queue_json"
+    private let pendingOverrideQueueKey = "smsfilter_pending_sender_override_queue_json"
     private let pendingOverrideIdsKey = "smsfilter_pending_sender_override_ids_json"
     private let pendingOverrideKeyPrefix = "smsfilter_pending_sender_override_"
     private let maximumQueuedEvents = 50
     private static let eventQueueLock = NSLock()
     private let selectionStack = UIStackView()
+    private var activeMessageRequest: ILMessageClassificationRequest?
+    private var lastPendingTimestamp = 0
     private var selectedCategory: ReportCategory?
     private var categoryButtons: [ReportCategory: UIButton] = [:]
 
@@ -80,6 +83,7 @@ final class ClassificationViewController: ILClassificationUIExtensionViewControl
     override func prepare(for request: ILClassificationRequest) {
         super.prepare(for: request)
         loadViewIfNeeded()
+        activeMessageRequest = request as? ILMessageClassificationRequest
         selectedCategory = nil
         extensionContext.isReadyForClassificationResponse = false
         refreshSelection()
@@ -94,7 +98,6 @@ final class ClassificationViewController: ILClassificationUIExtensionViewControl
         }
 
         persistReportEvents(from: messageRequest, category: category)
-        persistPendingSenderCorrections(from: messageRequest, category: category)
 
         let response = ILClassificationResponse(action: category.responseAction)
         response.userInfo = ["category": category.rawValue]
@@ -162,7 +165,18 @@ final class ClassificationViewController: ILClassificationUIExtensionViewControl
             return decoded
         }()
 
-        let baseTimestamp = Int(Date().timeIntervalSince1970 * 1_000)
+        let existingQueue: [[String: Any]] = {
+            let storedData = defaults.data(forKey: pendingOverrideQueueKey)
+                ?? defaults.string(forKey: pendingOverrideQueueKey)?.data(using: .utf8)
+            guard let storedData,
+                  let decoded = try? JSONSerialization.jsonObject(with: storedData) as? [[String: Any]]
+            else { return [] }
+            return decoded
+        }()
+
+        let currentTimestamp = Int(Date().timeIntervalSince1970 * 1_000)
+        let baseTimestamp = max(currentTimestamp, lastPendingTimestamp + 1)
+        lastPendingTimestamp = baseTimestamp + max(messageRequest.messageCommunications.count - 1, 0)
         let newCorrections = messageRequest.messageCommunications.enumerated().compactMap { index, communication -> (String, [String: Any])? in
             guard let rawSender = communication.sender else { return nil }
             let sender = rawSender.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -186,6 +200,11 @@ final class ClassificationViewController: ILClassificationUIExtensionViewControl
             defaults.set(encoded, forKey: "\(pendingOverrideKeyPrefix)\(id)")
         }
         evictedIds.forEach { defaults.removeObject(forKey: "\(pendingOverrideKeyPrefix)\($0)") }
+        let queuedCorrections = Array(
+            (existingQueue + newCorrections.map { $0.1 }).suffix(maximumQueuedEvents)
+        )
+        guard let encodedQueue = try? JSONSerialization.data(withJSONObject: queuedCorrections) else { return }
+        defaults.set(encodedQueue, forKey: pendingOverrideQueueKey)
         guard let encodedIds = try? JSONSerialization.data(withJSONObject: queuedIds) else { return }
         defaults.set(encodedIds, forKey: pendingOverrideIdsKey)
         defaults.synchronize()
@@ -304,6 +323,9 @@ final class ClassificationViewController: ILClassificationUIExtensionViewControl
     @objc private func selectCategory(_ sender: UIButton) {
         guard ReportCategory.allCases.indices.contains(sender.tag) else { return }
         selectedCategory = ReportCategory.allCases[sender.tag]
+        if let activeMessageRequest, let selectedCategory {
+            persistPendingSenderCorrections(from: activeMessageRequest, category: selectedCategory)
+        }
         extensionContext.isReadyForClassificationResponse = true
         refreshSelection()
     }
