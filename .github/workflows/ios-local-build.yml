@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   build-ios:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 60
     defaults:
       run:
@@ -25,6 +25,19 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+
+      - name: Verify Xcode and iOS SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          sdk_version="$(xcrun --sdk iphoneos --show-sdk-version)"
+          sdk_major="${sdk_version%%.*}"
+          echo "Active iphoneos SDK: $sdk_version"
+          if (( sdk_major < 26 )); then
+            echo "SDK major version must be 26 or newer" >&2
+            exit 1
+          fi
 
       - name: Set up Node.js
         uses: actions/setup-node@v5
@@ -88,6 +101,7 @@ jobs:
           retention-days: 7
 
       - name: Submit to App Store Connect / TestFlight
+        if: github.ref == 'refs/heads/main'
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
