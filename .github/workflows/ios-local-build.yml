@@ -88,6 +88,8 @@ jobs:
           strings "$report_extension/smsreport" | grep -F "smsfilter_report_event_queue_json" >/dev/null
           strings "$app/main.jsbundle" | grep -F "smsfilter_pending_sender_override_queue_json" >/dev/null
           strings "$report_extension/smsreport" | grep -F "smsfilter_pending_sender_override_queue_json" >/dev/null
+          strings "$app/FiltreAI" | grep -F "getFiles" >/dev/null
+          strings "$report_extension/smsreport" | grep -F "smsfilter_pending_sender_override_" >/dev/null
 
           security cms -D -i "$app/embedded.mobileprovision" > "$verify_dir/app-profile.plist"
           security cms -D -i "$report_extension/embedded.mobileprovision" > "$verify_dir/report-profile.plist"

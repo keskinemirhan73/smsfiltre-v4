@@ -17,6 +17,9 @@ test('native bekleyen gönderen ayarını doğrular ve bozuk girdileri reddeder'
     id: 'bad', sender: 'x'.repeat(65), category: 'junk', timestamp: 1000,
   })), null);
   assert.equal(parseNativeSenderOverride('{bozuk'), null);
+  assert.deepEqual(parseNativeSenderOverride(JSON.stringify({
+    id: 'missing-sender', sender: null, category: 'promotion', timestamp: 1001,
+  })), { id: 'missing-sender', sender: null, category: 'promotion', timestamp: 1001 });
 });
 
 test('bekleyen kimlik listesini sınırlar ve bozuk değerleri atar', () => {
@@ -49,6 +52,15 @@ test('aynı gönderen için yalnız en yeni bekleyen kategori gösterilir', () =
   assert.deepEqual(merged, [
     { id: 'new', sender: 'bankkart', category: 'transaction', timestamp: 20 },
   ]);
+});
+
+test('iOS göndereni vermediğinde bekleyen seçimler kimliğe göre korunur', () => {
+  const merged = mergePendingSenderCorrections([], [
+    { id: 'missing-one', sender: null, category: 'junk', timestamp: 10 },
+    { id: 'missing-two', sender: null, category: 'transaction', timestamp: 20 },
+  ]);
+
+  assert.deepEqual(merged.map(item => item.id), ['missing-two', 'missing-one']);
 });
 
 test('dayanikli native kuyruk gecerli secimleri okur ve bozuk kayitlari atar', () => {

@@ -48,6 +48,7 @@ export default function ReportsScreen() {
   const [rules, setRules] = useState<FilterRule[]>([]);
   const [events, setEvents] = useState<HistoryItem[]>([]);
   const [pendingCorrections, setPendingCorrections] = useState<PendingSenderCorrection[]>([]);
+  const [pendingSenderInputs, setPendingSenderInputs] = useState<Record<string, string>>({});
   const [reportInput, setReportInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -67,6 +68,12 @@ export default function ReportsScreen() {
       setRules(loadedRules);
       setEvents(loadedHistory);
       setPendingCorrections(loadedPending);
+      setPendingSenderInputs(current => Object.fromEntries(
+        loadedPending.map(correction => [
+          correction.id,
+          current[correction.id] ?? correction.sender ?? '',
+        ]),
+      ));
       const nativeWarning = FilterManager.getNativeImportWarning();
       setLoadError(nativeWarning ?? '');
       setSyncMessage(
@@ -124,7 +131,11 @@ export default function ReportsScreen() {
   const handlePendingConfirmation = async (id: string, category: ActivityCategory) => {
     setIsSubmitting(true);
     try {
-      const result = await FilterManager.confirmPendingSenderCorrection(id, category);
+      const result = await FilterManager.confirmPendingSenderCorrection(
+        id,
+        category,
+        pendingSenderInputs[id],
+      );
       setRules(result.rules);
       setEvents(result.history);
       setPendingCorrections(result.pending);
@@ -191,7 +202,21 @@ export default function ReportsScreen() {
                 <View key={correction.id} style={[styles.pendingCard, { backgroundColor: theme.background, borderColor: theme.border }]}>
                   <View style={styles.pendingHeader}>
                     <View style={styles.ruleTextCol}>
-                      <Text style={[styles.ruleKeyword, { color: theme.text }]}>{correction.sender}</Text>
+                      {!correction.sender && (
+                        <Text style={[styles.missingSenderText, { color: theme.danger }]}>Gönderen bilgisi iOS tarafından aktarılmadı. Aşağıya gönderen adı veya numarasını yazın.</Text>
+                      )}
+                      <TextInput
+                        style={[styles.input, { backgroundColor: theme.surface, color: theme.text, borderColor: theme.border }]}
+                        placeholder="Gönderen adı veya numarası"
+                        placeholderTextColor={theme.textMuted}
+                        value={pendingSenderInputs[correction.id] ?? correction.sender ?? ''}
+                        onChangeText={value => setPendingSenderInputs(current => ({
+                          ...current,
+                          [correction.id]: value,
+                        }))}
+                        maxLength={64}
+                        autoCapitalize="none"
+                      />
                       <Text style={[styles.ruleCategory, { color: selectedOption.color }]}>Mesajlar seçimi: {selectedOption.label}</Text>
                     </View>
                     <TouchableOpacity disabled={isSubmitting} onPress={() => handlePendingDismiss(correction.id)} style={styles.deleteButton}>
@@ -362,6 +387,7 @@ const styles = StyleSheet.create({
   ruleBadge: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   ruleTextCol: { flex: 1 },
   ruleKeyword: { fontSize: 15, fontWeight: '700' },
+  missingSenderText: { fontSize: 12, lineHeight: 17, marginBottom: spacing.sm },
   ruleCategory: { fontSize: 12, marginTop: 2 },
   eventPreview: { fontSize: 12, marginTop: 4 },
   eventDate: { fontSize: 11, marginTop: 3 },

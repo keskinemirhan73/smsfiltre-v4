@@ -19,7 +19,7 @@ test('reports exist only in the main tab and render imported native activity', (
   assert.match(reportsSource, /Bekleyen Gönderici Ayarları/);
   assert.match(reportsSource, /loadPendingSenderCorrections/);
   assert.match(reportsSource, /confirmPendingSenderCorrection/);
-  assert.match(managerSource, /categorizeSenderUnlocked\(correction\.sender, category, id\)/);
+  assert.match(managerSource, /categorizeSenderUnlocked\(sender, category, id\)/);
   assert.match(managerSource, /`manual-\$\{pendingId\}`/);
   assert.match(reportsSource, /Sil ve İstenmeyen Olarak Bildir/);
   assert.match(reportsSource, /Apple tarafından silinir/);

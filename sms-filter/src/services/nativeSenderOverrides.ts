@@ -4,7 +4,7 @@ export type PendingSenderCategory = 'junk' | 'allowed' | 'transaction' | 'promot
 
 export interface PendingSenderCorrection {
   id: string;
-  sender: string;
+  sender: string | null;
   category: PendingSenderCategory;
   timestamp: number;
 }
@@ -23,8 +23,10 @@ function isPendingSenderCorrection(value: unknown): value is PendingSenderCorrec
   const correction = value as Partial<PendingSenderCorrection>;
   return (
     isSafeId(correction.id) &&
-    typeof correction.sender === 'string' &&
-    parseSenderRuleInput(correction.sender) === correction.sender &&
+    (correction.sender === null || (
+      typeof correction.sender === 'string' &&
+      parseSenderRuleInput(correction.sender) === correction.sender
+    )) &&
     typeof correction.category === 'string' &&
     VALID_CATEGORIES.has(correction.category as PendingSenderCategory) &&
     typeof correction.timestamp === 'number' &&
@@ -93,7 +95,9 @@ export function mergePendingSenderCorrections(
   return [...byId.values()]
     .sort((left, right) => right.timestamp - left.timestamp)
     .filter(correction => {
-      const normalizedSender = correction.sender.trim().toLocaleLowerCase('tr-TR');
+      const normalizedSender = correction.sender
+        ? correction.sender.trim().toLocaleLowerCase('tr-TR')
+        : `missing:${correction.id}`;
       if (seenSenders.has(normalizedSender)) return false;
       seenSenders.add(normalizedSender);
       return true;

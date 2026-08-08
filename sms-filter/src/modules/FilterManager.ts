@@ -456,12 +456,20 @@ export class FilterManager {
     }
   }
 
-  static async confirmPendingSenderCorrection(id: string, category: MessageCategory) {
+  static async confirmPendingSenderCorrection(
+    id: string,
+    category: MessageCategory,
+    senderInput?: string,
+  ) {
     return this.withStorageMutation(async () => {
       const pending = await this.loadPendingSenderCorrections();
       const correction = pending.find(entry => entry.id === id);
       if (!correction) throw new Error('Bekleyen gönderici ayarı bulunamadı. Listeyi yenileyin.');
-      return this.categorizeSenderUnlocked(correction.sender, category, id);
+      const sender = parseSenderRuleInput(senderInput ?? correction.sender ?? '');
+      if (!sender) {
+        throw new Error('iOS göndereni aktarmadı. Gönderen adı veya numarasını girin.');
+      }
+      return this.categorizeSenderUnlocked(sender, category, id);
     });
   }
 
@@ -654,6 +662,7 @@ export class FilterManager {
       let rawEventQueues: Array<string | null> = [];
       let pendingCorrections: PendingSenderCorrection[] = [];
       let pendingKeysToRemove: string[] = [];
+      let pendingFilesToRemove: string[] = [];
       let pendingIdsToMarkProcessed: string[] = [];
       const processedPendingIds = parsePendingSenderOverrideIds(
         await AsyncStorage.getItem(PENDING_SENDER_PROCESSED_IDS_KEY),
@@ -661,6 +670,8 @@ export class FilterManager {
       let iosExtensionStorage: {
         get(key: string): unknown;
         getKeys(prefix: string): string[];
+        getFiles(prefix: string): string[];
+        removeFile(fileName: string): void;
         remove(key: string): void;
       } | null = null;
       if (Platform.OS === 'android') {
@@ -680,6 +691,15 @@ export class FilterManager {
             ),
             processedPendingIds,
           );
+          const fileCorrections = storage.getFiles(NATIVE_PENDING_SENDER_OVERRIDE_KEY_PREFIX)
+            .flatMap((rawCorrection: string) => {
+              const correction = parseNativeSenderOverride(rawCorrection);
+              if (!correction) return [];
+              pendingFilesToRemove.push(
+                `${NATIVE_PENDING_SENDER_OVERRIDE_KEY_PREFIX}${correction.id}.json`,
+              );
+              return [correction];
+            });
           const indexedIds = parsePendingSenderOverrideIds(
             storage.get(NATIVE_PENDING_SENDER_OVERRIDE_IDS_KEY) as string,
           );
@@ -702,7 +722,7 @@ export class FilterManager {
             return [correction];
           });
           const unprocessedCorrections = filterUnprocessedSenderCorrections(
-            [...queuedCorrections, ...legacyCorrections],
+            [...queuedCorrections, ...fileCorrections, ...legacyCorrections],
             processedPendingIds,
           );
           pendingCorrections = mergePendingSenderCorrections([], unprocessedCorrections);
@@ -728,6 +748,7 @@ export class FilterManager {
           ),
         );
       }
+      pendingFilesToRemove.forEach(fileName => iosExtensionStorage?.removeFile(fileName));
       pendingKeysToRemove.forEach(key => iosExtensionStorage?.remove(key));
 
       if (events.length === 0) return 0;

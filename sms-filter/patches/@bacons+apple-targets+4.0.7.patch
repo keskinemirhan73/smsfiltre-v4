@@ -1,48 +1,89 @@
 diff --git a/node_modules/@bacons/apple-targets/build/ExtensionStorage.d.ts b/node_modules/@bacons/apple-targets/build/ExtensionStorage.d.ts
-index 042cb10..2c865a1 100644
+index 042cb10..b72b87f 100644
 --- a/node_modules/@bacons/apple-targets/build/ExtensionStorage.d.ts
 +++ b/node_modules/@bacons/apple-targets/build/ExtensionStorage.d.ts
-@@ -5,5 +5,6 @@ export declare class ExtensionStorage {
+@@ -5,5 +5,8 @@ export declare class ExtensionStorage {
      constructor(appGroup: string);
      set(key: string, value?: string | number | Record<string, string | number> | Array<Record<string, string | number>>): void;
      get(key: string): string | null;
 +    getKeys(prefix: string): string[];
++    getFiles(prefix: string): string[];
++    removeFile(fileName: string): void;
      remove(key: string): void;
  }
 diff --git a/node_modules/@bacons/apple-targets/build/ExtensionStorage.js b/node_modules/@bacons/apple-targets/build/ExtensionStorage.js
-index e0e2566..f031690 100644
+index e0e2566..51f2f77 100644
 --- a/node_modules/@bacons/apple-targets/build/ExtensionStorage.js
 +++ b/node_modules/@bacons/apple-targets/build/ExtensionStorage.js
-@@ -12,6 +12,7 @@ const nativeModule = ExtensionStorageModule !== null && ExtensionStorageModule !
+@@ -12,6 +12,9 @@ const nativeModule = ExtensionStorageModule !== null && ExtensionStorageModule !
      setObject() { },
      setArray() { },
      get() { },
 +    getKeys() { return []; },
++    getFiles() { return []; },
++    removeFile() { },
      remove() { },
  };
  const originalSetObject = nativeModule.setObject;
-@@ -52,6 +53,9 @@ class ExtensionStorage {
+@@ -52,6 +55,15 @@ class ExtensionStorage {
      get(key) {
          return nativeModule.get(key, this.appGroup);
      }
 +    getKeys(prefix) {
 +        return nativeModule.getKeys(prefix, this.appGroup);
 +    }
++    getFiles(prefix) {
++        return nativeModule.getFiles(prefix, this.appGroup);
++    }
++    removeFile(fileName) {
++        return nativeModule.removeFile(fileName, this.appGroup);
++    }
      remove(key) {
          nativeModule.remove(key, this.appGroup);
      }
 diff --git a/node_modules/@bacons/apple-targets/ios/ExtensionStorageModule.swift b/node_modules/@bacons/apple-targets/ios/ExtensionStorageModule.swift
-index 56a949b..02685b6 100644
+index 56a949b..7ee5f20 100644
 --- a/node_modules/@bacons/apple-targets/ios/ExtensionStorageModule.swift
 +++ b/node_modules/@bacons/apple-targets/ios/ExtensionStorageModule.swift
-@@ -8,3 +8,10 @@ public class ExtensionStorageModule: Module {
-         Function("remove") { (forKey: String, suiteName: String?) in
+@@ -9,6 +9,41 @@ public class ExtensionStorageModule: Module {
              UserDefaults(suiteName: suiteName)?.removeObject(forKey: forKey)
          }
-+
+
 +        Function("getKeys") { (prefix: String, suiteName: String?) -> [String] in
 +            let defaults = UserDefaults(suiteName: suiteName)
 +            return defaults?.dictionaryRepresentation().keys
 +                .filter { $0.hasPrefix(prefix) }
 +                .sorted() ?? []
 +        }
++
++        Function("getFiles") { (prefix: String, suiteName: String?) -> [String] in
++            guard let suiteName,
++                  let containerURL = FileManager.default.containerURL(
++                    forSecurityApplicationGroupIdentifier: suiteName
++                  ),
++                  let fileURLs = try? FileManager.default.contentsOfDirectory(
++                    at: containerURL,
++                    includingPropertiesForKeys: nil
++                  ) else { return [] }
++            return fileURLs
++                .filter { $0.lastPathComponent.hasPrefix(prefix) && $0.pathExtension == "json" }
++                .compactMap { try? String(contentsOf: $0, encoding: .utf8) }
++        }
++
++        Function("removeFile") { (fileName: String, suiteName: String?) in
++            guard let suiteName,
++                  !fileName.contains("/"),
++                  !fileName.contains("\\"),
++                  fileName.hasPrefix("smsfilter_pending_sender_override_pending-"),
++                  fileName.hasSuffix(".json"),
++                  let containerURL = FileManager.default.containerURL(
++                    forSecurityApplicationGroupIdentifier: suiteName
++                  ) else { return }
++            try? FileManager.default.removeItem(
++                at: containerURL.appendingPathComponent(fileName, isDirectory: false)
++            )
++        }
++
+         Function("reloadWidget") { (timeline: String?) in
+             if let timeline = timeline {
+                 WidgetCenter.shared.reloadTimelines(ofKind: timeline)

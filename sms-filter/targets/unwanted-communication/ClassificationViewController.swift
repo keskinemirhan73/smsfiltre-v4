@@ -64,6 +64,7 @@ final class ClassificationViewController: ILClassificationUIExtensionViewControl
     }
 
     private let eventQueueKey = "smsfilter_report_event_queue_json"
+    private let appGroupIdentifier = "group.com.filtreai.app"
     private let pendingOverrideQueueKey = "smsfilter_pending_sender_override_queue_json"
     private let pendingOverrideIdsKey = "smsfilter_pending_sender_override_ids_json"
     private let pendingOverrideKeyPrefix = "smsfilter_pending_sender_override_"
@@ -151,14 +152,14 @@ final class ClassificationViewController: ILClassificationUIExtensionViewControl
         from messageRequest: ILMessageClassificationRequest,
         category: ReportCategory
     ) {
-        guard let defaults = UserDefaults(suiteName: "group.com.filtreai.app") else { return }
-
         Self.eventQueueLock.lock()
         defer { Self.eventQueueLock.unlock() }
 
+        let defaults = UserDefaults(suiteName: appGroupIdentifier)
+
         let existingIds: [String] = {
-            let storedData = defaults.data(forKey: pendingOverrideIdsKey)
-                ?? defaults.string(forKey: pendingOverrideIdsKey)?.data(using: .utf8)
+            let storedData = defaults?.data(forKey: pendingOverrideIdsKey)
+                ?? defaults?.string(forKey: pendingOverrideIdsKey)?.data(using: .utf8)
             guard let storedData,
                   let decoded = try? JSONSerialization.jsonObject(with: storedData) as? [String]
             else { return [] }
@@ -166,8 +167,8 @@ final class ClassificationViewController: ILClassificationUIExtensionViewControl
         }()
 
         let existingQueue: [[String: Any]] = {
-            let storedData = defaults.data(forKey: pendingOverrideQueueKey)
-                ?? defaults.string(forKey: pendingOverrideQueueKey)?.data(using: .utf8)
+            let storedData = defaults?.data(forKey: pendingOverrideQueueKey)
+                ?? defaults?.string(forKey: pendingOverrideQueueKey)?.data(using: .utf8)
             guard let storedData,
                   let decoded = try? JSONSerialization.jsonObject(with: storedData) as? [[String: Any]]
             else { return [] }
@@ -176,24 +177,42 @@ final class ClassificationViewController: ILClassificationUIExtensionViewControl
 
         let currentTimestamp = Int(Date().timeIntervalSince1970 * 1_000)
         let baseTimestamp = max(currentTimestamp, lastPendingTimestamp + 1)
-        lastPendingTimestamp = baseTimestamp + max(messageRequest.messageCommunications.count - 1, 0)
-        let newCorrections = messageRequest.messageCommunications.enumerated().compactMap { index, communication -> (String, [String: Any])? in
-            guard let rawSender = communication.sender else { return nil }
-            let sender = rawSender.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !sender.isEmpty, sender.count <= 64, isSafeSender(sender) else { return nil }
+        let senderCandidates: [String?] = messageRequest.messageCommunications.isEmpty
+            ? [nil]
+            : messageRequest.messageCommunications.map { communication in
+                guard let rawSender = communication.sender else { return nil }
+                let sender = rawSender.trimmingCharacters(in: .whitespacesAndNewlines)
+                return !sender.isEmpty && sender.count <= 64 && isSafeSender(sender)
+                    ? sender
+                    : nil
+            }
+        lastPendingTimestamp = baseTimestamp + max(senderCandidates.count - 1, 0)
+        let newCorrections = senderCandidates.enumerated().map { index, sender -> (String, [String: Any]) in
             let id = "pending-\(UUID().uuidString)"
+            let senderValue: Any = sender.map { $0 as Any } ?? NSNull()
             return (id, [
                 "id": id,
-                "sender": sender,
+                "sender": senderValue,
                 "category": category.rawValue,
                 "timestamp": baseTimestamp + index,
             ])
         }
 
-        guard !newCorrections.isEmpty else { return }
         let newIds = newCorrections.map(\.0)
         let queuedIds = Array((existingIds + newIds).suffix(maximumQueuedEvents))
         let evictedIds = Set(existingIds).subtracting(queuedIds)
+
+        if let containerURL = FileManager.default.containerURL(
+            forSecurityApplicationGroupIdentifier: appGroupIdentifier
+        ) {
+            for (id, correction) in newCorrections {
+                guard let encoded = try? JSONSerialization.data(withJSONObject: correction) else { continue }
+                let fileURL = containerURL.appendingPathComponent("\(pendingOverrideKeyPrefix)\(id).json")
+                try? encoded.write(to: fileURL, options: .atomic)
+            }
+        }
+
+        guard let defaults else { return }
 
         for (id, correction) in newCorrections {
             guard let encoded = try? JSONSerialization.data(withJSONObject: correction) else { continue }

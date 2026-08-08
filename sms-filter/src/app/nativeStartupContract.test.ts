@@ -48,6 +48,11 @@ test('uygulama indeks dışında kalan bekleyen gönderici kayıtlarını da bul
   assert.match(managerSource, /pendingKeysToRemove\.forEach/);
   assert.match(appleTargetsPatch, /dictionaryRepresentation\(\)/);
   assert.match(appleTargetsPatch, /getKeys/);
+  assert.match(managerSource, /getFiles\(/);
+  assert.match(managerSource, /removeFile\(/);
+  assert.match(appleTargetsPatch, /containerURL\([\s\S]*forSecurityApplicationGroupIdentifier:/);
+  assert.match(appleTargetsPatch, /Function\("getFiles"\)/);
+  assert.match(appleTargetsPatch, /Function\("removeFile"\)/);
 });
 
 test('uygulama dayanikli bekleyen kuyrugu ice aktarir ve yeni secimi otomatik acar', () => {
@@ -81,4 +86,19 @@ test('native kopru hatasi guncel gorunumu gibi sessizce gosterilmez', () => {
   assert.match(managerSource, /getNativeImportWarning/);
   assert.match(managerSource, /nativeImportWarning\s*=/);
   assert.match(reportsSource, /FilterManager\.getNativeImportWarning\(\)/);
+});
+
+test('iOS göndereni aktaramazsa rapor ekranı kullanıcıdan göndereni tamamlamasını ister', () => {
+  const managerSource = readFileSync(
+    resolve(projectRoot, 'src/modules/FilterManager.ts'),
+    'utf8',
+  );
+  const reportsSource = readFileSync(
+    resolve(projectRoot, 'src/screens/ReportsScreen.tsx'),
+    'utf8',
+  );
+
+  assert.match(managerSource, /confirmPendingSenderCorrection\([\s\S]*senderInput/);
+  assert.match(reportsSource, /pendingSenderInputs/);
+  assert.match(reportsSource, /Gönderen bilgisi iOS tarafından aktarılmadı/);
 });

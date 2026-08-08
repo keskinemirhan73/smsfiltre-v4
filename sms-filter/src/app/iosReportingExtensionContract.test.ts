@@ -134,4 +134,7 @@ test('kategori dokunusu Bitti akisindan bagimsiz olarak dayanikli bekleyen kuyru
     responseBody,
     /persistPendingSenderCorrections\(from:/,
   );
+  assert.match(source, /containerURL\([\s\S]*forSecurityApplicationGroupIdentifier:/);
+  assert.match(source, /\.write\(to:\s*fileURL,\s*options:\s*\.atomic\)/);
+  assert.match(source, /NSNull\(\)/);
 });
