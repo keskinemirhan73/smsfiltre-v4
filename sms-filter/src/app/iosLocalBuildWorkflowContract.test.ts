@@ -33,6 +33,7 @@ test('workflow verifies the native bridge, report destination, and App Group bef
     (workflow.match(/smsfilter_pending_sender_override_queue_json/g) ?? []).length,
     2,
   );
+  assert.match(workflow, /strings "\$app\/main\.jsbundle" \| grep -F "getFiles"/);
   assert.match(workflow, /group\.com\.filtreai\.app/);
   assert.match(workflow, /actions\/upload-artifact@v4/);
   assert.match(workflow, /Submit to App Store Connect[\s\S]*if:\s*github\.ref == ['"]refs\/heads\/main['"]/);
